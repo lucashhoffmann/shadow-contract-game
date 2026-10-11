@@ -1,0 +1,77 @@
+import { ROOM_H, ROOM_W } from '@/app/modules/world/constants/world.constants';
+import type { Vec2, World } from '@/app/modules/world/types/world.types';
+import { angleTo, clamp, distance } from '@/shared/utils/math.util';
+
+const RAY_STEP = 0.1;
+
+// fora das salas vivas tudo e parede
+export function tileAt(world: World, tx: number, ty: number): string {
+  if (tx < 0 || tx >= ROOM_W) return '#';
+  const index = Math.floor(ty / ROOM_H);
+  const room = world.rooms.find((r) => r.index === index);
+  if (!room) return '#';
+  return room.tiles[ROOM_H - 1 - (ty - index * ROOM_H)][tx];
+}
+
+export function isWall(world: World, x: number, y: number): boolean {
+  return tileAt(world, Math.floor(x), Math.floor(y)) === '#';
+}
+
+export function roomIndexAt(y: number): number {
+  return Math.floor(y / ROOM_H);
+}
+
+// (col, row) do template para o centro do tile em coordenadas de mundo
+export function tileCenter(roomIndex: number, col: number, row: number): Vec2 {
+  return { x: col + 0.5, y: roomIndex * ROOM_H + (ROOM_H - 1 - row) + 0.5 };
+}
+
+export function circleHitsWall(
+  world: World,
+  x: number,
+  y: number,
+  radius: number,
+): boolean {
+  for (let ty = Math.floor(y - radius); ty <= Math.floor(y + radius); ty++) {
+    for (let tx = Math.floor(x - radius); tx <= Math.floor(x + radius); tx++) {
+      if (tileAt(world, tx, ty) !== '#') continue;
+      const dx = x - clamp(x, tx, tx + 1);
+      const dy = y - clamp(y, ty, ty + 1);
+      if (dx * dx + dy * dy < radius * radius) return true;
+    }
+  }
+  return false;
+}
+
+// eixos separados: bater na parede em um eixo ainda desliza no outro
+export function moveCircle(
+  world: World,
+  pos: Vec2,
+  dx: number,
+  dy: number,
+  radius: number,
+): void {
+  if (!circleHitsWall(world, pos.x + dx, pos.y, radius)) pos.x += dx;
+  if (!circleHitsWall(world, pos.x, pos.y + dy, radius)) pos.y += dy;
+}
+
+// ponytail: marcha em passos de RAY_STEP em vez de DDA; erro maximo de 0.1
+// tile. Trocar por DDA se o numero de raios por frame crescer.
+export function castRay(
+  world: World,
+  from: Vec2,
+  angle: number,
+  maxDist: number,
+): number {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  for (let d = RAY_STEP; d < maxDist; d += RAY_STEP) {
+    if (isWall(world, from.x + cos * d, from.y + sin * d)) return d;
+  }
+  return maxDist;
+}
+
+export function hasLineOfSight(world: World, a: Vec2, b: Vec2): boolean {
+  const d = distance(a, b);
+  return castRay(world, a, angleTo(a, b), d) >= d;
+}
