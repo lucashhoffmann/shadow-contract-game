@@ -1,13 +1,17 @@
 import * as THREE from 'three';
 
-import { katanaBlade } from '@/app/engine/renderers/character.renderer';
+import {
+  type Character,
+  katanaBlade,
+} from '@/app/engine/renderers/character.renderer';
 import type { WeaponId } from '@/app/modules/world/types/world.types';
 
 // Modelos das armas: low-poly de cor chapada, sem contorno.
 // Cano em +x, y para cima, espessura em z, simetrico em z.
 // Os perfis foram tracados sobre as imagens de referencia: cada `Trace`
 // converte pixel da imagem em unidade do modelo.
-// Hoje so o preview do HUD usa (engine/weapon-preview.ts).
+// Usados no preview do HUD (engine/weapon-preview.ts) e na mao do player
+// (world.renderer.ts).
 
 export type WeaponModelId = WeaponId | 'sword';
 
@@ -375,6 +379,95 @@ export function createWeaponModel(id: WeaponModelId): WeaponModel {
     root,
     dispose() {
       for (const item of owned) item.dispose();
+    },
+  };
+}
+
+// Arma de fogo na mao de um personagem. Medidas em unidades do modelo:
+// `grip` e onde a mao segura, `muzzle` a boca do cano. `kick` e `flash`
+// escalam o recuo e o clarao de cada arma (world.renderer).
+export const GUNS: Record<
+  WeaponId,
+  {
+    scale: number;
+    grip: number[];
+    muzzle: number[];
+    kick: number;
+    flash: number;
+  }
+> = {
+  pistol: {
+    scale: 0.22,
+    grip: [0.3, -0.78],
+    muzzle: [PISTOL_MUZZLE_X, PISTOL_BORE_Y],
+    kick: 1,
+    flash: 1,
+  },
+  // silenciador segura o recuo e quase esconde o clarao
+  silenced: {
+    scale: 0.22,
+    grip: [0.3, -0.78],
+    muzzle: [PISTOL_MUZZLE_X + 1.43, PISTOL_BORE_Y],
+    kick: 0.75,
+    flash: 0.4,
+  },
+  shotgun: {
+    scale: 0.22,
+    grip: [-0.72, -0.44],
+    muzzle: [2.6, 0.12],
+    kick: 1.9,
+    flash: 1.7,
+  },
+};
+const GUN_IDS = Object.keys(GUNS) as WeaponId[];
+// braco direito estendido para frente, apontando a arma
+const GUN_AIM = Math.PI / 2 - 0.1;
+// altura da mao no braco
+export const HAND_Y = -0.3;
+
+export type HeldGuns = {
+  // suporte na mao direita; o recuo desloca ele ao longo do braco
+  mount: THREE.Group;
+  roots: Record<WeaponId, THREE.Group>;
+  // troca o que o personagem segura e a pose do braco; null = espada
+  hold: (id: WeaponId | null) => void;
+  dispose: () => void;
+};
+
+// Um modelo por arma preso a mao direita, todos escondidos ate `hold`. O
+// cano (+x do modelo) fica ao longo do braco. Jogo e preview usam o mesmo.
+// `size` escala as armas em torno da mao (look.weapon do player).
+export function createHeldGuns(character: Character, size = 1): HeldGuns {
+  const swordHold = character.hold;
+  const mount = new THREE.Group();
+  mount.position.y = HAND_Y;
+  mount.rotation.z = -Math.PI / 2;
+  mount.scale.setScalar(size);
+  character.arms[0].add(mount);
+  const models = GUN_IDS.map((id) => {
+    const model = createWeaponModel(id);
+    const { scale, grip } = GUNS[id];
+    model.root.scale.setScalar(scale);
+    model.root.position.set(-grip[0] * scale, -grip[1] * scale, 0);
+    model.root.visible = false;
+    mount.add(model.root);
+    return model;
+  });
+  const roots = Object.fromEntries(
+    GUN_IDS.map((id, i) => [id, models[i].root]),
+  ) as Record<WeaponId, THREE.Group>;
+  return {
+    mount,
+    roots,
+    hold(id) {
+      character.hold = id ? GUN_AIM : swordHold;
+      character.arms[0].rotation.z = character.hold ?? 0;
+      if (character.sword) character.sword.visible = !id;
+      for (const gun of GUN_IDS) roots[gun].visible = gun === id;
+    },
+    dispose() {
+      mount.removeFromParent();
+      for (const model of models) model.dispose();
     },
   };
 }

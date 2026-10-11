@@ -67,6 +67,7 @@ conhecida. Usar `createWorld(seed)` para testar geracao e integracao.
   do alcance, morte solta dinheiro, coleta soma
 - `shop`: compra cobra o preco de mercado, sem saldo nao compra, precos
   deterministicos por seed, oscilacao dentro da faixa, inflacao com teto,
-  recompra encarece, gatilho abre uma vez por sala
+  recompra encarece, bau abre e reabre com B so ao alcance, precos sorteados
+  so na primeira abertura
 - `world`: `stepWorld` integra tudo, congela em `intro`, `paused`, `shop` e
   `dead`, morte muda `status`

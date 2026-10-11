@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   type CharacterPreview,
   createCharacterPreview,
 } from '@/app/engine/character-preview';
+import type { WeaponId } from '@/app/modules/world/types/world.types';
 import { useGameStore } from '@/app/store/game-store/game.store';
 
 export function useCharacterPage() {
@@ -12,6 +13,8 @@ export function useCharacterPage() {
   const look = useGameStore((state) => state.look);
   const setLook = useGameStore((state) => state.setLook);
   const backToMenu = useGameStore((state) => state.backToMenu);
+  // so do preview: qual arma o personagem segura; null = espada
+  const [weapon, setWeapon] = useState<WeaponId | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -28,5 +31,9 @@ export function useCharacterPage() {
     previewRef.current?.setLook(look);
   }, [look]);
 
-  return { canvasRef, look, setLook, backToMenu };
+  useEffect(() => {
+    previewRef.current?.setWeapon(weapon);
+  }, [weapon]);
+
+  return { canvasRef, look, setLook, weapon, setWeapon, backToMenu };
 }

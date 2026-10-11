@@ -2,6 +2,7 @@ import {
   DEFAULT_LOOK,
   LOOK_SCALE,
   type PlayerLook,
+  WEAPON_SCALE,
 } from '@/app/store/game-store/game.store';
 import { Button } from '@/resources/components/ui/button';
 
@@ -17,9 +18,11 @@ const COLORS = [
 ] as const;
 
 const SIZES = [
-  ['head', 'Cabeca'],
-  ['legs', 'Pernas'],
-  ['hands', 'Maos'],
+  ['head', 'Cabeca', LOOK_SCALE],
+  ['legs', 'Pernas', LOOK_SCALE],
+  ['hands', 'Maos', LOOK_SCALE],
+  ['feet', 'Pes', LOOK_SCALE],
+  ['weapon', 'Arma', WEAPON_SCALE],
 ] as const;
 
 export function LookEditor({ look, onChange }: LookEditorProps) {
@@ -45,24 +48,30 @@ export function LookEditor({ look, onChange }: LookEditorProps) {
           </label>
         ))}
       </div>
-      {SIZES.map(([key, label]) => (
-        <label
+      {SIZES.map(([key, label, range]) => (
+        // numero fora do <label>: o nome acessivel do slider segue so o rotulo
+        <div
           key={key}
-          className='flex items-center justify-between gap-3'
+          className='flex items-center gap-2'
         >
-          {label}
-          <input
-            type='range'
-            min={LOOK_SCALE.min}
-            max={LOOK_SCALE.max}
-            step={0.05}
-            value={look[key]}
-            onChange={(event) =>
-              onChange({ [key]: Number(event.target.value) })
-            }
-            className='w-40'
-          />
-        </label>
+          <label className='flex flex-1 items-center justify-between gap-3'>
+            {label}
+            <input
+              type='range'
+              min={range.min}
+              max={range.max}
+              step={0.05}
+              value={look[key]}
+              onChange={(event) =>
+                onChange({ [key]: Number(event.target.value) })
+              }
+              className='w-32'
+            />
+          </label>
+          <output className='w-10 text-right font-bold tabular-nums'>
+            {Math.round(look[key] * 100)}%
+          </output>
+        </div>
       ))}
       <Button
         variant='outline'

@@ -1,4 +1,5 @@
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
+import { createEnemy } from '@/app/modules/enemy/systems/enemy.system';
 import {
   FIXED_DT,
   PLAYER_MAX_HP,
@@ -10,6 +11,7 @@ import {
   getWorld,
   LOOK_SCALE,
   useGameStore,
+  WEAPON_SCALE,
 } from '@/app/store/game-store/game.store';
 
 const IDLE = { moveX: 0, moveY: 0, dash: false };
@@ -28,6 +30,8 @@ beforeEach(() => {
     best: 0,
     look: DEFAULT_LOOK,
     bloodColor: DEFAULT_BLOOD_COLOR,
+    intelligence: {},
+    attackVariance: null,
   });
 });
 
@@ -163,6 +167,77 @@ describe('game store', () => {
     expect(store().bloodColor).toBe('#22aa44');
   });
 
+  it('salva os perfis de inteligencia em JSON e os reutiliza em outra run', () => {
+    play();
+    createEnemy(getWorld()!, 26, [{ x: 5.5, y: 5.5 }]);
+    store().tick(IDLE, FIXED_DT);
+
+    const profile = store().intelligence[6];
+    expect(profile).toBeDefined();
+    expect(profile.hearingThreshold).toBeGreaterThan(0.6);
+    expect(
+      JSON.parse(localStorage.getItem('shadow-contract')!).state
+        .intelligence[6],
+    ).toEqual(profile);
+
+    store().backToMenu();
+    store().startRun(2);
+    expect(getWorld()!.intelligence[6]).toEqual(profile);
+  });
+
+  it('salva a variacao de ataque em JSON e reutiliza a faixa', () => {
+    play();
+    const variance = getWorld()!.run.attackVariance;
+    expect(variance.min).toBeGreaterThanOrEqual(0.75);
+    expect(variance.max).toBeLessThanOrEqual(1.25);
+    expect(
+      JSON.parse(localStorage.getItem('shadow-contract')!).state.attackVariance,
+    ).toEqual(variance);
+
+    store().backToMenu();
+    store().startRun(2);
+    expect(getWorld()!.run.attackVariance).toEqual(variance);
+  });
+
+  it('descarta faixa de ataque invalida do localStorage', async () => {
+    localStorage.setItem(
+      'shadow-contract',
+      JSON.stringify({
+        state: { attackVariance: { min: -1, max: 99 } },
+        version: 0,
+      }),
+    );
+    await useGameStore.persist.rehydrate();
+    expect(store().attackVariance).toBeNull();
+  });
+
+  it('descarta perfis de inteligencia invalidos do localStorage', async () => {
+    localStorage.setItem(
+      'shadow-contract',
+      JSON.stringify({
+        state: {
+          intelligence: {
+            6: { hearing: 1.5, pursuit: 1.4, dash: 1.3 },
+            7: { hearing: 99, pursuit: 1, dash: 1 },
+            8: { hearing: 'alto', pursuit: 1, dash: 1 },
+            9: { hearing: 1.5, hearingThreshold: 2, pursuit: 1.4, dash: 1.3 },
+            10: {
+              hearing: 1.5,
+              hearingThreshold: null,
+              pursuit: 1.4,
+              dash: 1.3,
+            },
+          },
+        },
+        version: 0,
+      }),
+    );
+    await useGameStore.persist.rehydrate();
+    expect(store().intelligence).toEqual({
+      6: { hearing: 1.5, hearingThreshold: 1, pursuit: 1.4, dash: 1.3 },
+    });
+  });
+
   it('openCharacter abre a tela de personagem, onde setLook ainda vale', () => {
     store().openCharacter();
     store().setLook({ cloth: '#00ff00' });
@@ -182,4 +257,13 @@ describe('game store', () => {
     store().setLook({ cloth: '#00ff00' });
     expect(store().look.cloth).toBe(DEFAULT_LOOK.cloth);
   });
+});
+
+it('setLook aceita tamanho da arma dentro da faixa propria', () => {
+  const { setLook } = useGameStore.getState();
+  setLook({ weapon: 0.5 });
+  expect(useGameStore.getState().look.weapon).toBe(0.5);
+  setLook({ weapon: 0.1 });
+  expect(useGameStore.getState().look.weapon).toBe(WEAPON_SCALE.min);
+  setLook({ weapon: 1 });
 });

@@ -1,9 +1,11 @@
 import { Button } from '@/resources/components/ui/button';
+import { WeaponPicker } from '@/resources/pages/character/components/weapon-picker.component';
 import { LookEditor } from '@/resources/pages/character/components/look-editor.component';
 import { useCharacterPage } from '@/resources/pages/character/use-character.page';
 
 export function CharacterPage() {
-  const { canvasRef, look, setLook, backToMenu } = useCharacterPage();
+  const { canvasRef, look, setLook, weapon, setWeapon, backToMenu } =
+    useCharacterPage();
 
   return (
     <main className='flex h-full flex-col md:flex-row'>
@@ -21,6 +23,10 @@ export function CharacterPage() {
         <LookEditor
           look={look}
           onChange={setLook}
+        />
+        <WeaponPicker
+          weapon={weapon}
+          onChange={setWeapon}
         />
         <Button
           size='lg'

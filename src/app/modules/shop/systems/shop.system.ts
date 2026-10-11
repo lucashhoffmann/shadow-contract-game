@@ -62,11 +62,17 @@ export function buyItem(world: World, id: ItemId): boolean {
   const price = world.market.prices[id];
   world.run.money -= price;
   if (id === 'armor') {
+    const previousHp = world.player.hp;
     world.player.maxHp += ITEMS.armor.bonusHp;
     world.player.hp = world.player.maxHp;
+    world.run.stats.healthRecovered += world.player.hp - previousHp;
   } else {
     world.player.weapon = { id, ammo: ITEMS[id].ammo };
   }
+  world.run.events.push({
+    at: world.run.seconds,
+    text: `Comprou ${ITEMS[id].name} por $${price}.`,
+  });
   // objeto novo a cada mudanca: o store compara por referencia
   world.market = {
     ...world.market,
@@ -95,6 +101,10 @@ export function openChest(world: World): void {
     room.shopVisited = true;
     rollMarket(world);
     world.run.shops++;
+    world.run.events.push({
+      at: world.run.seconds,
+      text: `Loja ${world.run.shops} visitada.`,
+    });
   }
   world.status = 'shop';
 }

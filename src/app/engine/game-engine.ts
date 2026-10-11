@@ -48,6 +48,11 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   const input: InputState = { moveX: 0, moveY: 0, dash: false };
   const onKeyDown = (event: KeyboardEvent) => {
     keys.add(event.code);
+    // Ctrl agacha: sem isto Ctrl+S, Ctrl+D e Ctrl+A abririam coisas do
+    // navegador no meio do jogo. Ctrl+W (fechar aba) o navegador nao deixa
+    // bloquear; por isso C tambem agacha.
+    if (event.ctrlKey && getWorld()?.status === 'playing')
+      event.preventDefault();
     if (event.repeat) return;
     if (event.code === 'KeyP') useGameStore.getState().togglePause();
     if (event.code === 'Enter') useGameStore.getState().begin();
@@ -101,6 +106,8 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       axis(keys, ['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) +
       joystickInput.moveY;
     input.dash = keys.has('Space') || joystickInput.dash;
+    input.crouch =
+      keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyC');
 
     // passo fixo: a simulacao nao depende do fps
     const tick = useGameStore.getState().tick;
@@ -115,9 +122,11 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     if (!world) return;
     view.sync(world, now / 1000);
 
-    if (world.run.kills > kills || world.player.hp < hp) punch = 1;
+    // escudo absorvendo tambem conta como dano levado
+    const health = world.player.hp + world.player.shield;
+    if (world.run.kills > kills || health < hp) punch = 1;
     kills = world.run.kills;
-    hp = world.player.hp;
+    hp = health;
     punch = Math.max(0, punch - frameTime / PUNCH_TIME);
     camera.fov = CAMERA_FOV - PUNCH_ZOOM * punch;
     camera.updateProjectionMatrix();

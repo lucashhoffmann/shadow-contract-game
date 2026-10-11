@@ -16,8 +16,14 @@ const SHADOW_Y = 0.02;
 // bracos levemente abertos para fora
 export const ARM_OPEN = 0.25;
 // agachado: fracao da perna que o quadril desce, e a abertura que da isso
-const CROUCH_DROP = 0.45;
+const CROUCH_DROP = 0.6;
 const CROUCH_SPREAD = Math.acos(1 - CROUCH_DROP);
+// agachado o tronco dobra na cintura: gira para frente e encurta, e a cabeca
+// e os ombros descem e avancam junto
+const CROUCH_FOLD = 0.55;
+const CROUCH_SQUASH = 0.25;
+const CROUCH_HEAD = [0.16, -0.22];
+const CROUCH_SHOULDER = [0.1, -0.13];
 const OUTLINE = 0.025;
 // [direita, esquerda] em z local
 export const SIDES = [1, -1];
@@ -48,6 +54,10 @@ export type Character = {
   // perna maior ergue o corpo para o pe continuar no chao
   lift: number;
   head: THREE.Group;
+  // altura da cabeca em pe
+  headY: number;
+  // pecas do tronco, com origem no centro dele: dobra ao agachar
+  trunk: THREE.Group;
   shadow: THREE.Mesh;
   // pivos no quadril e no ombro, na ordem de SIDES
   legs: THREE.Group[];
@@ -116,7 +126,11 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     torso: new THREE.CapsuleGeometry(0.2, 0.16, 4, 12).scale(0.85, 1, 1.15),
     head: new THREE.SphereGeometry(0.3, 18, 14),
     leg: new THREE.CapsuleGeometry(0.085, 0.14, 4, 8),
-    foot: new THREE.BoxGeometry(0.2, 0.08, 0.13),
+    // sapato arredondado: capsula deitada ao longo de x e achatada, nas
+    // mesmas medidas da caixa antiga (0.2 x 0.08 x 0.13)
+    foot: new THREE.CapsuleGeometry(0.065, 0.07, 6, 14)
+      .rotateZ(Math.PI / 2)
+      .scale(1, 0.62, 1),
     arm: new THREE.CapsuleGeometry(0.075, 0.18, 4, 8),
     hand: new THREE.SphereGeometry(0.085, 10, 8),
     band: new THREE.TorusGeometry(0.287, 0.035, 8, 24).rotateX(Math.PI / 2),
@@ -228,7 +242,10 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
   function make(kind: CharacterKind): Character {
     const cloth = CLOTH[kind];
     // so o player e configuravel
-    const scale = kind === 'player' ? look : { head: 1, legs: 1, hands: 1 };
+    const scale =
+      kind === 'player'
+        ? look
+        : { head: 1, legs: 1, hands: 1, feet: 1, weapon: 1 };
     const lift = HIP_Y * (scale.legs - 1);
     const root = new THREE.Group();
     const lean = new THREE.Group();
@@ -238,7 +255,11 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     // cresce para cima: o queixo quase nao sai do lugar
     head.position.y = HEAD_Y + (scale.head - 1) * 0.25;
     head.scale.setScalar(scale.head);
-    addParts(body, PARTS[kind].body, mat.outline);
+    const trunk = new THREE.Group();
+    trunk.position.y = TORSO_Y;
+    addParts(trunk, PARTS[kind].body, mat.outline);
+    for (const part of trunk.children) part.position.y -= TORSO_Y;
+    body.add(trunk);
     addParts(head, PARTS[kind].head, mat.outline);
     const shadow = new THREE.Mesh(geo.shadow, mat.shadow);
     shadow.rotation.x = -Math.PI / 2;
@@ -257,7 +278,16 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     const legs = SIDES.map((side) => {
       const pivot = limb(HIP_Y, side * 0.11, [
         [geo.leg, cloth, 0, -0.155, 0],
-        [geo.foot, mat.dark, 0.05, -0.3, 0],
+        // cresce a partir do calcanhar e da sola: nao afunda no chao
+        [
+          geo.foot,
+          mat.dark,
+          -0.05 + 0.1 * scale.feet,
+          -0.34 + 0.04 * scale.feet,
+          0,
+          0,
+          scale.feet,
+        ],
       ]);
       pivot.scale.setScalar(scale.legs);
       return pivot;
@@ -284,6 +314,7 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
       sword = new THREE.Group();
       sword.position.set(0, -0.3, 0);
       sword.rotation.set(0, SWORD_REST_TURN, SWORD_REST_TILT);
+      sword.scale.setScalar(scale.weapon);
       addParts(sword, katanaInHand, mat.outline);
       arms[0].add(sword);
     }
@@ -293,6 +324,8 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
       body,
       lift,
       head,
+      headY: head.position.y,
+      trunk,
       shadow,
       legs,
       arms,
@@ -345,8 +378,8 @@ export function poseAttack(character: Character, remaining: number): void {
   }
 }
 
-// Agachado (cobertura, saida e queda do salto): quadril desce e as pernas
-// abrem em passo, uma a frente e outra atras. `stride` (-1..1) e a fase da
+// Agachado (cobertura, saida e queda do salto): quadril desce, o tronco
+// dobra para frente e as pernas abrem em passo, uma a frente e outra atras. `stride` (-1..1) e a fase da
 // passada. Devolve quanto o corpo desce.
 // ponytail: perna sem joelho; no meio da passada o pe afunda no chao, o que
 // nao aparece de cima. Dobrar joelho se a camera baixar.
@@ -355,8 +388,14 @@ export function poseCrouch(
   amount: number,
   stride: number,
 ): number {
-  const { legs, arms } = character;
+  const { legs, arms, head, trunk } = character;
+  trunk.rotation.z = -CROUCH_FOLD * amount;
+  trunk.scale.y = 1 - CROUCH_SQUASH * amount;
+  head.position.x = CROUCH_HEAD[0] * amount;
+  head.position.y = character.headY + CROUCH_HEAD[1] * amount;
   SIDES.forEach((side, i) => {
+    arms[i].position.x = CROUCH_SHOULDER[0] * amount;
+    arms[i].position.y = SHOULDER_Y + CROUCH_SHOULDER[1] * amount;
     legs[i].rotation.z +=
       (side * CROUCH_SPREAD * stride - legs[i].rotation.z) * amount;
   });
@@ -369,6 +408,8 @@ export function poseCrouch(
 // para frente (rotation.z = -PI/2); o tronco fica centrado na origem do root.
 export function poseDead(character: Character): void {
   const { lean, body, head, arms, legs, sword } = character;
+  // morreu agachado: desfaz a dobra do tronco
+  poseCrouch(character, 0, 0);
   lean.rotation.z = 0;
   lean.position.set(0, -TORSO_Y, 0);
   body.rotation.set(0, 0, 0);

@@ -6,6 +6,8 @@ export type InputState = {
   moveX: number;
   moveY: number;
   dash: boolean;
+  // segurando Ctrl ou C: anda agachado
+  crouch?: boolean;
   interact?: boolean;
   // pulso da tecla B: abre o bau ao alcance
   open?: boolean;
@@ -43,6 +45,15 @@ export type EnemyStats = {
 
 export type EnemyState = 'patrol' | 'suspicious' | 'alert' | 'dead';
 
+export type EnemyIntelligence = {
+  hearing: number;
+  hearingThreshold: number;
+  pursuit: number;
+  dash: number;
+};
+
+export type AttackVariance = { min: number; max: number };
+
 export type Enemy = {
   id: number;
   kind: EnemyKind;
@@ -62,6 +73,7 @@ export type Enemy = {
   attack: number;
   viewRange: number;
   detectTime: number;
+  intelligence: EnemyIntelligence;
   // segundos restantes do salto no ar
   dash: number;
   dashCooldown: number;
@@ -94,10 +106,15 @@ export type Prop = {
   broken: boolean;
 };
 
+// dinheiro, coracao (cura) ou escudo; os dois ultimos saem de caixa quebrada
+export type PickupKind = 'money' | 'heart' | 'shield';
+
 export type Pickup = {
   id: number;
+  kind: PickupKind;
   roomIndex: number;
   pos: Vec2;
+  // dinheiro, pontos de vida ou pontos de escudo, conforme `kind`
   value: number;
 };
 
@@ -128,17 +145,24 @@ export type Player = {
   facing: number;
   hp: number;
   maxHp: number;
+  // pontos que absorvem dano antes da vida; teto de SHIELD_MAX * maxHp
+  shield: number;
   attackCooldown: number;
   // segundos restantes do golpe de espada (so para animacao)
   slash: number;
+  // segundos restantes do recuo do ultimo tiro (so para animacao)
+  shot: number;
   // segundos restantes do bonus de velocidade apos uma morte
   adrenaline: number;
   // segundos restantes do salto no ar
   dash: number;
   // segundos ate poder saltar de novo
   dashCooldown: number;
-  // raio do barulho feito neste passo (andar, saltar); 0 = em silencio
+  // raio do barulho feito neste passo (parado, andando, saltando)
   noise: number;
+  // agachado neste passo: mais lento, menos barulho e so e ouvido ate o
+  // nivel branco
+  crouching: boolean;
   weapon: { id: WeaponId; ammo: number } | null;
 };
 
@@ -148,9 +172,34 @@ export type Run = {
   roomIndex: number;
   kills: number;
   shops: number;
+  seconds: number;
+  attackVariance: AttackVariance;
+  meleeMissChance: number;
+  nextMeleeChanceAt: number;
+  stats: {
+    meleeAttempts: number;
+    meleeHits: number;
+    damageDealt: number;
+    projectilesFired: number;
+    projectilesHit: number;
+    damageTaken: number;
+    damageBlocked: number;
+    healthRecovered: number;
+  };
+  events: { at: number; text: string }[];
 };
 
 export type WorldStatus = 'intro' | 'playing' | 'paused' | 'shop' | 'dead';
+
+// texto que sobe do ponto do golpe: dano causado, ou "Errou!". So visual
+export type Floater = {
+  id: number;
+  pos: Vec2;
+  // pontos de dano; 0 = errou
+  amount: number;
+  // segundos desde que apareceu; some em FLOATER_TIME
+  age: number;
+};
 
 export type World = {
   rngState: number;
@@ -161,7 +210,9 @@ export type World = {
   projectiles: Projectile[];
   props: Prop[];
   pickups: Pickup[];
+  floaters: Floater[];
   rooms: Room[];
   run: Run;
   market: Market;
+  intelligence: Record<number, EnemyIntelligence>;
 };

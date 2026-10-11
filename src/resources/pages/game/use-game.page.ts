@@ -27,12 +27,13 @@ export function useGamePage() {
   // fotos das armas para o HUD, tiradas uma vez por montagem
   const [previews] = useState(renderWeaponPreviews);
 
-  // conta golpes levados: vida caiu desde o ultimo render
-  const [damage, setDamage] = useState({ hp: hud.hp, hits: 0 });
-  if (hud.hp !== damage.hp) {
+  // conta golpes levados: vida ou escudo cairam desde o ultimo render
+  const health = hud.hp + hud.shield;
+  const [damage, setDamage] = useState({ hp: health, hits: 0 });
+  if (health !== damage.hp) {
     setDamage({
-      hp: hud.hp,
-      hits: damage.hits + (hud.hp < damage.hp ? 1 : 0),
+      hp: health,
+      hits: damage.hits + (health < damage.hp ? 1 : 0),
     });
   }
 

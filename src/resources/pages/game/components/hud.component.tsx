@@ -82,6 +82,9 @@ function WeaponCard({ hud, previews }: HudProps) {
 }
 
 export function Hud({ hud, previews }: HudProps) {
+  // escudo soma na barra: ela passa a medir vida maxima + escudo, com a
+  // parte do escudo em azul logo depois da vida
+  const capacity = hud.maxHp + hud.shield;
   return (
     <header className='pointer-events-none absolute inset-x-0 top-0 grid grid-cols-[1fr_auto_1fr] items-start gap-2 bg-gradient-to-b from-black/60 to-transparent p-4'>
       <div className='flex flex-col gap-2'>
@@ -92,14 +95,27 @@ export function Hud({ hud, previews }: HudProps) {
             aria-valuemin={0}
             aria-valuemax={hud.maxHp}
             aria-valuenow={hud.hp}
-            className='h-4 w-28 overflow-hidden rounded-full bg-black/50 sm:w-40'
+            className='flex h-4 w-28 overflow-hidden rounded-full bg-black/50 sm:w-40'
           >
             <div
               className='h-full bg-green-500 transition-[width]'
-              style={{ width: `${(hud.hp / hud.maxHp) * 100}%` }}
+              style={{ width: `${(hud.hp / capacity) * 100}%` }}
+            />
+            <div
+              data-testid='shield-bar'
+              className='h-full bg-sky-400 transition-[width]'
+              style={{ width: `${(hud.shield / capacity) * 100}%` }}
             />
           </div>
           <p className='text-sm font-black'>{hud.hp}</p>
+          {hud.shield > 0 && (
+            <p
+              aria-label='Escudo'
+              className='text-sm font-black text-sky-300'
+            >
+              +{hud.shield}
+            </p>
+          )}
         </div>
         <WeaponCard
           hud={hud}

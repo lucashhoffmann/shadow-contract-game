@@ -3,11 +3,14 @@ import { movePlayer } from '@/app/modules/player/systems/player.system';
 import {
   ADRENALINE_BOOST,
   ADRENALINE_TIME,
+  CROUCH_NOISE,
+  CROUCH_SPEED,
   DASH_COOLDOWN,
   DASH_SPEED,
   DASH_TIME,
   FIXED_DT,
   NOISE_DASH,
+  NOISE_IDLE,
   NOISE_WALK,
   PLAYER_RADIUS,
   PLAYER_SPEED,
@@ -111,15 +114,32 @@ describe('movePlayer', () => {
   });
 });
 
-it('faz barulho ao andar e mais ao saltar; parado fica em silencio', () => {
+it('faz barulho ao andar e mais ao saltar; parado so se ouve de perto', () => {
   const world = createArenaWorld();
   walk(world, 1, 0, FIXED_DT);
   expect(world.player.noise).toBe(NOISE_WALK);
   walk(world, 0.5, 0, FIXED_DT);
-  expect(world.player.noise).toBe(NOISE_WALK / 2);
+  expect(world.player.noise).toBe(NOISE_IDLE);
   movePlayer(world, { moveX: 0, moveY: 0, dash: true }, FIXED_DT);
   expect(world.player.noise).toBe(NOISE_DASH);
   world.player.dash = 0;
   walk(world, 0, 0, FIXED_DT);
-  expect(world.player.noise).toBe(0);
+  expect(world.player.noise).toBe(NOISE_IDLE);
+});
+
+it('agachado anda mais devagar e faz menos barulho; o salto levanta', () => {
+  const world = createArenaWorld();
+  const crouch = { moveX: 1, moveY: 0, dash: false, crouch: true };
+  const from = world.player.pos.x;
+  for (let i = 0; i < 60; i++) movePlayer(world, crouch, FIXED_DT);
+  expect(world.player.crouching).toBe(true);
+  expect(world.player.pos.x - from).toBeCloseTo(PLAYER_SPEED * CROUCH_SPEED, 5);
+  expect(world.player.noise).toBe(NOISE_WALK * CROUCH_NOISE);
+
+  movePlayer(world, { ...crouch, moveX: 0 }, FIXED_DT);
+  expect(world.player.noise).toBe(NOISE_IDLE * CROUCH_NOISE);
+
+  movePlayer(world, { ...crouch, dash: true }, FIXED_DT);
+  expect(world.player.crouching).toBe(false);
+  expect(world.player.noise).toBe(NOISE_DASH);
 });

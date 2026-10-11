@@ -75,6 +75,7 @@ export function spawnRoom(
       if (line[col] !== '$') continue;
       world.pickups.push({
         id: world.nextId++,
+        kind: 'money',
         roomIndex: index,
         pos: tileCenter(index, col, row),
         value: TILE_MONEY,
@@ -86,6 +87,12 @@ export function spawnRoom(
 // mantem vivas so as salas ao redor do player; o resto vira parede
 export function updateRooms(world: World): void {
   const current = roomIndexAt(world.player.pos.y);
+  if (current > world.run.roomIndex) {
+    world.run.events.push({
+      at: world.run.seconds,
+      text: `Sala ${current} alcancada.`,
+    });
+  }
   world.run.roomIndex = Math.max(world.run.roomIndex, current);
 
   let last = world.rooms[world.rooms.length - 1].index;

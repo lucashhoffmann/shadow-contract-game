@@ -2,6 +2,7 @@ import {
   FIXED_DT,
   KILL_MONEY,
 } from '@/app/modules/world/constants/world.constants';
+import { updateRooms } from '@/app/modules/level/systems/level.system';
 import {
   beginRun,
   createWorld,
@@ -67,8 +68,10 @@ describe('stepWorld', () => {
   it('player chega por tras, mata o inimigo e coleta o dinheiro', () => {
     const world = createArenaWorld();
     const enemy = addEnemy(world, 5.5, 8.5, Math.PI / 2);
+    updateRooms(world);
+    world.rngState = 1;
 
-    run(world, FORWARD, 3);
+    run(world, FORWARD, 1.6);
 
     expect(enemy.state).toBe('dead');
     expect(world.run.kills).toBe(1);
@@ -85,6 +88,7 @@ describe('stepWorld', () => {
 
     expect(world.status).toBe('dead');
     expect(world.player.hp).toBeLessThanOrEqual(0);
+    expect(world.run.events.at(-1)?.text).toContain('Contrato encerrado');
   });
 
   it('congela fora de playing', () => {

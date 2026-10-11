@@ -13,8 +13,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     spread: 0,
     bonusHp: 0,
   },
-  // ponytail: mesmos numeros da pistola, so o modelo muda; dar efeito ao
-  // silenciador quando existir regra de barulho
+  // mesmos numeros da pistola; o tiro nao chama inimigos (combat.system)
   silenced: {
     id: 'silenced',
     name: 'Pistola silenciada',

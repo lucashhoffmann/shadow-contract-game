@@ -58,6 +58,11 @@ it('agachado abre as pernas em passo e desce o corpo', () => {
   const character = kit.make('suit');
   expect(poseCrouch(character, 0, -1)).toBe(0);
   expect(poseCrouch(character, 1, -1)).toBeGreaterThan(0.1);
+  // tronco dobra e encurta; cabeca desce e avanca
+  expect(character.trunk.rotation.z).toBeLessThan(-0.3);
+  expect(character.trunk.scale.y).toBeLessThan(1);
+  expect(character.head.position.y).toBeLessThan(character.headY);
+  expect(character.head.position.x).toBeGreaterThan(0);
   // parado: perna esquerda a frente, direita atras
   expect(character.legs[1].rotation.z).toBeGreaterThan(0.5);
   expect(character.legs[0].rotation.z).toBeLessThan(-0.5);

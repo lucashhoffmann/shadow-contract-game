@@ -131,7 +131,8 @@ export function ShopDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className='border-4 border-white/80 bg-[#16345c] sm:max-w-2xl'
+        // entra com atraso: da tempo de ver a tampa do bau abrir
+        className='fill-mode-backwards border-4 border-white/80 bg-[#16345c] delay-500 sm:max-w-2xl'
       >
         <DialogHeader className='items-center sm:text-center'>
           <DialogTitle className='-mt-11 rounded-full border-4 border-white bg-[#1f4f8f] px-5 py-2 text-base font-black tracking-wide text-white uppercase shadow-lg'>

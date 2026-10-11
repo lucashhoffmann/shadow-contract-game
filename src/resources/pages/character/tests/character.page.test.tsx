@@ -5,16 +5,18 @@ import { DEFAULT_LOOK, useGameStore } from '@/app/store/game-store/game.store';
 import { CharacterPage } from '@/resources/pages/character/character.page';
 
 // jsdom nao tem WebGL
-const { setLook, dispose } = vi.hoisted(() => ({
+const { setLook, setWeapon, dispose } = vi.hoisted(() => ({
   setLook: vi.fn(),
+  setWeapon: vi.fn(),
   dispose: vi.fn(),
 }));
 vi.mock('@/app/engine/character-preview', () => ({
-  createCharacterPreview: vi.fn(() => ({ setLook, dispose })),
+  createCharacterPreview: vi.fn(() => ({ setLook, setWeapon, dispose })),
 }));
 
 beforeEach(() => {
   setLook.mockClear();
+  setWeapon.mockClear();
   dispose.mockClear();
   useGameStore.getState().backToMenu();
   useGameStore.getState().openCharacter();
@@ -39,6 +41,45 @@ describe('CharacterPage', () => {
     const look = { ...DEFAULT_LOOK, cloth: '#00ff00', head: 1.3 };
     expect(useGameStore.getState().look).toEqual(look);
     expect(setLook).toHaveBeenLastCalledWith(look);
+  });
+
+  it('mostra o valor de cada tamanho em porcentagem ao lado do slider', () => {
+    useGameStore.setState({ look: { ...DEFAULT_LOOK, head: 1.25 } });
+    render(<CharacterPage />);
+    expect(screen.getByText('125%')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Cabeca'), {
+      target: { value: '0.8' },
+    });
+    expect(screen.getByText('80%')).toBeInTheDocument();
+  });
+
+  it('tamanho do pe grava no store e redesenha o preview', () => {
+    render(<CharacterPage />);
+    fireEvent.change(screen.getByLabelText('Pes'), {
+      target: { value: '1.3' },
+    });
+    expect(useGameStore.getState().look.feet).toBe(1.3);
+    expect(setLook).toHaveBeenLastCalledWith({ ...DEFAULT_LOOK, feet: 1.3 });
+  });
+
+  it('abre com a espada e troca a arma do preview pelo seletor', async () => {
+    render(<CharacterPage />);
+    expect(setWeapon).toHaveBeenLastCalledWith(null);
+    expect(screen.getByRole('button', { name: 'Espada' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Escopeta' }));
+    expect(setWeapon).toHaveBeenLastCalledWith('shotgun');
+    expect(screen.getByRole('button', { name: 'Escopeta' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Espada' }));
+    expect(setWeapon).toHaveBeenLastCalledWith(null);
   });
 
   it('Restaurar padrao desfaz a customizacao', async () => {

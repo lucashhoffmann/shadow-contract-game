@@ -5,6 +5,11 @@ import {
   type CharacterKit,
   createCharacterKit,
 } from '@/app/engine/renderers/character.renderer';
+import {
+  createHeldGuns,
+  type HeldGuns,
+} from '@/app/engine/renderers/weapon.renderer';
+import type { WeaponId } from '@/app/modules/world/types/world.types';
 import type { PlayerLook } from '@/app/store/game-store/game.store';
 
 // Preview do player na tela de personagem: arrastar gira, roda do mouse
@@ -12,6 +17,8 @@ import type { PlayerLook } from '@/app/store/game-store/game.store';
 
 export type CharacterPreview = {
   setLook: (look: PlayerLook) => void;
+  // o que o player segura no preview; null = espada
+  setWeapon: (id: WeaponId | null) => void;
   dispose: () => void;
 };
 
@@ -61,8 +68,11 @@ export function createCharacterPreview(
 
   let kit: CharacterKit | null = null;
   let root: THREE.Group | null = null;
+  let held: HeldGuns | null = null;
+  let weapon: WeaponId | null = null;
   const clear = () => {
     if (root) scene.remove(root);
+    held?.dispose();
     kit?.dispose();
   };
 
@@ -70,8 +80,17 @@ export function createCharacterPreview(
     setLook(look) {
       clear();
       kit = createCharacterKit(look);
-      root = kit.make('player').root;
+      const character = kit.make('player');
+      root = character.root;
+      // personagem novo a cada look: a arma escolhida vai junto
+      held = createHeldGuns(character, look.weapon);
+      held.hold(weapon);
       scene.add(root);
+      draw();
+    },
+    setWeapon(id) {
+      weapon = id;
+      held?.hold(id);
       draw();
     },
     dispose() {

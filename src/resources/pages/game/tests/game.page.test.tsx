@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 
 import { createGameEngine } from '@/app/engine/game-engine';
 import { createMarket } from '@/app/modules/shop/systems/shop.system';
+import { createArenaWorld } from '@/test/world.fixture';
 import type { Hud as HudData } from '@/app/store/game-store/game.store';
 import { useGameStore } from '@/app/store/game-store/game.store';
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
@@ -30,6 +31,7 @@ const PREVIEWS = {
 const HUD: HudData = {
   hp: 50,
   maxHp: 100,
+  shield: 0,
   money: 250,
   room: 3,
   kills: 2,
@@ -85,6 +87,28 @@ describe('Hud', () => {
     expect(screen.getByText('Espada')).toBeInTheDocument();
     expect(container.querySelector('img')).toHaveAttribute('src', 'data:sword');
     expect(screen.queryByLabelText(/Balas/)).not.toBeInTheDocument();
+  });
+
+  it('escudo soma na barra em azul, na proporcao de vida + escudo', () => {
+    const { rerender } = render(
+      <Hud
+        previews={PREVIEWS}
+        hud={{ ...HUD, hp: 100, maxHp: 100, shield: 25 }}
+      />,
+    );
+    const bar = screen.getByRole('progressbar', { name: 'Vida' });
+    expect(bar.firstElementChild).toHaveStyle({ width: '80%' });
+    expect(screen.getByTestId('shield-bar')).toHaveStyle({ width: '20%' });
+    expect(screen.getByLabelText('Escudo')).toHaveTextContent('+25');
+
+    rerender(
+      <Hud
+        previews={PREVIEWS}
+        hud={{ ...HUD, hp: 50, maxHp: 100, shield: 0 }}
+      />,
+    );
+    expect(bar.firstElementChild).toHaveStyle({ width: '50%' });
+    expect(screen.getByTestId('shield-bar')).toHaveStyle({ width: '0%' });
   });
 
   it('barra de contrato marca salas feitas, a atual e as que faltam', () => {
@@ -244,6 +268,7 @@ describe('GameOverDialog', () => {
         room={5}
         kills={7}
         best={8}
+        run={createArenaWorld().run}
         onRestart={onRestart}
         onMenu={onMenu}
       />,
@@ -259,6 +284,52 @@ describe('GameOverDialog', () => {
 
     expect(onRestart).toHaveBeenCalled();
     expect(onMenu).toHaveBeenCalled();
+  });
+
+  it('abre a análise com taxas, cura e registro da partida', async () => {
+    const run = createArenaWorld().run;
+    run.seconds = 65;
+    run.stats.meleeAttempts = 4;
+    run.stats.meleeHits = 3;
+    run.stats.projectilesFired = 5;
+    run.stats.projectilesHit = 2;
+    run.stats.healthRecovered = 20;
+    run.stats.damageDealt = 75;
+    run.attackVariance = { min: 0.8, max: 1.2 };
+    run.events.push({ at: 15, text: 'Facada errou.' });
+    run.events.push({ at: 16, text: 'Facada acertou: 35 de dano.' });
+    render(
+      <GameOverDialog
+        open
+        room={2}
+        kills={1}
+        best={2}
+        run={run}
+        onRestart={vi.fn()}
+        onMenu={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Ver análise do jogo' }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Análise do jogo' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Acertos: 3 (75%)')).toBeInTheDocument();
+    expect(screen.getByText('Erros: 1 (25%)')).toBeInTheDocument();
+    expect(screen.getByText('Acertos de tiro: 2 (40%)')).toBeInTheDocument();
+    expect(screen.getByText('Erros de tiro: 3 (60%)')).toBeInTheDocument();
+    expect(screen.getByText('Vida recuperada: 20')).toBeInTheDocument();
+    expect(screen.getByText('Força do ataque: 80%–120%')).toBeInTheDocument();
+    expect(screen.getByText('Dano causado: 75')).toBeInTheDocument();
+    expect(screen.getByText('Tempo: 1:05')).toBeInTheDocument();
+    expect(screen.getByText('Facada errou.')).toBeInTheDocument();
+    expect(screen.getByText('Facada acertou: 35 de dano.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Voltar' }));
+    expect(
+      screen.queryByRole('dialog', { name: 'Análise do jogo' }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -320,7 +391,9 @@ describe('GamePage', () => {
     expect(screen.getByText('Escolha o equipamento')).toBeInTheDocument();
 
     act(() => useGameStore.setState({ screen: 'gameover' }));
-    expect(screen.getByText('Contrato encerrado')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Contrato falhou!' }),
+    ).toBeInTheDocument();
   });
 });
 

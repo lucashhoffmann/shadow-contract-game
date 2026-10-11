@@ -17,21 +17,32 @@ import {
   tileAt,
   tileCenter,
 } from '@/app/modules/level/utils/grid.util';
+import {
+  createHeldGuns,
+  GUNS,
+  HAND_Y,
+} from '@/app/engine/renderers/weapon.renderer';
 import { nearbyChest } from '@/app/modules/shop/systems/shop.system';
 import {
   DASH_TIME,
+  FLOATER_TIME,
+  HEARING_YELLOW,
   ROOM_H,
   ROOM_W,
+  SHOP_EVERY,
+  SHOT_TIME,
   VIEW_HALF_ANGLE,
 } from '@/app/modules/world/constants/world.constants';
 import type {
   Enemy,
   EnemyKind,
   EnemyState,
+  PickupKind,
   Projectile,
   Prop,
   Room,
   Vec2,
+  WeaponId,
   World,
 } from '@/app/modules/world/types/world.types';
 import type { PlayerLook } from '@/app/store/game-store/game.store';
@@ -55,12 +66,20 @@ const SNAP_DISTANCE = 2;
 const JUMP_HEIGHT = 0.8;
 // altura do centro do tronco: o mergulho gira em volta dele, nao dos pes
 const FLIP_PIVOT_Y = 0.6;
-// no alto do salto o corpo fica quase deitado, bracos esticados a frente
+// no alto do salto o corpo fica quase deitado, em pose de corrida: uma perna
+// dobrada com o joelho a frente e a outra esticada atras; braco livre a
+// frente e o da arma recolhido atras. Angulos relativos ao tronco inclinado.
 const DIVE_TILT = 1.3;
-const DIVE_REACH = 2.8;
+// [direita, esquerda], na ordem de SIDES
+const DIVE_LEGS = [1.8, 0];
+const DIVE_ARMS = [-0.3, 1.9];
 // parede ou caixa a menos disso do centro: agacha em cobertura
 const COVER_DISTANCE = 0.75;
 const CROUCH_LEAN = 0.35;
+// marcador deitado para tras, de frente para a camera (ver game-engine)
+const MARKER_TILT = -1;
+// ouvido abaixo disso nao mostra a orelha: evita piscar a cada passo longe
+const HEARING_SHOWN = 0.1;
 // encostado: quanto o corpo recua ate a parede e sai de lado na quina
 const HUG_BACK = 0.14;
 const PEEK_SHIFT = 0.16;
@@ -73,6 +92,40 @@ const CARDINALS = [
 ];
 // altura do root deitado: a cabeca encosta no chao
 const DEAD_Y = 0.3;
+// recuo no pico: braco sobe, arma volta para o ombro, corpo vai para tras
+const RECOIL_RISE = 0.5;
+const RECOIL_BACK = 0.07;
+const RECOIL_PUSH = 0.05;
+// o clarao dura so o comeco do recuo
+const FLASH_TIME = 0.07;
+// numero de dano flutuante. A fonte vem do index.html (Google Fonts)
+const FLOATER_FONT = '76px Creepster';
+const FLOATER_CANVAS = [320, 120];
+// tamanho do texto no mundo, na mesma proporcao do canvas
+const FLOATER_SIZE = [2, 0.75];
+const FLOATER_Y = 1.7;
+const FLOATER_RISE = 0.8;
+// mini zoom: cresce ate FLOATER_POP nesse trecho inicial, depois assenta
+const FLOATER_POP = 1.45;
+const FLOATER_POP_END = 0.18;
+// cor pelo tamanho do golpe: forte em vermelho, medio em amarelo, fraco em
+// verde; erro em claro, para nao parecer acerto
+const FLOATER_STRONG = 30;
+const FLOATER_WEAK = 5;
+function floaterColor(amount: number): string {
+  if (amount <= 0) return '#f4f1e8';
+  if (amount < FLOATER_WEAK) return '#4be06a';
+  if (amount < FLOATER_STRONG) return '#ffd21f';
+  return '#ff2b2b';
+}
+// icone de interacao (F da caixa, B do bau)
+const LETTER_SIZE = 0.28;
+const KEY_BEVEL = 0.025;
+// deitado para a camera: em pe, visto de cima, a letra some
+const PROMPT_TILT = -0.9;
+const PROMPT_SCALE = 1.4;
+const PROMPT_HOP = 0.22;
+const PROMPT_PULSE = 0.09;
 // giro da tampa do bau aberta, em torno da dobradica
 const CHEST_OPEN = -1.9;
 const BLOOD_GROW_TIME = 2.5;
@@ -92,6 +145,8 @@ const MONEY = {
   // pulo: altura maxima do salto, em tiles
   hop: { height: 0.06, speed: 5 },
 };
+// coracao e escudo soltos por caixa: altura, vai-e-vem e giro
+const FLOAT = { height: 0.6, bob: 3, spin: 1.6 };
 // pilhas do dinheiro: x, z, quantas moedas
 const COIN_STACKS = [
   [0, 0.13, 8],
@@ -137,6 +192,9 @@ function coverAt(
 type EnemyView = Jumper & {
   marker: THREE.Group;
   markerParts: THREE.Mesh[];
+  // icones do marcador: exclamacao (viu) e orelha (ouviu)
+  alarm: THREE.Group;
+  ear: THREE.Group;
   cone: THREE.Mesh;
   blood: THREE.Mesh;
   deathAt: number | null;
@@ -146,6 +204,156 @@ export type WorldRenderer = {
   sync: (world: World, time: number) => void;
   dispose: () => void;
 };
+
+// perfis das letras do icone de interacao, em um quadrado de altura 1
+const LETTER_F = new THREE.Shape(
+  [
+    [0, 0],
+    [0, 1],
+    [0.62, 1],
+    [0.62, 0.8],
+    [0.22, 0.8],
+    [0.22, 0.6],
+    [0.52, 0.6],
+    [0.52, 0.41],
+    [0.22, 0.41],
+    [0.22, 0],
+  ].map(([x, y]) => new THREE.Vector2(x, y)),
+);
+const LETTER_B = new THREE.Shape()
+  .moveTo(0, 0)
+  .lineTo(0, 1)
+  .lineTo(0.38, 1)
+  .absarc(0.38, 0.75, 0.25, Math.PI / 2, -Math.PI / 2, true)
+  .absarc(0.38, 0.25, 0.25, Math.PI / 2, -Math.PI / 2, true)
+  .lineTo(0, 0);
+for (const y of [0.16, 0.6]) {
+  LETTER_B.holes.push(
+    new THREE.Path()
+      .moveTo(0.2, y)
+      .lineTo(0.2, y + 0.24)
+      .lineTo(0.36, y + 0.24)
+      .absarc(0.36, y + 0.12, 0.12, Math.PI / 2, -Math.PI / 2, true)
+      .lineTo(0.2, y),
+  );
+}
+
+// letra em relevo, centrada, com LETTER_SIZE de altura
+function letter(shape: THREE.Shape): THREE.BufferGeometry {
+  return new THREE.ExtrudeGeometry(shape, {
+    depth: 0.14,
+    bevelEnabled: false,
+    curveSegments: 6,
+  })
+    .center()
+    .scale(LETTER_SIZE, LETTER_SIZE, 0.3);
+}
+
+// placa quadrada de cantos redondos e quina chanfrada, de pe em z
+function keySlab(
+  size: number,
+  radius: number,
+  depth: number,
+): THREE.BufferGeometry {
+  const half = size / 2;
+  const inner = half - radius;
+  const shape = new THREE.Shape()
+    .absarc(inner, inner, radius, 0, Math.PI / 2, false)
+    .absarc(-inner, inner, radius, Math.PI / 2, Math.PI, false)
+    .absarc(-inner, -inner, radius, Math.PI, Math.PI * 1.5, false)
+    .absarc(inner, -inner, radius, Math.PI * 1.5, Math.PI * 2, false);
+  return new THREE.ExtrudeGeometry(shape, {
+    depth: depth - KEY_BEVEL,
+    bevelEnabled: true,
+    bevelSize: KEY_BEVEL,
+    bevelOffset: -KEY_BEVEL,
+    bevelThickness: KEY_BEVEL,
+    bevelSegments: 1,
+    curveSegments: 4,
+  });
+}
+
+// papel de parede: desenhos de WALLPAPER_SIZE px que se repetem lado a lado;
+// true = cor do desenho, false = cor de fundo
+const WALLPAPER_SIZE = 16;
+const WALLPAPERS: ((x: number, y: number) => boolean)[] = [
+  // listras
+  (x) => x % 8 < 3,
+  // bolinhas
+  (x, y) => ((x % 8) - 4) ** 2 + ((y % 8) - 4) ** 2 < 5,
+  // tijolos
+  (x, y) => y % 8 === 0 || (x + (Math.floor(y / 8) % 2) * 4) % 8 === 0,
+  // losangos
+  (x, y) => Math.abs((x % 8) - 4) + Math.abs((y % 8) - 4) < 3,
+  // ziguezague
+  (x, y) => (y + Math.abs((x % 8) - 4)) % 8 < 2,
+];
+// passo aureo: cada nivel cai num tom bem longe do anterior, sem repetir cedo
+const HUE_START = 0.65;
+const HUE_STEP = 0.618034;
+
+// parede de um nivel (contrato): tom e desenho proprios. So visual e fixo por
+// nivel, entao a mesma run mostra sempre a mesma sequencia.
+function wallpaper(level: number): {
+  material: THREE.Material;
+  texture: THREE.Texture;
+} {
+  const hue = (HUE_START + level * HUE_STEP) % 1;
+  const colors = [0.4, 0.52].map((light) =>
+    new THREE.Color().setHSL(hue, 0.5, light).convertLinearToSRGB(),
+  );
+  const draw = WALLPAPERS[level % WALLPAPERS.length];
+  const data = new Uint8Array(WALLPAPER_SIZE * WALLPAPER_SIZE * 4);
+  for (let y = 0; y < WALLPAPER_SIZE; y++) {
+    for (let x = 0; x < WALLPAPER_SIZE; x++) {
+      const { r, g, b } = colors[draw(x, y) ? 1 : 0];
+      data.set([r * 255, g * 255, b * 255, 255], (y * WALLPAPER_SIZE + x) * 4);
+    }
+  }
+  const texture = new THREE.DataTexture(data, WALLPAPER_SIZE, WALLPAPER_SIZE);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return { material: new THREE.MeshLambertMaterial({ map: texture }), texture };
+}
+
+// coracao gordinho de poucas faces: contorno extrudado com chanfro largo
+function heartGeometry(): THREE.BufferGeometry {
+  const outline = new THREE.Shape();
+  outline.moveTo(25, 25);
+  outline.bezierCurveTo(25, 25, 20, 0, 0, 0);
+  outline.bezierCurveTo(-30, 0, -30, 35, -30, 35);
+  outline.bezierCurveTo(-30, 55, -10, 77, 25, 95);
+  outline.bezierCurveTo(60, 77, 80, 55, 80, 35);
+  outline.bezierCurveTo(80, 35, 80, 0, 50, 0);
+  outline.bezierCurveTo(35, 0, 25, 25, 25, 25);
+  // o contorno nasce de ponta para cima: centra, vira e reduz
+  return new THREE.ExtrudeGeometry(outline, {
+    depth: 14,
+    curveSegments: 4,
+    bevelThickness: 16,
+    bevelSize: 12,
+    bevelSegments: 2,
+  })
+    .center()
+    .rotateZ(Math.PI)
+    .scale(0.004, 0.004, 0.004);
+}
+
+// escudo: topo com dois recortes e um bico no meio, lados fechando em ponta
+function shieldGeometry(): THREE.BufferGeometry {
+  const outline = new THREE.Shape();
+  outline.moveTo(-0.2, 0.24);
+  outline.quadraticCurveTo(-0.1, 0.15, 0, 0.23);
+  outline.quadraticCurveTo(0.1, 0.15, 0.2, 0.24);
+  outline.quadraticCurveTo(0.21, -0.1, 0, -0.3);
+  outline.quadraticCurveTo(-0.21, -0.1, -0.2, 0.24);
+  return new THREE.ExtrudeGeometry(outline, {
+    depth: 0.07,
+    curveSegments: 6,
+    bevelEnabled: false,
+  }).translate(0, 0, -0.035);
+}
 
 function lambert(color: number): THREE.Material {
   return new THREE.MeshLambertMaterial({ color });
@@ -189,6 +397,8 @@ export function createWorldRenderer(
     // moeda octogonal, base no y=0
     coin: new THREE.CylinderGeometry(0.1, 0.1, 0.032, 8).translate(0, 0.016, 0),
     aura: new THREE.SphereGeometry(0.45, 12, 8),
+    heart: heartGeometry(),
+    shield: shieldGeometry(),
     // municao ao longo de +x, ponta na frente
     bulletCase: new THREE.CylinderGeometry(0.05, 0.05, 0.17, 8)
       .rotateZ(-Math.PI / 2)
@@ -202,10 +412,34 @@ export function createWorldRenderer(
     shellBase: new THREE.CylinderGeometry(0.062, 0.062, 0.1, 8)
       .rotateZ(-Math.PI / 2)
       .translate(-0.11, 0, 0),
-    markerStem: new THREE.BoxGeometry(0.07, 0.24, 0.07),
-    markerDot: new THREE.SphereGeometry(0.075, 10, 10),
-    prompt: new THREE.BoxGeometry(1, 1, 0.08),
+    // exclamacao: haste que afina para baixo e ponto
+    markerStem: new THREE.CylinderGeometry(0.085, 0.04, 0.3, 12),
+    markerDot: new THREE.SphereGeometry(0.07, 12, 10),
+    // orelha vista de frente: aro de fora aberto embaixo a esquerda, dobra
+    // de dentro e lobulo
+    earOuter: new THREE.TorusGeometry(0.15, 0.04, 8, 20, Math.PI * 1.5).rotateZ(
+      -Math.PI / 2,
+    ),
+    earInner: new THREE.TorusGeometry(0.065, 0.03, 8, 12, Math.PI).rotateZ(
+      -Math.PI / 2,
+    ),
+    earLobe: new THREE.SphereGeometry(0.06, 10, 8),
+    // onda de som chegando pela esquerda
+    earWave: new THREE.TorusGeometry(0.3, 0.025, 6, 12, Math.PI / 2).rotateZ(
+      (Math.PI * 3) / 4,
+    ),
+    // tecla do icone de interacao: placa de contorno, corpo e topo
+    keyPlate: keySlab(0.6, 0.12, 0.04),
+    keyBody: keySlab(0.52, 0.1, 0.14),
+    keyTop: keySlab(0.42, 0.09, 0.08),
+    letterF: letter(LETTER_F),
+    letterB: letter(LETTER_B),
     box: new THREE.BoxGeometry(1, 1, 1),
+    // clarao do tiro: lingua de fogo com a base na boca do cano, para +x
+    flashTongue: new THREE.ConeGeometry(0.42, 1.6, 6)
+      .rotateZ(-Math.PI / 2)
+      .translate(0.8, 0, 0),
+    flashCore: new THREE.SphereGeometry(0.3, 8, 6),
     blood: new THREE.CircleGeometry(1, 16),
     crate: new THREE.BoxGeometry(0.78, 0.62, 0.78),
     plank: new THREE.BoxGeometry(0.34, 0.06, 0.2),
@@ -217,9 +451,24 @@ export function createWorldRenderer(
   };
   const mat = {
     floor: lambert(0x4a4f6a),
-    wall: lambert(0x8a8fb0),
     chestLight: lambert(0xdcb980),
     chestLock: lambert(0x9aa0aa),
+    flash: new THREE.MeshBasicMaterial({
+      color: 0xffc94a,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+    flashCore: flat(0xfff6d8),
+    heart: new THREE.MeshLambertMaterial({
+      color: 0xe8527a,
+      flatShading: true,
+    }),
+    shield: new THREE.MeshLambertMaterial({
+      color: 0xd9dce3,
+      flatShading: true,
+    }),
     coin: new THREE.MeshLambertMaterial({
       color: MONEY.color,
       flatShading: true,
@@ -233,7 +482,8 @@ export function createWorldRenderer(
     }),
     wood: lambert(0xa8703c),
     woodDark: lambert(0x6e4726),
-    prompt: flat(0xffe477),
+    prompt: lambert(0xffe066),
+    promptSide: lambert(0xd9931f),
     promptBorder: flat(0x1b1d3a),
     blood: new THREE.MeshBasicMaterial({
       color: bloodColor,
@@ -347,6 +597,48 @@ export function createWorldRenderer(
   const bullets = new Map<number, THREE.Group>();
   const removeMesh = (mesh: THREE.Object3D) => scene.remove(mesh);
 
+  // texto de dano: uma textura por texto ("+1", "Errou!"), um sprite por aviso
+  const floaterTextures = new Map<string, THREE.Texture>();
+  const floaters = new Map<number, THREE.Sprite>();
+  // a fonte pode chegar depois do primeiro numero: joga fora o que foi
+  // desenhado com a fonte reserva
+  void document.fonts?.load(FLOATER_FONT).then(() => {
+    for (const texture of floaterTextures.values()) texture.dispose();
+    floaterTextures.clear();
+  });
+
+  function floaterTexture(amount: number): THREE.Texture | null {
+    const text = amount > 0 ? `+${amount}` : 'Errou!';
+    const cached = floaterTextures.get(text);
+    if (cached) return cached;
+    const canvas = document.createElement('canvas');
+    [canvas.width, canvas.height] = FLOATER_CANVAS;
+    const context = canvas.getContext('2d');
+    // sem canvas 2D (jsdom) nao ha como desenhar texto
+    if (!context) return null;
+    context.font = FLOATER_FONT;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.lineJoin = 'round';
+    context.lineWidth = 12;
+    context.strokeStyle = '#1b0508';
+    context.fillStyle = floaterColor(amount);
+    const [x, y] = [canvas.width / 2, canvas.height / 2 + 4];
+    context.strokeText(text, x, y);
+    context.fillText(text, x, y);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    floaterTextures.set(text, texture);
+    return texture;
+  }
+
+  function removeFloater(sprite: THREE.Sprite) {
+    scene.remove(sprite);
+    sprite.material.dispose();
+  }
+
+  // parede de cada nivel ja visto, por indice do nivel
+  const wallpapers = new Map<number, ReturnType<typeof wallpaper>>();
   // tampa do bau de cada sala de loja, por indice da sala
   const chestLids = new Map<number, THREE.Group>();
 
@@ -377,11 +669,13 @@ export function createWorldRenderer(
     }
     part(group, mat.chestLight, [0.6, 0.18, 0.02], [0, 0.17, 0.3]);
     // tampa: origem na dobradica; forro claro por dentro e fecho na frente
-    part(lid, mat.woodDark, [0.84, 0.16, 0.64], [0, 0.08, 0.3]);
+    part(lid, mat.wood, [0.84, 0.16, 0.64], [0, 0.08, 0.3]);
+    part(lid, mat.chestLight, [0.64, 0.02, 0.44], [0, 0.165, 0.3]);
     part(lid, mat.chestLight, [0.64, 0.02, 0.44], [0, -0.005, 0.3]);
     part(lid, mat.chestLight, [0.6, 0.08, 0.02], [0, 0.09, 0.62]);
     part(lid, mat.chestLock, [0.12, 0.16, 0.05], [0, 0.03, 0.63]);
     group.add(lid);
+    group.scale.setScalar(1.15);
     return { group, lid };
   }
 
@@ -408,7 +702,18 @@ export function createWorldRenderer(
       chestLids.set(room.index, chest.lid);
     }
 
-    const instanced = new THREE.InstancedMesh(geo.wall, mat.wall, walls.length);
+    // um contrato = um nivel: SHOP_EVERY salas com a mesma parede
+    const level = Math.max(0, Math.floor((room.index - 1) / SHOP_EVERY));
+    let paper = wallpapers.get(level);
+    if (!paper) {
+      paper = wallpaper(level);
+      wallpapers.set(level, paper);
+    }
+    const instanced = new THREE.InstancedMesh(
+      geo.wall,
+      paper.material,
+      walls.length,
+    );
     const matrix = new THREE.Matrix4();
     walls.forEach((center, i) => {
       matrix.setPosition(center.x, WALL_HEIGHT / 2, -center.y);
@@ -449,9 +754,16 @@ export function createWorldRenderer(
     return group;
   }
 
-  // pilhas de moedas levemente tortas, com aura dourada em volta
-  function buildPickup(): THREE.Group {
+  // coracao ou escudo: uma peca so, flutuando; dinheiro: pilhas de moedas
+  // levemente tortas, com aura dourada em volta
+  function buildPickup(kind: PickupKind): THREE.Group {
     const group = new THREE.Group();
+    if (kind !== 'money') {
+      group.name = `${kind}Pickup`;
+      group.add(new THREE.Mesh(geo[kind], mat[kind]));
+      scene.add(group);
+      return group;
+    }
     COIN_STACKS.forEach(([x, z, count], s) => {
       for (let i = 0; i < count; i++) {
         const coin = new THREE.Mesh(geo.coin, mat.coin);
@@ -520,8 +832,9 @@ export function createWorldRenderer(
   }
 
   // `animate` mais o salto e a cobertura. Salto: sobe e desce em arco,
-  // mergulhando de frente em volta do tronco, bracos esticados e pernas
-  // soltas atras; sai e cai agachado. Perto de parede ou caixa: agacha.
+  // mergulhando de frente em volta do tronco, em pose de corrida (uma perna
+  // dobrada, braco livre a frente); sai e cai agachado. Perto de parede ou
+  // caixa: agacha.
   // Parado nela (`canHug`): encosta de costas, olhando para os lados; na
   // quina, sai de lado e espia para alem dela.
   // `dash` e o tempo que falta no ar. `lookAround`: cabeca passeia parado.
@@ -536,6 +849,7 @@ export function createWorldRenderer(
     maxLean: number,
     canHug: boolean,
     lookAround: boolean,
+    crouching = false,
   ) {
     const { character, wind } = jumper;
     const { lean, legs, arms } = character;
@@ -562,7 +876,8 @@ export function createWorldRenderer(
     const air = jumping ? 1 - dash / DASH_TIME : 0;
     const arc = Math.sin(Math.PI * air);
     const ease = Math.min(1, dt * 7);
-    jumper.crouch += ((jumping || wall ? 1 : 0) - jumper.crouch) * ease;
+    jumper.crouch +=
+      ((jumping || wall || crouching ? 1 : 0) - jumper.crouch) * ease;
     jumper.hug += ((hugging ? 1 : 0) - jumper.hug) * ease;
     const crouch = jumper.crouch * (1 - arc);
     // passada agachada segue a da corrida; parado, perna esquerda a frente
@@ -580,9 +895,9 @@ export function createWorldRenderer(
     lean.position.y +=
       (1 - Math.cos(jumper.flip)) * FLIP_PIVOT_Y + arc * JUMP_HEIGHT - drop;
     character.shadow.scale.setScalar(1 - arc * 0.35);
-    SIDES.forEach((side, i) => {
-      arms[i].rotation.z += (DIVE_REACH - arms[i].rotation.z) * arc;
-      legs[i].rotation.z += (-side * 0.45 - legs[i].rotation.z) * arc;
+    SIDES.forEach((_, i) => {
+      arms[i].rotation.z += (DIVE_ARMS[i] - arms[i].rotation.z) * arc;
+      legs[i].rotation.z += (DIVE_LEGS[i] - legs[i].rotation.z) * arc;
     });
     // vento cresce e some com o arco
     wind.visible = jumping;
@@ -610,13 +925,37 @@ export function createWorldRenderer(
   function buildEnemy(kind: EnemyKind): EnemyView {
     const jumper = makeJumper(kind);
     const { character } = jumper;
-    // exclamação sobre a cabeca: amarelo ao notar, vermelho em alerta
+    // sobre a cabeca, de frente para a camera. Exclamacao: amarela ao
+    // notar, vermelha em alerta. Orelha: branca ouvindo, amarela ao ouvir.
     const marker = new THREE.Group();
-    const stem = new THREE.Mesh(geo.markerStem, markerMat.patrol);
-    stem.position.y = 0.08;
-    const dot = new THREE.Mesh(geo.markerDot, markerMat.patrol);
-    dot.position.y = -0.12;
-    marker.add(stem, dot);
+    marker.rotation.order = 'YXZ';
+    const alarm = new THREE.Group();
+    alarm.name = 'alarmMarker';
+    const ear = new THREE.Group();
+    ear.name = 'earMarker';
+    const part = (
+      group: THREE.Group,
+      geometry: THREE.BufferGeometry,
+      x: number,
+      y: number,
+      scale = 1,
+    ) => {
+      const mesh = new THREE.Mesh(geometry, markerMat.patrol);
+      mesh.position.set(x, y, 0);
+      mesh.scale.setScalar(scale);
+      group.add(mesh);
+      return mesh;
+    };
+    const markerParts = [
+      part(alarm, geo.markerStem, 0, 0.1),
+      part(alarm, geo.markerDot, 0, -0.14),
+      part(ear, geo.earOuter, 0.06, 0.03),
+      part(ear, geo.earInner, 0.05, 0.02),
+      part(ear, geo.earLobe, 0.06, -0.13),
+      part(ear, geo.earWave, 0.06, 0.03),
+      part(ear, geo.earWave, 0.06, 0.03, 1.4),
+    ];
+    marker.add(alarm, ear);
     marker.position.y = 1.7;
     character.root.add(marker);
 
@@ -640,7 +979,9 @@ export function createWorldRenderer(
     return {
       ...jumper,
       marker,
-      markerParts: [stem, dot],
+      markerParts,
+      alarm,
+      ear,
       cone,
       blood,
       deathAt: null,
@@ -674,37 +1015,57 @@ export function createWorldRenderer(
 
   const hero = makeJumper('player');
   const player = hero.character;
-  // letra modelada com barras [x, y, largura, altura], amarela com contorno
-  function buildPrompt(name: string, bars: number[][]): THREE.Group {
+  // arma de fogo na mao direita (weapon.renderer)
+  const held = createHeldGuns(player, look.weapon);
+  // clarao: lingua central e duas menores abertas para os lados
+  const flash = new THREE.Group();
+  flash.visible = false;
+  for (const [turn, size] of [
+    [0, 1],
+    [0.9, 0.55],
+    [-0.9, 0.55],
+  ]) {
+    const tongue = new THREE.Mesh(geo.flashTongue, mat.flash);
+    tongue.rotation.y = turn;
+    tongue.scale.setScalar(size);
+    flash.add(tongue);
+  }
+  flash.add(new THREE.Mesh(geo.flashCore, mat.flashCore));
+  // ultima arma na mao: o ultimo tiro zera a municao e tira a arma do World,
+  // mas o recuo e o clarao dele ainda precisam do modelo
+  let lastGun: WeaponId | null = null;
+
+  // icone de interacao: tecla 3D amarela com a letra em relevo, deitada para
+  // a camera. `animatePrompt` faz pular e pulsar.
+  function buildPrompt(name: string, glyph: THREE.BufferGeometry): THREE.Group {
     const group = new THREE.Group();
     group.name = name;
     group.visible = false;
-    for (const [x, y, width, height] of bars) {
-      const border = new THREE.Mesh(geo.prompt, mat.promptBorder);
-      border.position.set(x, y, -0.05);
-      border.scale.set(width + 0.08, height + 0.08, 1);
-      const bar = new THREE.Mesh(geo.prompt, mat.prompt);
-      bar.position.set(x, y, 0.05);
-      bar.scale.set(width, height, 1);
-      group.add(border, bar);
+    group.rotation.x = PROMPT_TILT;
+    const layers: [THREE.BufferGeometry, THREE.Material, number][] = [
+      [geo.keyPlate, mat.promptBorder, -0.04],
+      [geo.keyBody, mat.promptSide, 0],
+      [geo.keyTop, mat.prompt, 0.14],
+      [glyph, mat.promptBorder, 0.22],
+    ];
+    for (const [geometry, material, z] of layers) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.z = z;
+      group.add(mesh);
     }
     return group;
   }
+  // pulo com quique no chao e pulso de tamanho, fora de fase com o pulo
+  function animatePrompt(icon: THREE.Group, baseY: number, time: number) {
+    icon.position.y = baseY + Math.abs(Math.sin(time * 4.5)) * PROMPT_HOP;
+    icon.scale.setScalar(
+      PROMPT_SCALE * (1 + Math.sin(time * 9) * PROMPT_PULSE),
+    );
+  }
   // F sobre a caixa ao alcance
-  const prompt = buildPrompt('interactionPrompt', [
-    [-0.11, 0, 0.07, 0.38],
-    [0, 0.155, 0.29, 0.07],
-    [-0.015, 0.02, 0.26, 0.07],
-  ]);
+  const prompt = buildPrompt('interactionPrompt', geo.letterF);
   // B sobre o bau ao alcance
-  const chestPrompt = buildPrompt('chestPrompt', [
-    [-0.11, 0, 0.07, 0.38],
-    [-0.02, 0.155, 0.2, 0.07],
-    [-0.02, 0, 0.2, 0.07],
-    [-0.02, -0.155, 0.2, 0.07],
-    [0.1, 0.078, 0.07, 0.12],
-    [0.1, -0.078, 0.07, 0.12],
-  ]);
+  const chestPrompt = buildPrompt('chestPrompt', geo.letterB);
   scene.add(chestPrompt);
   let lastTime = 0;
 
@@ -735,8 +1096,45 @@ export function createWorldRenderer(
       prompt.visible = !!prop;
       if (prop) {
         props.get(prop.id)?.group.add(prompt);
-        prompt.position.set(0, 1.03 + Math.sin(time * 5) * 0.06, 0);
+        prompt.position.set(0, 0, 0);
+        animatePrompt(prompt, 1.15, time);
       }
+
+      for (const floater of world.floaters) {
+        let sprite = floaters.get(floater.id);
+        if (!sprite) {
+          const map = floaterTexture(floater.amount);
+          if (!map) continue;
+          sprite = new THREE.Sprite(
+            new THREE.SpriteMaterial({
+              map,
+              transparent: true,
+              depthTest: false,
+            }),
+          );
+          sprite.renderOrder = 10;
+          scene.add(sprite);
+          floaters.set(floater.id, sprite);
+        }
+        const t = floater.age / FLOATER_TIME;
+        // estoura maior que o normal, assenta e some de leve, subindo
+        const pop =
+          t < FLOATER_POP_END
+            ? 0.5 + (t / FLOATER_POP_END) * (FLOATER_POP - 0.5)
+            : Math.max(1, FLOATER_POP - (t - FLOATER_POP_END) * 2.5);
+        sprite.scale.set(FLOATER_SIZE[0] * pop, FLOATER_SIZE[1] * pop, 1);
+        sprite.position.set(
+          floater.pos.x,
+          FLOATER_Y + t * FLOATER_RISE,
+          -floater.pos.y,
+        );
+        sprite.material.opacity = Math.min(1, (1 - t) * 2.2);
+      }
+      reconcile(
+        floaters,
+        new Set(world.floaters.map((f) => f.id)),
+        removeFloater,
+      );
 
       // bau: B flutua em cima quando da para abrir; a tampa abre com a loja
       const chestRoom =
@@ -745,11 +1143,8 @@ export function createWorldRenderer(
           : undefined;
       chestPrompt.visible = world.status === 'playing' && !!chestRoom?.chest;
       if (chestRoom?.chest) {
-        chestPrompt.position.set(
-          chestRoom.chest.x,
-          1.05 + Math.sin(time * 5) * 0.06,
-          -chestRoom.chest.y,
-        );
+        chestPrompt.position.set(chestRoom.chest.x, 0, -chestRoom.chest.y);
+        animatePrompt(chestPrompt, 1.3, time);
       }
       const opened = world.status === 'shop' ? chestRoom?.index : undefined;
       for (const [index, lid] of chestLids) {
@@ -758,6 +1153,14 @@ export function createWorldRenderer(
       }
 
       const lost = world.status === 'dead';
+      const shot = world.player.shot;
+      const gunId = lost
+        ? null
+        : (world.player.weapon?.id ?? (shot > 0 ? lastGun : null));
+      lastGun = gunId;
+      // encostado no inimigo o golpe e de espada, mesmo com arma de fogo
+      const armed = gunId !== null && world.player.slash <= 0;
+      held.hold(armed ? gunId : null);
       if (lost) {
         layDead(hero, world.player.pos, world.player.facing);
       } else {
@@ -772,10 +1175,32 @@ export function createWorldRenderer(
           world.player.adrenaline > 0 ? ADRENALINE_LEAN : RUN_LEAN,
           world.player.slash <= 0,
           true,
+          world.player.crouching,
         );
         poseAttack(player, world.player.slash);
       }
       player.shadow.visible = !lost;
+
+      flash.visible = false;
+      held.mount.position.y = HAND_Y;
+      if (armed) {
+        const { muzzle, kick, flash: flashSize } = GUNS[gunId];
+        // coice seco: forte no instante do tiro, some rapido
+        const recoil = (shot / SHOT_TIME) ** 2 * kick;
+        player.arms[0].rotation.z += recoil * RECOIL_RISE;
+        held.mount.position.y += recoil * RECOIL_BACK;
+        player.body.position.x -= recoil * RECOIL_PUSH;
+        if (shot > SHOT_TIME - FLASH_TIME) {
+          held.roots[gunId].add(flash);
+          flash.position.set(muzzle[0], muzzle[1], 0);
+          // tremula: tamanho e giro mudam a cada frame
+          flash.scale.setScalar(
+            flashSize * (0.8 + Math.abs(Math.sin(time * 90)) * 0.4),
+          );
+          flash.rotation.x = time * 40;
+          flash.visible = true;
+        }
+      }
 
       for (const enemy of world.enemies) {
         let view = enemies.get(enemy.id);
@@ -810,13 +1235,47 @@ export function createWorldRenderer(
           poseAttack(view.character, enemy.attack);
           updateCone(world, enemy, view.cone);
         }
+        // orelha: ouvido enchendo (cresce junto) ou indo atras do barulho.
+        // Ver o player troca pela exclamacao.
+        const listening =
+          enemy.state !== 'alert' &&
+          enemy.state !== 'dead' &&
+          enemy.detection === 0 &&
+          (enemy.heard !== null || enemy.hearing > HEARING_SHOWN);
+        const yellowHearing =
+          enemy.hearing >=
+            enemy.intelligence.hearingThreshold * HEARING_YELLOW ||
+          (enemy.heard !== null && enemy.hearing === 0);
+        const markerState = listening
+          ? yellowHearing
+            ? 'suspicious'
+            : 'patrol'
+          : enemy.state;
         for (const part of view.markerParts)
-          part.material = markerMat[enemy.state];
+          part.material = markerMat[markerState];
+        view.ear.visible = listening;
+        view.ear.scale.setScalar(
+          enemy.hearing
+            ? 0.5 +
+                0.5 *
+                  Math.min(
+                    1,
+                    enemy.hearing / enemy.intelligence.hearingThreshold,
+                  )
+            : 1,
+        );
+        view.alarm.visible = !listening;
         view.marker.visible =
-          enemy.state === 'suspicious' || enemy.state === 'alert';
+          listening || enemy.state === 'suspicious' || enemy.state === 'alert';
         view.marker.position.y =
           1.7 +
           Math.sin(time * 14 + enemy.id) * (view.marker.visible ? 0.04 : 0);
+        // o root gira com o inimigo; o marcador nao
+        view.marker.rotation.set(
+          MARKER_TILT,
+          -view.character.root.rotation.y,
+          0,
+        );
         view.cone.material = coneMat[enemy.state];
         view.cone.visible = !dead;
         view.blood.visible = dead;
@@ -827,9 +1286,19 @@ export function createWorldRenderer(
       for (const pickup of world.pickups) {
         let mesh = pickups.get(pickup.id);
         if (!mesh) {
-          mesh = buildPickup();
+          mesh = buildPickup(pickup.kind);
           mesh.rotation.y = pickup.id;
           pickups.set(pickup.id, mesh);
+        }
+        if (pickup.kind !== 'money') {
+          // flutua sobre os destrocos da caixa, girando devagar
+          mesh.position.set(
+            pickup.pos.x,
+            FLOAT.height + Math.sin(time * FLOAT.bob + pickup.id) * 0.08,
+            -pickup.pos.y,
+          );
+          mesh.rotation.y = time * FLOAT.spin + pickup.id;
+          continue;
         }
         const { pulse, hop } = MONEY;
         mesh.position.set(
@@ -867,7 +1336,14 @@ export function createWorldRenderer(
       scene.remove(player.root);
       prompt.removeFromParent();
       chestPrompt.removeFromParent();
+      held.dispose();
+      reconcile(floaters, new Set(), removeFloater);
+      for (const texture of floaterTextures.values()) texture.dispose();
       kit.dispose();
+      for (const paper of wallpapers.values()) {
+        paper.material.dispose();
+        paper.texture.dispose();
+      }
       for (const item of [
         ...Object.values(geo),
         ...Object.values(mat),

@@ -1,10 +1,17 @@
 import {
+  HEART_MAX,
+  HEART_MIN,
+  LOOT_HEART_CHANCE,
+  LOOT_SHIELD_CHANCE,
   MELEE_RANGE,
   ROOM_H,
   ROOM_W,
+  SHIELD_MAX,
+  SHIELD_MIN,
 } from '@/app/modules/world/constants/world.constants';
 import type { Prop, Vec2, World } from '@/app/modules/world/types/world.types';
 import { angleTo, clamp, distance } from '@/shared/utils/math.util';
+import { nextRandom } from '@/shared/utils/rng.util';
 
 const RAY_STEP = 0.1;
 
@@ -105,10 +112,30 @@ export function nearbyProp(world: World): Prop | undefined {
   return nearest;
 }
 
+// caixa quebrada as vezes solta coracao (cura pouca na maioria das vezes) ou
+// escudo; sorteio pelo `rngState`, entao reproduzivel por seed
+function dropLoot(world: World, prop: Prop): void {
+  const roll = nextRandom(world);
+  if (roll >= LOOT_HEART_CHANCE + LOOT_SHIELD_CHANCE) return;
+  const heart = roll < LOOT_HEART_CHANCE;
+  const amount = nextRandom(world);
+  const fraction = heart
+    ? HEART_MIN + (HEART_MAX - HEART_MIN) * amount * amount
+    : SHIELD_MIN + (SHIELD_MAX - SHIELD_MIN) * amount;
+  world.pickups.push({
+    id: world.nextId++,
+    kind: heart ? 'heart' : 'shield',
+    roomIndex: prop.roomIndex,
+    pos: { ...prop.pos },
+    value: Math.round(world.player.maxHp * fraction),
+  });
+}
+
 // quebrar libera o tile: a sala guarda a propria copia de `tiles`
 export function breakProp(world: World, prop: Prop): void {
   if (prop.broken) return;
   prop.broken = true;
+  dropLoot(world, prop);
   const tx = Math.floor(prop.pos.x);
   const ty = Math.floor(prop.pos.y);
   const room = roomAt(world, ty);

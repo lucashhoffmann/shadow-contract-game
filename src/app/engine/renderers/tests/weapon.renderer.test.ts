@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 
+import { createCharacterKit } from '@/app/engine/renderers/character.renderer';
 import {
+  createHeldGuns,
   createWeaponModel,
   PISTOL_BORE_Y,
   PISTOL_MUZZLE_X,
   type WeaponModelId,
 } from '@/app/engine/renderers/weapon.renderer';
+import { DEFAULT_LOOK } from '@/app/store/game-store/game.store';
 
 function bounds(id: WeaponModelId): THREE.Box3 {
   return new THREE.Box3().setFromObject(createWeaponModel(id).root);
@@ -43,4 +46,23 @@ describe('createWeaponModel', () => {
       expect(part.position.z).toBe(0);
     }
   });
+});
+
+it('createHeldGuns troca espada por arma na mao direita e volta', () => {
+  const character = createCharacterKit(DEFAULT_LOOK).make('player');
+  const swordArm = character.arms[0].rotation.z;
+  const held = createHeldGuns(character);
+  expect(held.mount.parent).toBe(character.arms[0]);
+
+  held.hold('shotgun');
+  expect(held.roots.shotgun.visible).toBe(true);
+  expect(held.roots.pistol.visible).toBe(false);
+  expect(character.sword?.visible).toBe(false);
+  // braco estendido para frente
+  expect(character.arms[0].rotation.z).toBeGreaterThan(1);
+
+  held.hold(null);
+  expect(held.roots.shotgun.visible).toBe(false);
+  expect(character.sword?.visible).toBe(true);
+  expect(character.arms[0].rotation.z).toBe(swordArm);
 });

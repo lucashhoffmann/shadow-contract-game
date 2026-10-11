@@ -1,10 +1,13 @@
 import { moveCircle } from '@/app/modules/level/utils/grid.util';
 import {
   ADRENALINE_BOOST,
+  CROUCH_NOISE,
+  CROUCH_SPEED,
   DASH_COOLDOWN,
   DASH_SPEED,
   DASH_TIME,
   NOISE_DASH,
+  NOISE_IDLE,
   NOISE_WALK,
   PLAYER_RADIUS,
   PLAYER_SPEED,
@@ -17,7 +20,9 @@ export function movePlayer(world: World, input: InputState, dt: number): void {
   const player = world.player;
   player.adrenaline = Math.max(0, player.adrenaline - dt);
   player.dashCooldown = Math.max(0, player.dashCooldown - dt);
-  player.noise = 0;
+  // salto levanta: so vale agachar com os pes no chao
+  player.crouching = false;
+  player.noise = NOISE_IDLE;
   const length = Math.hypot(input.moveX, input.moveY);
   if (input.dash && player.dashCooldown === 0) {
     player.dash = DASH_TIME;
@@ -41,12 +46,18 @@ export function movePlayer(world: World, input: InputState, dt: number): void {
     );
     return;
   }
+  player.crouching = !!input.crouch;
+  const quiet = player.crouching ? CROUCH_NOISE : 1;
+  player.noise *= quiet;
   if (length < DEAD_ZONE) return;
   // vetor maior que 1 (diagonal no teclado) e normalizado; menor (joystick
   // pela metade) anda mais devagar
   // joystick pela metade faz menos barulho
-  player.noise = NOISE_WALK * Math.min(1, length);
-  const speed = PLAYER_SPEED * (player.adrenaline > 0 ? ADRENALINE_BOOST : 1);
+  player.noise = Math.max(NOISE_IDLE, NOISE_WALK * Math.min(1, length)) * quiet;
+  const speed =
+    PLAYER_SPEED *
+    (player.adrenaline > 0 ? ADRENALINE_BOOST : 1) *
+    (player.crouching ? CROUCH_SPEED : 1);
   const scale = (speed * dt) / Math.max(1, length);
   moveCircle(
     world,

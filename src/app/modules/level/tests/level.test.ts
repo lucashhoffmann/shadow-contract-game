@@ -8,14 +8,20 @@ import {
   START_TEMPLATE,
 } from '@/app/modules/level/templates/room.template';
 import {
+  breakProp,
   breakPropAt,
   hasLineOfSight,
   tileCenter,
 } from '@/app/modules/level/utils/grid.util';
 import { findPath } from '@/app/modules/level/utils/pathfinding.util';
 import {
+  HEART_MAX,
+  HEART_MIN,
+  PLAYER_MAX_HP,
   ROOM_H,
   ROOM_W,
+  SHIELD_MAX,
+  SHIELD_MIN,
   SHOP_EVERY,
 } from '@/app/modules/world/constants/world.constants';
 import {
@@ -167,4 +173,33 @@ describe('grid e caminho', () => {
     const world = createArenaWorld({ 6: '###########' });
     expect(findPath(world, from, to)).toEqual([]);
   });
+});
+
+it('caixa quebrada as vezes solta coracao ou escudo, dentro das faixas', () => {
+  const world = createArenaWorld();
+  for (let i = 0; i < 400; i++) {
+    breakProp(world, {
+      id: i,
+      roomIndex: 0,
+      pos: { x: 5.5, y: 5.5 },
+      broken: false,
+    });
+  }
+  const values = (kind: string) =>
+    world.pickups.filter((p) => p.kind === kind).map((p) => p.value);
+  const hearts = values('heart');
+  const shields = values('shield');
+  // nem toda caixa da algo, e sai dos dois tipos
+  expect(world.pickups.length).toBeLessThan(300);
+  expect(hearts.length).toBeGreaterThan(40);
+  expect(shields.length).toBeGreaterThan(40);
+  expect(Math.min(...hearts)).toBeGreaterThanOrEqual(PLAYER_MAX_HP * HEART_MIN);
+  expect(Math.max(...hearts)).toBeLessThanOrEqual(PLAYER_MAX_HP * HEART_MAX);
+  expect(Math.min(...shields)).toBeGreaterThanOrEqual(
+    PLAYER_MAX_HP * SHIELD_MIN,
+  );
+  expect(Math.max(...shields)).toBeLessThanOrEqual(PLAYER_MAX_HP * SHIELD_MAX);
+  // cura pouca na maioria das vezes
+  const median = [...hearts].sort((a, b) => a - b)[hearts.length >> 1];
+  expect(median).toBeLessThan(PLAYER_MAX_HP * 0.3);
 });

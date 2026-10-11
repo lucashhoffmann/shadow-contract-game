@@ -113,7 +113,8 @@ src/resources/pages
 │   ├── character.page.tsx
 │   ├── use-character.page.ts            cria preview 3D, le store
 │   ├── components
-│   │   └── look-editor.component.tsx    cores e tamanhos do player
+│   │   ├── look-editor.component.tsx    cores e tamanhos do player
+│   │   └── weapon-picker.component.tsx  arma mostrada no preview
 │   └── tests
 └── game
     ├── game.page.tsx

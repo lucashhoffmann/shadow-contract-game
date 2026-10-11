@@ -1,5 +1,9 @@
-import { spawnProjectile } from '@/app/modules/combat/systems/combat.system';
 import {
+  damagePlayer,
+  spawnProjectile,
+} from '@/app/modules/combat/systems/combat.system';
+import {
+  circleHitsWall,
   hasLineOfSight,
   moveCircle,
 } from '@/app/modules/level/utils/grid.util';
@@ -26,10 +30,15 @@ import {
   HEAR_MAX_BONUS,
   HEAR_PER_ROOM,
   HEAR_TIME,
+  HEARING_YELLOW,
   NINJA_DAMAGE,
   NINJA_REACH,
   REPATH_INTERVAL,
   SEARCH_TIME,
+  SENSE_MAX_BONUS,
+  SENSE_PER_CONTRACT,
+  SENSE_RANGE,
+  SHOP_EVERY,
   SLASH_TIME,
   VIEW_HALF_ANGLE,
   VIEW_RANGE_MAX_BONUS,
@@ -47,6 +56,23 @@ import { nextRandom } from '@/shared/utils/rng.util';
 
 const NODE_REACH = 0.1;
 
+function intelligenceForRoom(world: World, roomIndex: number) {
+  const level = Math.max(1, Math.ceil(roomIndex / SHOP_EVERY));
+  const saved = world.intelligence[level];
+  if (saved) return saved;
+  const growth = 1 - 0.85 ** (level - 1);
+  const rng = { rngState: world.rngState ^ Math.imul(level, 0x9e3779b9) };
+  const roll = () => (level < 6 ? 1 : 1 + nextRandom(rng) * 0.1);
+  const intelligence = {
+    hearing: (1 + 0.7 * growth) * roll(),
+    hearingThreshold: (1 - 0.25 * growth) / roll(),
+    pursuit: (1 + 0.55 * growth) * roll(),
+    dash: (1 + 0.5 * growth) * roll(),
+  };
+  world.intelligence = { ...world.intelligence, [level]: intelligence };
+  return intelligence;
+}
+
 export function createEnemy(
   world: World,
   roomIndex: number,
@@ -54,6 +80,7 @@ export function createEnemy(
   kind: EnemyKind = 'suit',
 ): Enemy {
   const stats = ENEMY_KINDS[kind];
+  const intelligence = intelligenceForRoom(world, roomIndex);
   return {
     id: world.nextId++,
     kind,
@@ -77,6 +104,7 @@ export function createEnemy(
       DETECT_TIME_MIN,
       DETECT_TIME - roomIndex * DETECT_TIME_PER_ROOM,
     ),
+    intelligence,
     dash: 0,
     dashCooldown: 0,
     dashEvery:
@@ -86,17 +114,26 @@ export function createEnemy(
             ENEMY_DASH_MIN_INTERVAL,
             ENEMY_DASH_INTERVAL -
               (roomIndex - ENEMY_DASH_FROM_ROOM) * ENEMY_DASH_PER_ROOM,
-          ),
+          ) / intelligence.dash,
     hearing: 0,
     heard: null,
     searchTimer: 0,
   };
 }
 
+// raio em que o inimigo nota o player em qualquer direcao
+export function senseRange(enemy: Enemy): number {
+  const contract = Math.floor(enemy.roomIndex / SHOP_EVERY);
+  return SENSE_RANGE + Math.min(SENSE_MAX_BONUS, contract * SENSE_PER_CONTRACT);
+}
+
+// no cone ate `viewRange`, ou em qualquer direcao dentro de `senseRange`
 export function canSee(world: World, enemy: Enemy, target: Vec2): boolean {
-  if (distance(enemy.pos, target) > enemy.viewRange) return false;
+  const gap = distance(enemy.pos, target);
+  if (gap > enemy.viewRange) return false;
   const offset = angleDiff(angleTo(enemy.pos, target), enemy.facing);
-  if (Math.abs(offset) > VIEW_HALF_ANGLE) return false;
+  if (Math.abs(offset) > VIEW_HALF_ANGLE && gap > senseRange(enemy))
+    return false;
   return hasLineOfSight(world, enemy.pos, target);
 }
 
@@ -110,7 +147,9 @@ function navigate(
   enemy.repathTimer -= dt;
   if (enemy.repathTimer <= 0) {
     enemy.route = findPath(world, enemy.pos, target);
-    enemy.repathTimer = REPATH_INTERVAL;
+    enemy.repathTimer =
+      REPATH_INTERVAL /
+      (enemy.state === 'alert' ? enemy.intelligence.pursuit : 1);
   }
   const next = enemy.route[0];
   if (!next) return;
@@ -140,24 +179,40 @@ function patrol(world: World, enemy: Enemy, dt: number): void {
   navigate(world, enemy, target, ENEMY_KINDS[enemy.kind].patrolSpeed, dt);
 }
 
-// Barulho do player (andar, saltar) enche `hearing`, mais rapido quanto mais
-// perto; atravessa parede. Cheio, o inimigo guarda onde ouviu e vai la.
-function listen(world: World, enemy: Enemy, dt: number): void {
-  const range =
+function hearingRange(world: World, enemy: Enemy): number {
+  return (
     world.player.noise *
-    (1 + Math.min(HEAR_MAX_BONUS, enemy.roomIndex * HEAR_PER_ROOM));
+    (1 + Math.min(HEAR_MAX_BONUS, enemy.roomIndex * HEAR_PER_ROOM)) *
+    enemy.intelligence.hearing
+  );
+}
+
+// O primeiro som ja muda a rota; escuta acumulada leva ao alerta.
+function listen(world: World, enemy: Enemy, dt: number): boolean {
+  const range = hearingRange(world, enemy);
   const gap = distance(enemy.pos, world.player.pos);
   if (gap >= range) {
     enemy.hearing = Math.max(0, enemy.hearing - dt * DETECT_DECAY);
-    return;
+    return false;
   }
-  enemy.hearing += (dt * (1 - gap / range)) / HEAR_TIME;
-  if (enemy.hearing < 1) return;
-  enemy.hearing = 0;
+  // player agachado so e ouvido ate o nivel branco: nunca vira alerta
+  const limit = enemy.intelligence.hearingThreshold;
+  enemy.hearing = Math.min(
+    world.player.crouching ? limit * HEARING_YELLOW - 1e-3 : limit,
+    enemy.hearing +
+      (dt * (1 - gap / range) * enemy.intelligence.hearing) / HEAR_TIME,
+  );
+  const routedTo = enemy.route.at(-1);
+  if (
+    !enemy.heard ||
+    (routedTo && distance(routedTo, world.player.pos) >= 0.5)
+  ) {
+    enemy.route = [];
+    enemy.repathTimer = 0;
+  }
   enemy.heard = { ...world.player.pos };
-  enemy.searchTimer = SEARCH_TIME;
-  enemy.route = [];
-  enemy.repathTimer = 0;
+  enemy.searchTimer = SEARCH_TIME * enemy.intelligence.hearing;
+  return enemy.hearing >= limit;
 }
 
 // vai ate onde ouviu e espera la; acabou o tempo, volta a patrulha
@@ -177,7 +232,7 @@ function enterAlert(enemy: Enemy): void {
   enemy.state = 'alert';
   enemy.hearing = 0;
   enemy.heard = null;
-  enemy.alertTimer = ALERT_DURATION;
+  enemy.alertTimer = ALERT_DURATION * enemy.intelligence.pursuit;
   enemy.fireCooldown = FIRE_DELAY;
   // primeiro salto nao vem junto com o alerta
   enemy.dashCooldown = enemy.dashEvery / 2;
@@ -191,7 +246,11 @@ function alert(world: World, enemy: Enemy, dt: number): void {
   const player = world.player;
   const stats = ENEMY_KINDS[enemy.kind];
   const los = hasLineOfSight(world, enemy.pos, player.pos);
-  enemy.alertTimer = los ? ALERT_DURATION : enemy.alertTimer - dt;
+  const audible = distance(enemy.pos, player.pos) < hearingRange(world, enemy);
+  enemy.alertTimer =
+    los || audible
+      ? ALERT_DURATION * enemy.intelligence.pursuit
+      : enemy.alertTimer - dt;
   if (enemy.alertTimer <= 0) {
     enemy.state = 'patrol';
     enemy.detection = 0;
@@ -201,7 +260,8 @@ function alert(world: World, enemy: Enemy, dt: number): void {
   const reach = stats.ranged ? FIRE_RANGE : NINJA_REACH;
   const gap = distance(enemy.pos, player.pos);
   if (enemy.dash > 0) {
-    const step = DASH_SPEED * Math.min(dt, enemy.dash);
+    const step =
+      DASH_SPEED * enemy.intelligence.dash * Math.min(dt, enemy.dash);
     enemy.dash = Math.max(0, enemy.dash - dt);
     moveCircle(
       world,
@@ -225,17 +285,39 @@ function alert(world: World, enemy: Enemy, dt: number): void {
     los &&
     (gap > reach || stats.ranged)
   ) {
+    const toward = angleTo(enemy.pos, player.pos);
     const side = nextRandom(world) < 0.5 ? 1 : -1;
-    enemy.facing =
-      angleTo(enemy.pos, player.pos) + (gap > reach ? 0 : (side * Math.PI) / 2);
-    enemy.dash = DASH_TIME;
-    enemy.dashCooldown = enemy.dashEvery;
-    enemy.route = [];
-    enemy.repathTimer = 0;
-    return;
+    const angles =
+      gap > reach
+        ? [toward]
+        : [toward + (side * Math.PI) / 2, toward - (side * Math.PI) / 2];
+    const probe = DASH_SPEED * enemy.intelligence.dash * (DASH_TIME / 2);
+    const angle = angles.find(
+      (candidate) =>
+        !circleHitsWall(
+          world,
+          enemy.pos.x + Math.cos(candidate) * probe,
+          enemy.pos.y + Math.sin(candidate) * probe,
+          ENEMY_RADIUS,
+        ),
+    );
+    if (angle !== undefined) {
+      enemy.facing = angle;
+      enemy.dash = DASH_TIME;
+      enemy.dashCooldown = enemy.dashEvery;
+      enemy.route = [];
+      enemy.repathTimer = 0;
+      return;
+    }
   }
   if (!los || gap > reach) {
-    navigate(world, enemy, player.pos, stats.chaseSpeed, dt);
+    navigate(
+      world,
+      enemy,
+      player.pos,
+      stats.chaseSpeed * enemy.intelligence.pursuit,
+      dt,
+    );
     return;
   }
   enemy.facing = angleTo(enemy.pos, player.pos);
@@ -253,7 +335,7 @@ function alert(world: World, enemy: Enemy, dt: number): void {
       FIRE_RANGE,
     );
   } else {
-    player.hp -= NINJA_DAMAGE;
+    damagePlayer(world, NINJA_DAMAGE);
   }
   enemy.attack = SLASH_TIME;
 }
@@ -268,7 +350,11 @@ export function updateEnemies(world: World, dt: number): void {
       alert(world, enemy, dt);
       continue;
     }
-    listen(world, enemy, dt);
+    if (listen(world, enemy, dt)) {
+      enterAlert(enemy);
+      alert(world, enemy, dt);
+      continue;
+    }
     if (canSee(world, enemy, world.player.pos)) {
       enemy.detection = Math.min(1, enemy.detection + dt / enemy.detectTime);
       enemy.facing = angleTo(enemy.pos, world.player.pos);

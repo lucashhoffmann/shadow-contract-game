@@ -13,6 +13,8 @@ import {
   togglePause as toggleWorldPause,
 } from '@/app/modules/world/systems/world.system';
 import type {
+  AttackVariance,
+  EnemyIntelligence,
   InputState,
   ItemId,
   Market,
@@ -29,6 +31,7 @@ export type Screen =
 export type Hud = {
   hp: number;
   maxHp: number;
+  shield: number;
   money: number;
   room: number;
   kills: number;
@@ -44,9 +47,13 @@ export type PlayerLook = {
   head: number; // escalas, 1 = padrao
   legs: number;
   hands: number;
+  feet: number;
+  // espada e armas de fogo na mao; faixa propria (WEAPON_SCALE)
+  weapon: number;
 };
 
 export const LOOK_SCALE = { min: 0.7, max: 1.4 };
+export const WEAPON_SCALE = { min: 0.4, max: 1.4 };
 
 export const DEFAULT_LOOK: PlayerLook = {
   cloth: '#ff8a3c',
@@ -55,11 +62,56 @@ export const DEFAULT_LOOK: PlayerLook = {
   head: 1,
   legs: 1,
   hands: 1,
+  feet: 1,
+  weapon: 1,
 };
 
 export const DEFAULT_BLOOD_COLOR = '#a61020';
 
 const COLOR = /^#[0-9a-f]{6}$/i;
+
+function validIntelligence(saved: unknown): Record<number, EnemyIntelligence> {
+  const levels: Record<number, EnemyIntelligence> = {};
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved))
+    return levels;
+  for (const [key, value] of Object.entries(saved)) {
+    const level = Number(key);
+    if (!Number.isSafeInteger(level) || level < 1 || level > 1000) continue;
+    if (!value || typeof value !== 'object') continue;
+    const profile = value as Partial<EnemyIntelligence>;
+    const hearingThreshold =
+      profile.hearingThreshold === undefined ? 1 : profile.hearingThreshold;
+    if (
+      [profile.hearing, profile.pursuit, profile.dash].every(
+        (number) => typeof number === 'number' && number >= 1 && number <= 3,
+      ) &&
+      typeof hearingThreshold === 'number' &&
+      hearingThreshold >= 0.6 &&
+      hearingThreshold <= 1
+    ) {
+      levels[level] = {
+        hearing: profile.hearing!,
+        hearingThreshold,
+        pursuit: profile.pursuit!,
+        dash: profile.dash!,
+      };
+    }
+  }
+  return levels;
+}
+
+function validAttackVariance(saved: unknown): AttackVariance | null {
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null;
+  const { min, max } = saved as Partial<AttackVariance>;
+  return typeof min === 'number' &&
+    min >= 0.5 &&
+    min <= 1 &&
+    typeof max === 'number' &&
+    max >= 1 &&
+    max <= 1.5
+    ? { min, max }
+    : null;
+}
 
 // descarta cor invalida e prende escala na faixa
 function mergeLook(look: PlayerLook, patch: Partial<PlayerLook>): PlayerLook {
@@ -68,10 +120,11 @@ function mergeLook(look: PlayerLook, patch: Partial<PlayerLook>): PlayerLook {
     const value = patch[key];
     if (value && COLOR.test(value)) next[key] = value;
   }
-  for (const key of ['head', 'legs', 'hands'] as const) {
+  for (const key of ['head', 'legs', 'hands', 'feet', 'weapon'] as const) {
     const value = patch[key];
+    const range = key === 'weapon' ? WEAPON_SCALE : LOOK_SCALE;
     if (typeof value === 'number' && Number.isFinite(value)) {
-      next[key] = Math.min(LOOK_SCALE.max, Math.max(LOOK_SCALE.min, value));
+      next[key] = Math.min(range.max, Math.max(range.min, value));
     }
   }
   return next;
@@ -84,6 +137,8 @@ type GameStore = {
   best: number;
   look: PlayerLook;
   bloodColor: string;
+  intelligence: Record<number, EnemyIntelligence>;
+  attackVariance: AttackVariance | null;
   setLook: (patch: Partial<PlayerLook>) => void;
   setBloodColor: (color: string) => void;
   openCharacter: () => void;
@@ -99,6 +154,7 @@ type GameStore = {
 const EMPTY_HUD: Hud = {
   hp: 0,
   maxHp: 0,
+  shield: 0,
   money: 0,
   room: 0,
   kills: 0,
@@ -133,6 +189,7 @@ function readHud(w: World): Hud {
   return {
     hp: Math.max(0, w.player.hp),
     maxHp: w.player.maxHp,
+    shield: w.player.shield,
     money: w.run.money,
     room: w.run.roomIndex,
     kills: w.run.kills,
@@ -153,6 +210,8 @@ export const useGameStore = create<GameStore>()(
         const changed =
           screen !== prev.screen ||
           world.market !== prev.market ||
+          world.intelligence !== prev.intelligence ||
+          world.run.attackVariance !== prev.attackVariance ||
           (Object.keys(hud) as (keyof Hud)[]).some(
             (key) => hud[key] !== prev.hud[key],
           );
@@ -161,6 +220,8 @@ export const useGameStore = create<GameStore>()(
           hud,
           screen,
           market: world.market,
+          intelligence: world.intelligence,
+          attackVariance: world.run.attackVariance,
           best: Math.max(prev.best, hud.room),
         });
       };
@@ -172,6 +233,8 @@ export const useGameStore = create<GameStore>()(
         best: 0,
         look: DEFAULT_LOOK,
         bloodColor: DEFAULT_BLOOD_COLOR,
+        intelligence: {},
+        attackVariance: null,
         // so antes da run: a engine le `look` uma vez, ao criar o renderer
         setLook: (patch) => {
           if (world) return;
@@ -185,7 +248,7 @@ export const useGameStore = create<GameStore>()(
         },
         // toda run abre na legenda; `begin` solta a simulacao
         startRun: (seed = Date.now()) => {
-          world = createWorld(seed);
+          world = createWorld(seed, get().intelligence, get().attackVariance);
           world.status = 'intro';
           setJoystickInput(0, 0);
           sync();
@@ -225,10 +288,13 @@ export const useGameStore = create<GameStore>()(
         best: state.best,
         look: state.look,
         bloodColor: state.bloodColor,
+        intelligence: state.intelligence,
+        attackVariance: state.attackVariance,
       }),
       // valor salvo passa pela mesma validacao de `setLook`
       merge: (saved, current) => {
-        const { best, look, bloodColor } = (saved ?? {}) as Partial<GameStore>;
+        const { best, look, bloodColor, intelligence, attackVariance } =
+          (saved ?? {}) as Partial<GameStore>;
         return {
           ...current,
           best: best ?? current.best,
@@ -237,6 +303,8 @@ export const useGameStore = create<GameStore>()(
             typeof bloodColor === 'string' && COLOR.test(bloodColor)
               ? bloodColor
               : current.bloodColor,
+          intelligence: validIntelligence(intelligence),
+          attackVariance: validAttackVariance(attackVariance),
         };
       },
     },

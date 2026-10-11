@@ -26,6 +26,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --animate-damage: damage 0.7s ease-out;
+  --font-display: 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif;
 }
 
 /* dano: bate forte, pulsa uma vez e some */
@@ -86,4 +87,12 @@
     touch-action: none;
     user-select: none;
   }
+}
+
+/* letra gorda com contorno escuro grosso e sombra dura embaixo, estilo
+   titulo de jogo; o contorno fica atras do preenchimento */
+@utility text-outline {
+  -webkit-text-stroke: 0.22em #14141f;
+  paint-order: stroke fill;
+  text-shadow: 0 0.09em 0 #14141f;
 }

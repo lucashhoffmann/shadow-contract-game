@@ -1,4 +1,4 @@
-import { setJoystickInput } from '@/app/store/game-store/game.store';
+import { getWorld, setJoystickInput } from '@/app/store/game-store/game.store';
 import { VirtualJoystick } from '@/resources/components/base/virtual-joystick/virtual-joystick.component';
 import { DamageVignette } from '@/resources/pages/game/components/damage-vignette.component';
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
@@ -52,6 +52,7 @@ export function GamePage() {
         room={hud.room}
         kills={hud.kills}
         best={best}
+        run={getWorld()?.run ?? null}
         onRestart={restart}
         onMenu={backToMenu}
       />
