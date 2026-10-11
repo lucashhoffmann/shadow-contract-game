@@ -2,7 +2,12 @@
 
 export type Vec2 = { x: number; y: number };
 
-export type InputState = { moveX: number; moveY: number; dash: boolean };
+export type InputState = {
+  moveX: number;
+  moveY: number;
+  dash: boolean;
+  interact?: boolean;
+};
 
 export type RoomKind = 'start' | 'combat' | 'shop';
 
@@ -48,8 +53,15 @@ export type Enemy = {
   repathTimer: number;
   alertTimer: number;
   fireCooldown: number;
+  // segundos restantes da pose de ataque; nao altera dano nem alcance
+  attack: number;
   viewRange: number;
   detectTime: number;
+  // segundos restantes do salto no ar
+  dash: number;
+  dashCooldown: number;
+  // segundos entre saltos em alerta; 0 = nao salta
+  dashEvery: number;
 };
 
 export type Projectile = {

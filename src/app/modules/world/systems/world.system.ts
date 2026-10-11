@@ -8,14 +8,19 @@ import {
   spawnRoom,
   updateRooms,
 } from '@/app/modules/level/systems/level.system';
-import { tileCenter } from '@/app/modules/level/utils/grid.util';
+import { breakProp, nearbyProp, tileCenter } from '@/app/modules/level/utils/grid.util';
 import { movePlayer } from '@/app/modules/player/systems/player.system';
 import {
   createMarket,
   updateShopTrigger,
 } from '@/app/modules/shop/systems/shop.system';
-import { PLAYER_MAX_HP } from '@/app/modules/world/constants/world.constants';
+import {
+  ATTACK_COOLDOWN,
+  PLAYER_MAX_HP,
+  SLASH_TIME,
+} from '@/app/modules/world/constants/world.constants';
 import type { InputState, World } from '@/app/modules/world/types/world.types';
+import { angleTo } from '@/shared/utils/math.util';
 
 // mundo sem salas; usado pela fixture de teste para montar geometria propria
 export function createEmptyWorld(seed: number): World {
@@ -67,6 +72,13 @@ export function stepWorld(world: World, input: InputState, dt: number): void {
   movePlayer(world, input, dt);
   updateRooms(world);
   updateEnemies(world, dt);
+  const prop = input.interact && nearbyProp(world);
+  if (prop) {
+    world.player.facing = angleTo(world.player.pos, prop.pos);
+    world.player.slash = SLASH_TIME;
+    world.player.attackCooldown = ATTACK_COOLDOWN;
+    breakProp(world, prop);
+  }
   updateCombat(world, dt);
   updateProjectiles(world, dt);
   collectPickups(world);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { SLASH_TIME } from '@/app/modules/world/constants/world.constants';
 import type { EnemyKind, Vec2 } from '@/app/modules/world/types/world.types';
 import type { PlayerLook } from '@/app/store/game-store/game.store';
 
@@ -16,7 +17,7 @@ const OUTLINE = 0.025;
 export const SIDES = [1, -1];
 // em descanso a lamina aponta para tras e para fora, visivel de cima
 export const SWORD_REST_TURN = 0.5;
-export const SWORD_REST_TILT = 1.85;
+export const SWORD_REST_TILT = 1.35;
 
 export type CharacterKind = 'player' | EnemyKind;
 
@@ -36,6 +37,8 @@ export type Character = {
   root: THREE.Group;
   // inclina o corpo todo para frente ao correr
   lean: THREE.Group;
+  // torso e membros giram juntos sem alterar a inclinacao da corrida
+  body: THREE.Group;
   // perna maior ergue o corpo para o pe continuar no chao
   lift: number;
   head: THREE.Group;
@@ -184,8 +187,6 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
   }
 
   const CLOTH = { player: mat.playerCloth, ninja: mat.purple, suit: mat.navy };
-  // base da lamina no quadril, ponta atras da cabeca
-  const katanaOnBack: Part = [geo.blade, mat.steel, -0.1, 0.36, 0.08, 0.45];
   // cabo na mao, guarda e lamina; a origem e o ponto de pegada
   const katanaInHand: Part[] = [
     [geo.grip, mat.dark, 0, 0.03, 0],
@@ -196,7 +197,7 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
   const PARTS: Record<CharacterKind, { body: Part[]; head: Part[] }> = {
     // player leva a espada na mao (grupo proprio, para o golpe)
     player: ninja(mat.playerCloth, mat.playerAccent, mat.playerSkin),
-    ninja: { ...enemyNinja, body: [...enemyNinja.body, katanaOnBack] },
+    ninja: enemyNinja,
     // terno: camisa e gravata na frente, cabelo; pistola vai no braco
     suit: {
       body: [
@@ -211,10 +212,10 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
       ],
     },
   };
-  // angulo do braco direito: player segura a espada, terno aponta a pistola
+  // angulo do braco direito: ninjas seguram espada, terno aponta a pistola
   const HOLD: Record<CharacterKind, number | null> = {
     player: 0.5,
-    ninja: null,
+    ninja: 0.5,
     suit: Math.PI / 2 - 0.1,
   };
 
@@ -225,24 +226,26 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     const lift = HIP_Y * (scale.legs - 1);
     const root = new THREE.Group();
     const lean = new THREE.Group();
+    const body = new THREE.Group();
     lean.position.y = lift;
     const head = new THREE.Group();
     // cresce para cima: o queixo quase nao sai do lugar
     head.position.y = HEAD_Y + (scale.head - 1) * 0.25;
     head.scale.setScalar(scale.head);
-    addParts(lean, PARTS[kind].body, mat.outline);
+    addParts(body, PARTS[kind].body, mat.outline);
     addParts(head, PARTS[kind].head, mat.outline);
     const shadow = new THREE.Mesh(geo.shadow, mat.shadow);
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = SHADOW_Y;
-    lean.add(head);
+    body.add(head);
+    lean.add(body);
     root.add(lean, shadow);
 
     const limb = (y: number, z: number, parts: Part[]) => {
       const pivot = new THREE.Group();
       pivot.position.set(0, y, z);
       addParts(pivot, parts, mat.outline);
-      lean.add(pivot);
+      body.add(pivot);
       return pivot;
     };
     const legs = SIDES.map((side) => {
@@ -271,17 +274,18 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     });
 
     let sword: THREE.Group | null = null;
-    if (kind === 'player') {
-      // pivo na mao direita (ver HOLD); a lamina cresce a partir do pivo
+    if (kind !== 'suit') {
+      // A espada acompanha o punho durante a preparacao e o corte.
       sword = new THREE.Group();
-      sword.position.set(0.14, 0.5, 0.33);
+      sword.position.set(0, -0.3, 0);
       sword.rotation.set(0, SWORD_REST_TURN, SWORD_REST_TILT);
       addParts(sword, katanaInHand, mat.outline);
-      lean.add(sword);
+      arms[0].add(sword);
     }
     return {
       root,
       lean,
+      body,
       lift,
       head,
       shadow,
@@ -303,4 +307,35 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
       }
     },
   };
+}
+
+// Pose compartilhada pelo player e pelo ninja; o terno usa o mesmo tempo para o recuo.
+export function poseAttack(character: Character, remaining: number): void {
+  const { body, head, arms, legs, sword } = character;
+  const phase = Math.max(0, Math.min(1, 1 - remaining / SLASH_TIME));
+  const windup =
+    remaining > 0 && phase < 0.5 ? Math.sin(Math.PI * phase * 2) : 0;
+  const strike =
+    remaining > 0 && phase > 0.2
+      ? Math.sin((Math.PI * (phase - 0.2)) / 0.8)
+      : 0;
+  body.rotation.y = -windup * 0.3 + strike * (sword ? 0.48 : 0.12);
+  body.rotation.z = windup * 0.1 - strike * (sword ? 0.16 : -0.08);
+  body.position.x = -windup * 0.08 + strike * (sword ? 0.12 : -0.08);
+  head.rotation.z = -strike * 0.1;
+  arms[0].rotation.y = windup * 0.55 - strike * (sword ? 0.65 : 0.1);
+  arms[1].rotation.y = -windup * 0.18;
+  if (remaining <= 0) {
+    if (sword) sword.rotation.set(0, SWORD_REST_TURN, SWORD_REST_TILT);
+    return;
+  }
+  arms[0].rotation.z =
+    (character.hold ?? 0) - windup * 0.6 + strike * (sword ? 0.95 : -0.32);
+  arms[1].rotation.z += windup * 0.25 + strike * (sword ? 0.45 : 0.12);
+  legs[0].rotation.z -= strike * 0.28;
+  legs[1].rotation.z += strike * 0.2;
+  if (sword) {
+    sword.rotation.y = SWORD_REST_TURN + windup * 0.55 - strike * 1.65;
+    sword.rotation.z = SWORD_REST_TILT + windup * 0.25 - strike * 4.15;
+  }
 }

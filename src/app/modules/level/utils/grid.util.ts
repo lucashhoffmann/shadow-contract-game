@@ -1,4 +1,8 @@
-import { ROOM_H, ROOM_W } from '@/app/modules/world/constants/world.constants';
+import {
+  MELEE_RANGE,
+  ROOM_H,
+  ROOM_W,
+} from '@/app/modules/world/constants/world.constants';
 import type { Prop, Vec2, World } from '@/app/modules/world/types/world.types';
 import { angleTo, clamp, distance } from '@/shared/utils/math.util';
 
@@ -84,6 +88,21 @@ export function castRay(
 export function hasLineOfSight(world: World, a: Vec2, b: Vec2): boolean {
   const d = distance(a, b);
   return castRay(world, a, angleTo(a, b), d) >= d;
+}
+
+export function nearbyProp(world: World): Prop | undefined {
+  const from = world.player.pos;
+  let nearest: Prop | undefined;
+  let nearestDistance = MELEE_RANGE;
+  for (const prop of world.props) {
+    if (prop.broken) continue;
+    const d = distance(from, prop.pos);
+    if (d <= nearestDistance && hasLineOfSight(world, from, prop.pos)) {
+      nearest = prop;
+      nearestDistance = d;
+    }
+  }
+  return nearest;
 }
 
 // quebrar libera o tile: a sala guarda a propria copia de `tiles`

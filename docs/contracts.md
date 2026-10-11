@@ -119,6 +119,16 @@ Estados:
   sem ver
 - levar tiro e sobreviver poe `detection = 1`: alerta no passo seguinte
 - `alert` enxerga em 360 graus e persegue por `findPath`
+- a partir da sala `ENEMY_DASH_FROM_ROOM`, `alert` com linha de visao salta
+  igual ao player (`DASH_TIME` a `DASH_SPEED`, para na parede) a cada
+  `dashEvery` segundos. `dashEvery` e fixado ao nascer: comeca em
+  `ENEMY_DASH_INTERVAL` e cai `ENEMY_DASH_PER_ROOM` por sala, ate
+  `ENEMY_DASH_MIN_INTERVAL`; `0` = nao salta
+  - fora do alcance de ataque: salta na direcao do player; `ninja` pousa ao
+    chegar em `NINJA_REACH`
+  - `suit` ja no alcance de tiro: salta de lado (lado sorteado por `rngState`)
+  - no ar nao atira nem golpeia; `enemy.dash` conta o tempo no ar, para a
+    engine animar
 
 ## `Projectile`
 

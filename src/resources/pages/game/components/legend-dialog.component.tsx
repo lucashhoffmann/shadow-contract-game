@@ -18,6 +18,7 @@ type LegendDialogProps = {
 const LEGEND: [label: string, text: string][] = [
   ['WASD / setas / arrastar', 'mover'],
   ['Espaco', 'salto de esquiva para frente'],
+  ['F', 'quebrar a caixa ao alcance'],
   ['P', 'pausar e ver esta legenda'],
   ['Espada', 'por tras elimina na hora; inimigo em alerta leva 1 de dano'],
   ['Cone branco', 'patrulha. Amarelo: suspeito. Vermelho: alerta'],

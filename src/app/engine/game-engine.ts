@@ -44,14 +44,20 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   const view = createWorldRenderer(scene, useGameStore.getState().look);
 
   const keys = new Set<string>();
+  const input: InputState = { moveX: 0, moveY: 0, dash: false };
   const onKeyDown = (event: KeyboardEvent) => {
     keys.add(event.code);
     if (event.repeat) return;
     if (event.code === 'KeyP') useGameStore.getState().togglePause();
     if (event.code === 'Enter') useGameStore.getState().begin();
+    if (event.code === 'KeyF' && getWorld()?.status === 'playing')
+      input.interact = true;
   };
   const onKeyUp = (event: KeyboardEvent) => keys.delete(event.code);
-  const onBlur = () => keys.clear();
+  const onBlur = () => {
+    keys.clear();
+    input.interact = false;
+  };
 
   const resize = () => {
     const width = canvas.clientWidth;
@@ -67,7 +73,6 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   window.addEventListener('resize', resize);
   resize();
 
-  const input: InputState = { moveX: 0, moveY: 0, dash: false };
   let last = performance.now();
   let accumulator = 0;
   let frameId = 0;
@@ -94,6 +99,7 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     const tick = useGameStore.getState().tick;
     while (accumulator >= FIXED_DT) {
       tick(input, FIXED_DT);
+      input.interact = false;
       accumulator -= FIXED_DT;
     }
 

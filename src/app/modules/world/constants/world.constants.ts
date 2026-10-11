@@ -22,7 +22,7 @@ export const ATTACK_COOLDOWN = 0.5;
 export const PICKUP_RADIUS = 0.7;
 // espada: executa desavisado; em alerta tira SWORD_DAMAGE por golpe
 export const SWORD_DAMAGE = 1;
-export const SLASH_TIME = 0.25;
+export const SLASH_TIME = 0.36;
 // adrenalina: bonus de velocidade apos cada morte
 export const ADRENALINE_TIME = 1.5;
 export const ADRENALINE_BOOST = 1.35;
@@ -82,6 +82,11 @@ export const VIEW_RANGE_PER_ROOM = 0.1;
 export const VIEW_RANGE_MAX_BONUS = 2;
 export const DETECT_TIME_PER_ROOM = 0.02;
 export const DETECT_TIME_MIN = 0.3;
+// inimigo em alerta salta como o player: mais vezes a cada sala
+export const ENEMY_DASH_FROM_ROOM = 2;
+export const ENEMY_DASH_INTERVAL = 4;
+export const ENEMY_DASH_PER_ROOM = 0.25;
+export const ENEMY_DASH_MIN_INTERVAL = 1.2;
 
 // economia: recompensa fixa por sala; quem sobe e o preco (shop.constants)
 export const KILL_MONEY = 40;

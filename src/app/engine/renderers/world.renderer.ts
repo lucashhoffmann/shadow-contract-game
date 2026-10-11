@@ -4,16 +4,14 @@ import {
   type Character,
   type CharacterKind,
   createCharacterKit,
+  poseAttack,
   SIDES,
-  SWORD_REST_TILT,
-  SWORD_REST_TURN,
 } from '@/app/engine/renderers/character.renderer';
 import { castRay, tileCenter } from '@/app/modules/level/utils/grid.util';
 import {
   DASH_TIME,
   ROOM_H,
   ROOM_W,
-  SLASH_TIME,
   VIEW_HALF_ANGLE,
 } from '@/app/modules/world/constants/world.constants';
 import type {
@@ -55,8 +53,32 @@ const DEBRIS = [
   [0.3, 0.32, 0.9],
   [-0.32, 0.12, 1.3],
 ];
+// visual do dinheiro no chao. amount/height 0 desliga a animacao
+const MONEY = {
+  color: 0xcfae52,
+  aura: { color: 0xffc83a, opacity: 0.16 },
+  // pulso: escala vai e volta em torno de 1 (0.06 = +-6%)
+  pulse: { amount: 0.06, speed: 4 },
+  // pulo: altura maxima do salto, em tiles
+  hop: { height: 0.06, speed: 5 },
+};
+// pilhas do dinheiro: x, z, quantas moedas
+const COIN_STACKS = [
+  [0, 0.13, 8],
+  [-0.2, 0.05, 3],
+  [0.19, 0.03, 5],
+  [0.02, -0.12, 9],
+  [0.2, -0.17, 4],
+];
 
-type EnemyView = { character: Character; marker: THREE.Mesh; cone: THREE.Mesh };
+// quem salta: personagem, vento nas costas e quanto do giro do lean e
+// cambalhota (o resto e a inclinacao de correr)
+type Jumper = { character: Character; wind: THREE.Group; flip: number };
+type EnemyView = Jumper & {
+  marker: THREE.Group;
+  markerParts: THREE.Mesh[];
+  cone: THREE.Mesh;
+};
 
 export type WorldRenderer = {
   sync: (world: World, time: number) => void;
@@ -102,7 +124,9 @@ export function createWorldRenderer(
     wall: new THREE.BoxGeometry(1, WALL_HEIGHT, 1),
     floor: new THREE.PlaneGeometry(ROOM_W, ROOM_H),
     tile: new THREE.PlaneGeometry(1, 1),
-    pickup: new THREE.BoxGeometry(0.4, 0.08, 0.22),
+    // moeda octogonal, base no y=0
+    coin: new THREE.CylinderGeometry(0.1, 0.1, 0.032, 8).translate(0, 0.016, 0),
+    aura: new THREE.SphereGeometry(0.45, 12, 8),
     // municao ao longo de +x, ponta na frente
     bulletCase: new THREE.CylinderGeometry(0.05, 0.05, 0.17, 8)
       .rotateZ(-Math.PI / 2)
@@ -116,7 +140,8 @@ export function createWorldRenderer(
     shellBase: new THREE.CylinderGeometry(0.062, 0.062, 0.1, 8)
       .rotateZ(-Math.PI / 2)
       .translate(-0.11, 0, 0),
-    marker: new THREE.SphereGeometry(0.11, 10, 10),
+    markerStem: new THREE.BoxGeometry(0.07, 0.24, 0.07),
+    markerDot: new THREE.SphereGeometry(0.075, 10, 10),
     crate: new THREE.BoxGeometry(0.78, 0.62, 0.78),
     plank: new THREE.BoxGeometry(0.34, 0.06, 0.2),
     // meio aro deitado, aberto para frente (+x)
@@ -129,7 +154,17 @@ export function createWorldRenderer(
     floor: lambert(0x4a4f6a),
     wall: lambert(0x8a8fb0),
     shop: lambert(0x3d9a6a),
-    pickup: lambert(0x4ade80),
+    coin: new THREE.MeshLambertMaterial({
+      color: MONEY.color,
+      flatShading: true,
+    }),
+    aura: new THREE.MeshBasicMaterial({
+      color: MONEY.aura.color,
+      transparent: true,
+      opacity: MONEY.aura.opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
     wood: lambert(0xa8703c),
     woodDark: lambert(0x6e4726),
     brass: lambert(0xd9b84a),
@@ -139,7 +174,7 @@ export function createWorldRenderer(
     wind: new THREE.MeshBasicMaterial({
       color: 0xd6f4ff,
       transparent: true,
-      opacity: 0,
+      opacity: 0.6,
       depthWrite: false,
     }),
   };
@@ -225,7 +260,7 @@ export function createWorldRenderer(
   const rooms = new Map<number, THREE.Group>();
   const enemies = new Map<number, EnemyView>();
   const props = new Map<number, { group: THREE.Group; broken: boolean }>();
-  const pickups = new Map<number, THREE.Mesh>();
+  const pickups = new Map<number, THREE.Group>();
   const bullets = new Map<number, THREE.Group>();
   const removeMesh = (mesh: THREE.Object3D) => scene.remove(mesh);
 
@@ -292,6 +327,28 @@ export function createWorldRenderer(
     return group;
   }
 
+  // pilhas de moedas levemente tortas, com aura dourada em volta
+  function buildPickup(): THREE.Group {
+    const group = new THREE.Group();
+    COIN_STACKS.forEach(([x, z, count], s) => {
+      for (let i = 0; i < count; i++) {
+        const coin = new THREE.Mesh(geo.coin, mat.coin);
+        coin.position.set(
+          x + Math.sin(i * 12.9 + s * 78.2) * 0.012,
+          i * 0.034,
+          z + Math.cos(i * 37.7 + s * 11.1) * 0.012,
+        );
+        coin.rotation.y = i * 0.9 + s;
+        group.add(coin);
+      }
+    });
+    const aura = new THREE.Mesh(geo.aura, mat.aura);
+    aura.position.y = 0.14;
+    group.add(aura);
+    scene.add(group);
+    return group;
+  }
+
   // caixa inteira, ou tabuas espalhadas no chao depois de quebrar
   function buildProp(prop: Prop): THREE.Group {
     const group = new THREE.Group();
@@ -318,11 +375,76 @@ export function createWorldRenderer(
     return group;
   }
 
-  function buildEnemy(kind: EnemyKind): EnemyView {
+  // vento do salto, nas costas: arcos cada vez menores e riscos soltos atras.
+  // Fica no root, nao no lean: nao gira junto com a cambalhota.
+  function makeJumper(kind: CharacterKind): Jumper {
     const character = makeCharacter(kind);
-    // bolinha sobre a cabeca: amarela suspeito, vermelha alerta
-    const marker = new THREE.Mesh(geo.marker, markerMat.patrol);
-    marker.position.y = 1.65;
+    const wind = new THREE.Group();
+    for (let i = 0; i < 3; i++) {
+      const gust = new THREE.Mesh(geo.gust, mat.wind);
+      gust.position.x = -0.1 - i * 0.24;
+      gust.scale.setScalar(1 - i * 0.22);
+      const streak = new THREE.Mesh(geo.streak, mat.wind);
+      streak.position.set(
+        -0.75 - (i % 2) * 0.2,
+        (i - 1) * 0.12,
+        (i - 1) * 0.22,
+      );
+      wind.add(gust, streak);
+    }
+    wind.visible = false;
+    character.root.add(wind);
+    return { character, wind, flip: 0 };
+  }
+
+  // `animate` mais o salto: sobe e desce em arco, uma cambalhota para frente
+  // em volta do tronco, joelhos e braco livre recolhidos no meio do giro.
+  // `dash` e o tempo que falta no ar.
+  function animateJumper(
+    jumper: Jumper,
+    pos: Vec2,
+    facing: number,
+    dash: number,
+    dt: number,
+    time: number,
+    maxLean: number,
+  ) {
+    const { character, wind } = jumper;
+    const { lean } = character;
+    lean.rotation.z -= jumper.flip;
+    animate(character, pos, facing, dt, time, maxLean);
+    const jumping = dash > 0;
+    const air = jumping ? 1 - dash / DASH_TIME : 0;
+    const arc = Math.sin(Math.PI * air);
+    jumper.flip = -2 * Math.PI * air;
+    lean.rotation.z += jumper.flip;
+    lean.position.x = Math.sin(jumper.flip) * FLIP_PIVOT_Y;
+    lean.position.y +=
+      (1 - Math.cos(jumper.flip)) * FLIP_PIVOT_Y + arc * JUMP_HEIGHT;
+    character.shadow.scale.setScalar(1 - arc * 0.35);
+    if (jumping) {
+      for (const leg of character.legs) leg.rotation.z = arc * TUCK;
+      character.arms[1].rotation.z = arc * TUCK;
+    }
+    // vento cresce e some com o arco
+    wind.visible = jumping;
+    wind.position.y = FLIP_PIVOT_Y + arc * JUMP_HEIGHT;
+    wind.scale.setScalar(0.3 + arc * 0.7);
+    wind.scale.x *= 1 + air * 0.8;
+    wind.rotation.x = Math.sin(time * 30) * 0.15;
+  }
+
+  function buildEnemy(kind: EnemyKind): EnemyView {
+    const jumper = makeJumper(kind);
+    const { character } = jumper;
+    // exclamação sobre a cabeca: amarelo ao notar, vermelho em alerta
+    const marker = new THREE.Group();
+    const stem = new THREE.Mesh(geo.markerStem, markerMat.patrol);
+    stem.position.y = 0.08;
+    const dot = new THREE.Mesh(geo.markerDot, markerMat.patrol);
+    dot.position.y = -0.12;
+    marker.add(stem, dot);
+    marker.position.y = 1.7;
     character.root.add(marker);
 
     const geometry = new THREE.BufferGeometry();
@@ -337,7 +459,7 @@ export function createWorldRenderer(
     // vertices mudam todo frame; o bounding do three ficaria velho
     cone.frustumCulled = false;
     scene.add(cone);
-    return { character, marker, cone };
+    return { ...jumper, marker, markerParts: [stem, dot], cone };
   }
 
   function removeEnemy(view: EnemyView) {
@@ -365,22 +487,8 @@ export function createWorldRenderer(
     position.needsUpdate = true;
   }
 
-  const player = makeCharacter('player');
-  // vento do salto, nas costas: arcos cada vez menores e riscos soltos atras.
-  // Fica no root, nao no lean: nao gira junto com a cambalhota.
-  const wind = new THREE.Group();
-  for (let i = 0; i < 3; i++) {
-    const gust = new THREE.Mesh(geo.gust, mat.wind);
-    gust.position.x = -0.1 - i * 0.24;
-    gust.scale.setScalar(1 - i * 0.22);
-    const streak = new THREE.Mesh(geo.streak, mat.wind);
-    streak.position.set(-0.75 - (i % 2) * 0.2, (i - 1) * 0.12, (i - 1) * 0.22);
-    wind.add(gust, streak);
-  }
-  wind.visible = false;
-  player.root.add(wind);
-  // parte da rotacao do lean que e cambalhota; o resto e a inclinacao de correr
-  let flip = 0;
+  const hero = makeJumper('player');
+  const player = hero.character;
   let lastTime = 0;
 
   return {
@@ -403,44 +511,16 @@ export function createWorldRenderer(
         scene.remove(view.group),
       );
 
-      player.lean.rotation.z -= flip;
-      animate(
-        player,
+      animateJumper(
+        hero,
         world.player.pos,
         world.player.facing,
+        world.player.dash,
         dt,
         time,
         world.player.adrenaline > 0 ? ADRENALINE_LEAN : RUN_LEAN,
       );
-      // salto: sobe e desce em arco, uma cambalhota para frente em volta do
-      // tronco, joelhos e braco livre recolhidos no meio do giro
-      const jumping = world.player.dash > 0;
-      const air = jumping ? 1 - world.player.dash / DASH_TIME : 0;
-      const arc = Math.sin(Math.PI * air);
-      flip = -2 * Math.PI * air;
-      player.lean.rotation.z += flip;
-      player.lean.position.x = Math.sin(flip) * FLIP_PIVOT_Y;
-      player.lean.position.y +=
-        (1 - Math.cos(flip)) * FLIP_PIVOT_Y + arc * JUMP_HEIGHT;
-      player.shadow.scale.setScalar(1 - arc * 0.35);
-      if (jumping) {
-        for (const leg of player.legs) leg.rotation.z = arc * TUCK;
-        player.arms[1].rotation.z = arc * TUCK;
-      }
-      wind.visible = jumping;
-      wind.position.y = FLIP_PIVOT_Y + arc * JUMP_HEIGHT;
-      wind.scale.x = 1 + air * 0.8;
-      wind.rotation.x = Math.sin(time * 30) * 0.15;
-      mat.wind.opacity = arc * 0.75;
-      if (player.sword) {
-        // golpe: lamina deita para frente e varre da direita para a esquerda
-        const swing = world.player.slash / SLASH_TIME;
-        player.sword.rotation.set(
-          0,
-          swing > 0 ? (swing - 0.5) * 3 : SWORD_REST_TURN,
-          swing > 0 ? -Math.PI / 2 : SWORD_REST_TILT,
-        );
-      }
+      poseAttack(player, world.player.slash);
 
       for (const enemy of world.enemies) {
         let view = enemies.get(enemy.id);
@@ -454,17 +534,33 @@ export function createWorldRenderer(
           root.position.set(enemy.pos.x, 0.3, -enemy.pos.y);
           root.rotation.set(0, enemy.facing, Math.PI / 2);
           lean.rotation.z = 0;
-          lean.position.y = 0;
+          lean.position.set(0, 0, 0);
           head.rotation.y = 0;
+          // morreu no ar: cai sem giro nem vento
+          view.flip = 0;
+          view.wind.visible = false;
         } else {
-          animate(view.character, enemy.pos, enemy.facing, dt, time, RUN_LEAN);
+          animateJumper(
+            view,
+            enemy.pos,
+            enemy.facing,
+            enemy.dash,
+            dt,
+            time,
+            RUN_LEAN,
+          );
           // inimigo nao fica olhando em volta: o cone mostra para onde ele ve
           head.rotation.y = 0;
+          poseAttack(view.character, enemy.attack);
           updateCone(world, enemy, view.cone);
         }
-        view.marker.material = markerMat[enemy.state];
+        for (const part of view.markerParts)
+          part.material = markerMat[enemy.state];
         view.marker.visible =
           enemy.state === 'suspicious' || enemy.state === 'alert';
+        view.marker.position.y =
+          1.7 +
+          Math.sin(time * 14 + enemy.id) * (view.marker.visible ? 0.04 : 0);
         view.cone.material = coneMat[enemy.state];
         view.cone.visible = !dead;
         view.character.shadow.visible = !dead;
@@ -474,16 +570,19 @@ export function createWorldRenderer(
       for (const pickup of world.pickups) {
         let mesh = pickups.get(pickup.id);
         if (!mesh) {
-          mesh = new THREE.Mesh(geo.pickup, mat.pickup);
+          mesh = buildPickup();
+          mesh.rotation.y = pickup.id;
           pickups.set(pickup.id, mesh);
-          scene.add(mesh);
         }
+        const { pulse, hop } = MONEY;
         mesh.position.set(
           pickup.pos.x,
-          0.25 + Math.sin(time * 3 + pickup.id) * 0.05,
+          0.02 + Math.abs(Math.sin(time * hop.speed + pickup.id)) * hop.height,
           -pickup.pos.y,
         );
-        mesh.rotation.y = time * 2;
+        mesh.scale.setScalar(
+          1 + Math.sin(time * pulse.speed + pickup.id) * pulse.amount,
+        );
       }
       reconcile(pickups, new Set(world.pickups.map((p) => p.id)), removeMesh);
 

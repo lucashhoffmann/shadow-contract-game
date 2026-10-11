@@ -5,7 +5,11 @@ import {
 } from '@/app/modules/enemy/systems/enemy.system';
 import {
   ALERT_DURATION,
+  DASH_SPEED,
+  DASH_TIME,
   DETECT_TIME,
+  ENEMY_DASH_FROM_ROOM,
+  ENEMY_DASH_MIN_INTERVAL,
   FIXED_DT,
   PLAYER_MAX_HP,
 } from '@/app/modules/world/constants/world.constants';
@@ -90,6 +94,22 @@ describe('updateEnemies', () => {
     expect(world.player.hp).toBeLessThan(PLAYER_MAX_HP);
   });
 
+  it('inicia a pose de ataque quando dispara ou golpeia', () => {
+    const world = createArenaWorld();
+    const suit = addEnemy(world, 5.5, 5.5, -Math.PI / 2, 'suit');
+    const ninja = addEnemy(world, 5.5, 3.3, -Math.PI / 2, 'ninja');
+    for (const enemy of [suit, ninja]) {
+      enemy.state = 'alert';
+      enemy.alertTimer = ALERT_DURATION;
+      enemy.fireCooldown = 0;
+    }
+
+    updateEnemies(world, FIXED_DT);
+
+    expect(suit.attack).toBeGreaterThan(0);
+    expect(ninja.attack).toBeGreaterThan(0);
+  });
+
   it('entra em alerta ao levar tiro, mesmo sem ver o player', () => {
     const world = createArenaWorld();
     const enemy = addEnemy(world, 5.5, 5.5, Math.PI / 2);
@@ -147,5 +167,47 @@ describe('updateEnemies', () => {
     run(world, 2);
     expect(enemy.state).toBe('dead');
     expect(world.player.hp).toBe(PLAYER_MAX_HP);
+  });
+
+  it('salta mais vezes a cada sala, e nunca nas primeiras', () => {
+    const world = createArenaWorld();
+    const every = (room: number) =>
+      createEnemy(world, room, [{ x: 5.5, y: 5.5 }]).dashEvery;
+    expect(every(ENEMY_DASH_FROM_ROOM - 1)).toBe(0);
+    expect(every(ENEMY_DASH_FROM_ROOM + 1)).toBeLessThan(
+      every(ENEMY_DASH_FROM_ROOM),
+    );
+    expect(every(999)).toBe(ENEMY_DASH_MIN_INTERVAL);
+  });
+
+  it('ninja em alerta salta para cima do player e pousa sem atravessar', () => {
+    const world = createArenaWorld();
+    world.player.pos = { x: 5.5, y: 10.5 };
+    const enemy = addEnemy(world, 5.5, 2.5, Math.PI / 2, 'ninja');
+    enemy.dashEvery = 1;
+    enemy.detection = 1;
+    // alerta, meia recarga, e o salto comeca
+    run(world, 0.5 + 2 * FIXED_DT);
+    expect(enemy.dash).toBeGreaterThan(0);
+    const from = enemy.pos.y;
+
+    run(world, DASH_TIME);
+    expect(enemy.dash).toBe(0);
+    expect(enemy.pos.y).toBeCloseTo(from + DASH_SPEED * DASH_TIME, 0);
+    expect(enemy.pos.y).toBeLessThan(world.player.pos.y);
+  });
+
+  it('terno no alcance salta de lado e continua atirando', () => {
+    const world = createArenaWorld();
+    world.player.pos = { x: 5.5, y: 9.5 };
+    const enemy = addEnemy(world, 5.5, 5.5, Math.PI / 2);
+    enemy.dashEvery = 1;
+    enemy.detection = 1;
+    run(world, 0.5 + DASH_TIME + 4 * FIXED_DT);
+    expect(Math.abs(enemy.pos.x - 5.5)).toBeGreaterThan(2);
+    expect(enemy.pos.y).toBeCloseTo(5.5, 1);
+
+    run(world, 1);
+    expect(world.projectiles.length).toBeGreaterThan(0);
   });
 });
