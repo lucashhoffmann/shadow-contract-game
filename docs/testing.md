@@ -22,7 +22,8 @@ pnpm typecheck     # inclui os arquivos de teste (tsconfig.spec.json)
 
 jsdom nao tem WebGL. Teste de pagina que monta a engine usa
 `vi.mock('@/app/engine/game-engine')`; a tela de personagem usa
-`vi.mock('@/app/engine/character-preview')`.
+`vi.mock('@/app/engine/character-preview')`. O preview de arma do HUD tambem
+precisa de WebGL: `vi.mock('@/app/engine/weapon-preview')`.
 
 ## Onde colocar
 
@@ -58,7 +59,8 @@ conhecida. Usar `createWorld(seed)` para testar geracao e integracao.
   deterministica, loja a cada `SHOP_EVERY` salas, no maximo 3 salas vivas
 - `player`: anda, nao atravessa parede, desliza na parede, diagonal nao e mais
   rapida
-- `enemy`: cone (angulo, alcance, parede), deteccao sobe e desce, terno
+- `enemy`: cone (angulo, alcance, parede), deteccao sobe e desce, ouve passo
+  e salto por perto e vai investigar, terno
   dispara bala, ninja golpeia de perto, tiro recebido alerta
 - `combat`: melee so em inimigo nao alertado e sem gastar municao, arma dispara
   balas e gasta municao, bala para em parede, acerta por contato, some no fim

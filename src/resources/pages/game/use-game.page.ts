@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { createGameEngine } from '@/app/engine/game-engine';
+import { renderWeaponPreviews } from '@/app/engine/weapon-preview';
 import { useGameStore } from '@/app/store/game-store/game.store';
 
 export function useGamePage() {
@@ -23,6 +24,18 @@ export function useGamePage() {
   }, []);
 
   // a mesma legenda serve de abertura da run e de tela de pausa
+  // fotos das armas para o HUD, tiradas uma vez por montagem
+  const [previews] = useState(renderWeaponPreviews);
+
+  // conta golpes levados: vida caiu desde o ultimo render
+  const [damage, setDamage] = useState({ hp: hud.hp, hits: 0 });
+  if (hud.hp !== damage.hp) {
+    setDamage({
+      hp: hud.hp,
+      hits: damage.hits + (hud.hp < damage.hp ? 1 : 0),
+    });
+  }
+
   const restart = () => startRun();
   const legend =
     screen === 'paused'
@@ -38,9 +51,11 @@ export function useGamePage() {
     canvasRef,
     screen,
     hud,
+    hits: damage.hits,
     market,
     best,
     legend,
+    previews,
     buy,
     closeShop,
     restart,

@@ -94,7 +94,7 @@ function addParts(
 
 // Lamina de katana: perfil curvo com ponta, base na origem, crescendo em +y.
 // Fio em -z e dorso em +z; fina em x, para aparecer larga vista de cima.
-function katanaBlade(): THREE.BufferGeometry {
+export function katanaBlade(): THREE.BufferGeometry {
   const profile = new THREE.Shape();
   profile.moveTo(-0.035, 0);
   profile.quadraticCurveTo(-0.05, 0.45, 0, 0.78);

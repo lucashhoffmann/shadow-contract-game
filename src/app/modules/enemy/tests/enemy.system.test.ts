@@ -11,6 +11,9 @@ import {
   ENEMY_DASH_FROM_ROOM,
   ENEMY_DASH_MIN_INTERVAL,
   FIXED_DT,
+  HEAR_TIME,
+  NOISE_DASH,
+  NOISE_WALK,
   PLAYER_MAX_HP,
 } from '@/app/modules/world/constants/world.constants';
 import type { World } from '@/app/modules/world/types/world.types';
@@ -209,5 +212,64 @@ describe('updateEnemies', () => {
 
     run(world, 1);
     expect(world.projectiles.length).toBeGreaterThan(0);
+  });
+});
+
+describe('audicao', () => {
+  // inimigo de costas para o player: so pode notar pelo ouvido
+  function behind(gap: number, noise: number) {
+    const world = createArenaWorld();
+    world.player.pos = { x: 5.5, y: 2.5 };
+    world.player.noise = noise;
+    const enemy = addEnemy(world, 5.5, 2.5 + gap, Math.PI / 2);
+    return { world, enemy };
+  }
+
+  it('ouve passos por perto, larga a patrulha e vai ate o barulho', () => {
+    const { world, enemy } = behind(1.5, NOISE_WALK);
+    run(world, HEAR_TIME * 2 + FIXED_DT);
+    expect(enemy.heard).toEqual(world.player.pos);
+    expect(enemy.state).toBe('suspicious');
+
+    world.player.noise = 0;
+    world.player.pos = { x: 9.5, y: 11.5 };
+    run(world, 0.5);
+    expect(enemy.pos.y).toBeLessThan(4);
+    expect(enemy.state).not.toBe('alert');
+  });
+
+  it('quanto mais perto, mais rapido ouve', () => {
+    const near = behind(1, NOISE_WALK);
+    const far = behind(2.5, NOISE_WALK);
+    run(near.world, 0.2);
+    run(far.world, 0.2);
+    expect(near.enemy.hearing).toBeGreaterThan(far.enemy.hearing * 2);
+  });
+
+  it('fora do raio do barulho ou com o player parado nao ouve', () => {
+    const quiet = behind(1, 0);
+    const far = behind(NOISE_WALK + 0.1, NOISE_WALK);
+    run(quiet.world, 2);
+    run(far.world, 2);
+    expect(quiet.enemy.heard).toBeNull();
+    expect(far.enemy.heard).toBeNull();
+    expect(far.enemy.state).toBe('patrol');
+  });
+
+  it('salto e ouvido de mais longe que passo', () => {
+    const { world, enemy } = behind(NOISE_WALK + 0.5, NOISE_DASH);
+    // antes de virar, ver o player e trocar a investigacao por alerta
+    run(world, 1.8);
+    expect(enemy.heard).not.toBeNull();
+  });
+
+  it('sem novo barulho desiste e volta a patrulha', () => {
+    const { world, enemy } = behind(1.5, NOISE_WALK);
+    run(world, HEAR_TIME * 2 + FIXED_DT);
+    world.player.noise = 0;
+    world.player.pos = { x: 9.5, y: 11.5 };
+    run(world, 5);
+    expect(enemy.heard).toBeNull();
+    expect(enemy.state).toBe('patrol');
   });
 });

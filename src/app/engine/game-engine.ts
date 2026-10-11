@@ -41,7 +41,8 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   scene.add(sun);
 
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
-  const view = createWorldRenderer(scene, useGameStore.getState().look);
+  const { look, bloodColor } = useGameStore.getState();
+  const view = createWorldRenderer(scene, look, bloodColor);
 
   const keys = new Set<string>();
   const input: InputState = { moveX: 0, moveY: 0, dash: false };
@@ -52,11 +53,17 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     if (event.code === 'Enter') useGameStore.getState().begin();
     if (event.code === 'KeyF' && getWorld()?.status === 'playing')
       input.interact = true;
+    // B abre o bau ao alcance e fecha a loja aberta
+    if (event.code === 'KeyB') {
+      if (getWorld()?.status === 'shop') useGameStore.getState().closeShop();
+      else if (getWorld()?.status === 'playing') input.open = true;
+    }
   };
   const onKeyUp = (event: KeyboardEvent) => keys.delete(event.code);
   const onBlur = () => {
     keys.clear();
     input.interact = false;
+    input.open = false;
   };
 
   const resize = () => {
@@ -100,6 +107,7 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     while (accumulator >= FIXED_DT) {
       tick(input, FIXED_DT);
       input.interact = false;
+      input.open = false;
       accumulator -= FIXED_DT;
     }
 

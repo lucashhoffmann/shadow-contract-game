@@ -5,6 +5,7 @@ import {
   ROOM_H,
 } from '@/app/modules/world/constants/world.constants';
 import {
+  DEFAULT_BLOOD_COLOR,
   DEFAULT_LOOK,
   getWorld,
   LOOK_SCALE,
@@ -23,7 +24,11 @@ function play() {
 
 beforeEach(() => {
   store().backToMenu();
-  useGameStore.setState({ best: 0, look: DEFAULT_LOOK });
+  useGameStore.setState({
+    best: 0,
+    look: DEFAULT_LOOK,
+    bloodColor: DEFAULT_BLOOD_COLOR,
+  });
 });
 
 describe('game store', () => {
@@ -146,6 +151,16 @@ describe('game store', () => {
   it('setLook ignora cor invalida', () => {
     store().setLook({ skin: 'red' });
     expect(store().look.skin).toBe(DEFAULT_LOOK.skin);
+  });
+
+  it('grava a cor do sangue e rejeita cor invalida', () => {
+    store().setBloodColor('#22aa44');
+    expect(store().bloodColor).toBe('#22aa44');
+    expect(
+      JSON.parse(localStorage.getItem('shadow-contract')!).state.bloodColor,
+    ).toBe('#22aa44');
+    store().setBloodColor('verde');
+    expect(store().bloodColor).toBe('#22aa44');
   });
 
   it('openCharacter abre a tela de personagem, onde setLook ainda vale', () => {

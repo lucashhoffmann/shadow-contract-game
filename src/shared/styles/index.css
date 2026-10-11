@@ -25,6 +25,26 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --animate-damage: damage 0.7s ease-out;
+}
+
+/* dano: bate forte, pulsa uma vez e some */
+@keyframes damage {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 0.45;
+  }
+  60% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 :root {

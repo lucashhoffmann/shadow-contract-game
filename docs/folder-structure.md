@@ -35,8 +35,10 @@ src
 │   ├── engine
 │   │   ├── game-engine.ts
 │   │   ├── character-preview.ts
+│   │   ├── weapon-preview.ts
 │   │   └── renderers
 │   │       ├── character.renderer.ts
+│   │       ├── weapon.renderer.ts
 │   │       └── world.renderer.ts
 │   ├── modules
 │   │   ├── world

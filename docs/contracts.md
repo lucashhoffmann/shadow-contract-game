@@ -115,16 +115,27 @@ Tipos (numeros em `ENEMY_KINDS`):
 
 Estados:
 
-| De           | Para         | Quando                              |
-| ------------ | ------------ | ----------------------------------- |
-| `patrol`     | `suspicious` | player no cone, com linha de visao  |
-| `suspicious` | `alert`      | `detection` chega a 1               |
-| `suspicious` | `patrol`     | `detection` volta a 0               |
-| `alert`      | `patrol`     | `ALERT_DURATION` sem linha de visao |
-| qualquer     | `dead`       | `killEnemy`                         |
+| De           | Para         | Quando                               |
+| ------------ | ------------ | ------------------------------------ |
+| `patrol`     | `suspicious` | player no cone, com linha de visao   |
+| `patrol`     | `suspicious` | `hearing` chega a 1 (ouviu o player) |
+| `suspicious` | `patrol`     | `searchTimer` zera sem ver o player  |
+| `suspicious` | `alert`      | `detection` chega a 1                |
+| `suspicious` | `patrol`     | `detection` volta a 0                |
+| `alert`      | `patrol`     | `ALERT_DURATION` sem linha de visao  |
+| qualquer     | `dead`       | `killEnemy`                          |
 
 - `detection` sobe `dt / detectTime` vendo o player e cai `dt * DETECT_DECAY`
   sem ver
+- audicao: `player.noise` e o raio do barulho do passo (`NOISE_WALK` vezes a
+  forca do input ao andar, `NOISE_DASH` no salto, `0` parado). O raio cresce
+  `HEAR_PER_ROOM` por sala do inimigo, ate `+HEAR_MAX_BONUS`. Dentro dele,
+  `hearing` sobe `dt * (1 - distancia / raio) / HEAR_TIME`; fora, cai
+  `dt * DETECT_DECAY`. Parede nao abafa
+- `hearing` cheio: `heard` guarda a posicao do player e o inimigo anda ate la
+  em `patrolSpeed`, em `suspicious`, por `SEARCH_TIME`; depois volta a
+  patrulha. Ouvir de novo troca `heard` e reinicia o tempo. Ouvir nao poe em
+  alerta: so ver ou levar tiro
 - levar tiro e sobreviver poe `detection = 1`: alerta no passo seguinte
 - `alert` enxerga em 360 graus e persegue por `findPath`
 - a partir da sala `ENEMY_DASH_FROM_ROOM`, `alert` com linha de visao salta
@@ -198,7 +209,7 @@ O player comeca com a espada e nunca a perde.
 
 ```ts
 type ItemDef = {
-  id: 'pistol' | 'shotgun' | 'armor';
+  id: 'pistol' | 'silenced' | 'shotgun' | 'armor';
   name: string;
   kind: 'weapon' | 'armor';
   price: number; // preco base
@@ -211,6 +222,9 @@ type ItemDef = {
 ```
 
 Equipamento vale so para a run atual; `startRun` cria `World` novo.
+
+`WeaponId` e `'pistol' | 'silenced' | 'shotgun'`. `silenced` e a pistola com
+silenciador: hoje tem os mesmos numeros da pistola e so muda o modelo.
 
 ## Economia (`Market`)
 
@@ -253,12 +267,13 @@ hud: {
   money;
   room;
   kills;
-  weaponId;
+  weaponId; // null = so a espada
   ammo;
 }
 market: Market;
 best: number; // maior sala alcancada, persistido em localStorage
 look: PlayerLook; // aparencia do player, persistida em localStorage
+bloodColor: string; // cor das pocas, persistida em localStorage
 ```
 
 ```ts
@@ -275,20 +290,24 @@ type PlayerLook = {
 `look` e so visual: nao entra no `World` nem muda colisao. A engine le uma vez,
 ao criar o renderer; por isso `setLook` so vale antes da run (telas `menu` e
 `character`).
+`bloodColor` e uma cor `#rrggbb` escolhida nas configuracoes da home. O
+renderer a le ao abrir a run; a poca sob cada inimigo morto cresce suavemente
+por `BLOOD_GROW_TIME` segundos ate um tamanho fixo.
 
 Acoes:
 
-| Acao              | Quem chama | Efeito                                  |
-| ----------------- | ---------- | --------------------------------------- |
-| `startRun(seed?)` | UI         | cria `World` em `intro`                 |
-| `begin()`         | UI, engine | `intro` -> `playing`                    |
-| `togglePause()`   | UI, engine | `playing` <-> `paused`                  |
-| `tick(input, dt)` | engine     | `stepWorld` e sincroniza `hud`/`screen` |
-| `buy(itemId)`     | UI         | `buyItem` e sincroniza                  |
-| `closeShop()`     | UI         | volta para `playing`                    |
-| `backToMenu()`    | UI         | descarta `World`, `screen = 'menu'`     |
-| `openCharacter()` | UI (menu)  | `screen = 'character'`; em run, nada    |
-| `setLook(patch)`  | UI         | valida e grava `look`; em run, nada     |
+| Acao                   | Quem chama | Efeito                                  |
+| ---------------------- | ---------- | --------------------------------------- |
+| `startRun(seed?)`      | UI         | cria `World` em `intro`                 |
+| `begin()`              | UI, engine | `intro` -> `playing`                    |
+| `togglePause()`        | UI, engine | `playing` <-> `paused`                  |
+| `tick(input, dt)`      | engine     | `stepWorld` e sincroniza `hud`/`screen` |
+| `buy(itemId)`          | UI         | `buyItem` e sincroniza                  |
+| `closeShop()`          | UI         | volta para `playing`                    |
+| `backToMenu()`         | UI         | descarta `World`, `screen = 'menu'`     |
+| `openCharacter()`      | UI (menu)  | `screen = 'character'`; em run, nada    |
+| `setLook(patch)`       | UI         | valida e grava `look`; em run, nada     |
+| `setBloodColor(color)` | UI         | valida e grava a cor do sangue          |
 
 Fora do estado reativo:
 
@@ -316,6 +335,26 @@ function createGameEngine(canvas: HTMLCanvasElement): { dispose(): void };
   cabeca olhando para os lados quando parado, golpe de espada, zoom com blur
   quando `run.kills` sobe
 - `dispose` cancela o loop, remove listeners e libera geometrias e materiais
+
+### Modelos e preview de arma
+
+```ts
+type WeaponModelId = WeaponId | 'sword';
+function createWeaponModel(id: WeaponModelId): {
+  root: THREE.Group;
+  dispose(): void;
+};
+function renderWeaponPreviews(): Record<WeaponModelId, string>;
+```
+
+- `createWeaponModel` (`renderers/weapon.renderer.ts`): cano em `+x`, `y` para
+  cima, simetrico em `z`. O silenciador fica no eixo do cano
+  (`PISTOL_BORE_Y`), a partir de `PISTOL_MUZZLE_X`
+- `renderWeaponPreviews` (`weapon-preview.ts`): desenha cada modelo uma vez
+  fora da tela e devolve data URLs. `use-game.page.ts` chama uma vez e passa
+  para o `Hud`, que mostra a foto de `hud.weaponId ?? 'sword'`
+- o HUD mostra balas restantes sobre `ItemDef.ammo`; com a espada, nao mostra
+- o modelo ainda nao aparece na mao do player durante a run
 
 ### Preview de personagem
 

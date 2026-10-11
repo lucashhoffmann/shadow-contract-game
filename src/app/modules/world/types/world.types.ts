@@ -7,6 +7,8 @@ export type InputState = {
   moveY: number;
   dash: boolean;
   interact?: boolean;
+  // pulso da tecla B: abre o bau ao alcance
+  open?: boolean;
 };
 
 export type RoomKind = 'start' | 'combat' | 'shop';
@@ -23,6 +25,9 @@ export type Room = {
   templateId: string;
   kind: RoomKind;
   tiles: string[];
+  // centro do bau da loja (tile 'C'); null = sala sem bau
+  chest: Vec2 | null;
+  // ja abriu o bau: os precos desta sala ja foram sorteados
   shopVisited: boolean;
 };
 
@@ -62,6 +67,12 @@ export type Enemy = {
   dashCooldown: number;
   // segundos entre saltos em alerta; 0 = nao salta
   dashEvery: number;
+  // 0..1: quanto ja ouviu do player; cheio, vai investigar
+  hearing: number;
+  // onde ouviu o player; null = nada a investigar
+  heard: Vec2 | null;
+  // segundos restantes da investigacao
+  searchTimer: number;
 };
 
 export type Projectile = {
@@ -90,7 +101,8 @@ export type Pickup = {
   value: number;
 };
 
-export type WeaponId = 'pistol' | 'shotgun';
+// 'silenced' e a pistola com silenciador
+export type WeaponId = 'pistol' | 'silenced' | 'shotgun';
 
 export type ItemId = WeaponId | 'armor';
 
@@ -125,6 +137,8 @@ export type Player = {
   dash: number;
   // segundos ate poder saltar de novo
   dashCooldown: number;
+  // raio do barulho feito neste passo (andar, saltar); 0 = em silencio
+  noise: number;
   weapon: { id: WeaponId; ammo: number } | null;
 };
 

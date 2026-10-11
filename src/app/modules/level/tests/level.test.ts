@@ -34,7 +34,7 @@ describe.each(ALL_TEMPLATES)('template $id', (template) => {
   it('tem ROOM_H linhas de ROOM_W tiles validos', () => {
     expect(template.tiles).toHaveLength(ROOM_H);
     for (const line of template.tiles) {
-      expect(line).toMatch(new RegExp(`^[#.$So]{${ROOM_W}}$`));
+      expect(line).toMatch(new RegExp(`^[#.$Co]{${ROOM_W}}$`));
     }
   });
 

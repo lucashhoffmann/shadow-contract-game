@@ -16,6 +16,16 @@ const { dispose } = vi.hoisted(() => ({ dispose: vi.fn() }));
 vi.mock('@/app/engine/game-engine', () => ({
   createGameEngine: vi.fn(() => ({ dispose })),
 }));
+vi.mock('@/app/engine/weapon-preview', () => ({
+  renderWeaponPreviews: () => PREVIEWS,
+}));
+
+const PREVIEWS = {
+  sword: 'data:sword',
+  pistol: 'data:pistol',
+  silenced: 'data:silenced',
+  shotgun: 'data:shotgun',
+};
 
 const HUD: HudData = {
   hp: 50,
@@ -33,23 +43,57 @@ function segments(container: HTMLElement, state: string) {
 
 describe('Hud', () => {
   it('mostra vida, sala, dinheiro e arma', () => {
-    render(<Hud hud={HUD} />);
+    render(
+      <Hud
+        previews={PREVIEWS}
+        hud={HUD}
+      />,
+    );
     expect(screen.getByRole('progressbar', { name: 'Vida' })).toHaveAttribute(
       'aria-valuenow',
       '50',
     );
     expect(screen.getByText('Sala 3')).toBeInTheDocument();
     expect(screen.getByText('$ 250')).toBeInTheDocument();
-    expect(screen.getByText('Pistola x4')).toBeInTheDocument();
+    expect(screen.getByText('Pistola')).toBeInTheDocument();
+    expect(screen.getByLabelText('Balas: 4 de 8')).toBeInTheDocument();
   });
 
-  it('mostra a espada quando nao ha arma de fogo', () => {
-    render(<Hud hud={{ ...HUD, weaponId: null, ammo: 0 }} />);
+  it.each(['pistol', 'silenced', 'shotgun'] as const)(
+    'mostra o preview da arma %s',
+    (weaponId) => {
+      const { container } = render(
+        <Hud
+          previews={PREVIEWS}
+          hud={{ ...HUD, weaponId }}
+        />,
+      );
+      expect(container.querySelector('img')).toHaveAttribute(
+        'src',
+        PREVIEWS[weaponId],
+      );
+    },
+  );
+
+  it('espada: mostra o preview e nao mostra balas', () => {
+    const { container } = render(
+      <Hud
+        previews={PREVIEWS}
+        hud={{ ...HUD, weaponId: null, ammo: 0 }}
+      />,
+    );
     expect(screen.getByText('Espada')).toBeInTheDocument();
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:sword');
+    expect(screen.queryByLabelText(/Balas/)).not.toBeInTheDocument();
   });
 
   it('barra de contrato marca salas feitas, a atual e as que faltam', () => {
-    const { container } = render(<Hud hud={{ ...HUD, room: 3 }} />);
+    const { container } = render(
+      <Hud
+        previews={PREVIEWS}
+        hud={{ ...HUD, room: 3 }}
+      />,
+    );
     expect(screen.getByText('Contrato 1')).toBeInTheDocument();
     expect(segments(container, 'done')).toBe(2);
     expect(segments(container, 'current')).toBe(1);
@@ -57,17 +101,32 @@ describe('Hud', () => {
   });
 
   it('barra de contrato: sala inicial vazia, loja fecha o contrato', () => {
-    const start = render(<Hud hud={{ ...HUD, room: 0 }} />);
+    const start = render(
+      <Hud
+        previews={PREVIEWS}
+        hud={{ ...HUD, room: 0 }}
+      />,
+    );
     expect(segments(start.container, 'todo')).toBe(5);
     start.unmount();
 
-    const shop = render(<Hud hud={{ ...HUD, room: 5 }} />);
+    const shop = render(
+      <Hud
+        previews={PREVIEWS}
+        hud={{ ...HUD, room: 5 }}
+      />,
+    );
     expect(screen.getByText('Contrato 1')).toBeInTheDocument();
     expect(segments(shop.container, 'done')).toBe(4);
     expect(screen.getByText('$')).toHaveAttribute('data-state', 'current');
     shop.unmount();
 
-    render(<Hud hud={{ ...HUD, room: 7 }} />);
+    render(
+      <Hud
+        previews={PREVIEWS}
+        hud={{ ...HUD, room: 7 }}
+      />,
+    );
     expect(screen.getByText('Contrato 2')).toBeInTheDocument();
   });
 });
@@ -78,6 +137,7 @@ describe('ShopDialog', () => {
     render(
       <ShopDialog
         open
+        previews={PREVIEWS}
         money={250}
         market={createMarket()}
         onBuy={onBuy}
@@ -86,7 +146,9 @@ describe('ShopDialog', () => {
     );
 
     expect(screen.getByRole('button', { name: /Escopeta/ })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: /Pistola/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Pistola(?! silenciada)/ }),
+    );
 
     expect(onBuy).toHaveBeenCalledWith('pistol');
   });
@@ -96,6 +158,7 @@ describe('ShopDialog', () => {
     render(
       <ShopDialog
         open
+        previews={PREVIEWS}
         money={250}
         market={{
           inflation: 1.12,
@@ -107,8 +170,11 @@ describe('ShopDialog', () => {
     );
 
     expect(screen.getByText(/Inflacao: \+12%/)).toBeInTheDocument();
-    const pistol = screen.getByRole('button', { name: /Pistola/ });
-    expect(pistol).toHaveTextContent('$ 250');
+    const pistol = screen.getByRole('button', {
+      name: /^Pistola(?! silenciada)/,
+    });
+    expect(pistol).toHaveTextContent('250');
+    expect(pistol.querySelector('img')).toHaveAttribute('src', 'data:pistol');
     expect(pistol).toHaveTextContent('▲ 25%');
     expect(screen.getByRole('button', { name: /Colete/ })).toHaveTextContent(
       '▼ 20%',
@@ -120,6 +186,7 @@ describe('ShopDialog', () => {
     render(
       <ShopDialog
         open
+        previews={PREVIEWS}
         money={0}
         market={createMarket()}
         onBuy={vi.fn()}
@@ -134,6 +201,7 @@ describe('ShopDialog', () => {
     render(
       <ShopDialog
         open={false}
+        previews={PREVIEWS}
         money={0}
         market={createMarket()}
         onBuy={vi.fn()}
@@ -254,4 +322,16 @@ describe('GamePage', () => {
     act(() => useGameStore.setState({ screen: 'gameover' }));
     expect(screen.getByText('Contrato encerrado')).toBeInTheDocument();
   });
+});
+
+it('borda vermelha aparece so quando a vida cai', () => {
+  const setHp = (hp: number) =>
+    act(() =>
+      useGameStore.setState((state) => ({ hud: { ...state.hud, hp } })),
+    );
+  setHp(100);
+  render(<GamePage />);
+  expect(screen.queryByTestId('damage-vignette')).toBeNull();
+  setHp(80);
+  expect(screen.getByTestId('damage-vignette')).toBeInTheDocument();
 });

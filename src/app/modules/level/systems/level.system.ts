@@ -33,12 +33,17 @@ export function spawnRoom(
   index: number,
   template: RoomTemplate = pickTemplate(world, index),
 ): void {
+  const chestRow = template.tiles.findIndex((line) => line.includes('C'));
   world.rooms.push({
     index,
     templateId: template.id,
     kind: template.kind,
     // copia: quebrar caixa edita os tiles desta sala, nao do template
     tiles: [...template.tiles],
+    chest:
+      chestRow < 0
+        ? null
+        : tileCenter(index, template.tiles[chestRow].indexOf('C'), chestRow),
     shopVisited: false,
   });
 

@@ -13,6 +13,19 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     spread: 0,
     bonusHp: 0,
   },
+  // ponytail: mesmos numeros da pistola, so o modelo muda; dar efeito ao
+  // silenciador quando existir regra de barulho
+  silenced: {
+    id: 'silenced',
+    name: 'Pistola silenciada',
+    kind: 'weapon',
+    price: 260,
+    range: 5.5,
+    ammo: 8,
+    pellets: 1,
+    spread: 0,
+    bonusHp: 0,
+  },
   shotgun: {
     id: 'shotgun',
     name: 'Escopeta',

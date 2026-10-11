@@ -23,9 +23,13 @@ import {
   FIRE_DELAY,
   FIRE_INTERVAL,
   FIRE_RANGE,
+  HEAR_MAX_BONUS,
+  HEAR_PER_ROOM,
+  HEAR_TIME,
   NINJA_DAMAGE,
   NINJA_REACH,
   REPATH_INTERVAL,
+  SEARCH_TIME,
   SLASH_TIME,
   VIEW_HALF_ANGLE,
   VIEW_RANGE_MAX_BONUS,
@@ -83,6 +87,9 @@ export function createEnemy(
             ENEMY_DASH_INTERVAL -
               (roomIndex - ENEMY_DASH_FROM_ROOM) * ENEMY_DASH_PER_ROOM,
           ),
+    hearing: 0,
+    heard: null,
+    searchTimer: 0,
   };
 }
 
@@ -133,8 +140,43 @@ function patrol(world: World, enemy: Enemy, dt: number): void {
   navigate(world, enemy, target, ENEMY_KINDS[enemy.kind].patrolSpeed, dt);
 }
 
+// Barulho do player (andar, saltar) enche `hearing`, mais rapido quanto mais
+// perto; atravessa parede. Cheio, o inimigo guarda onde ouviu e vai la.
+function listen(world: World, enemy: Enemy, dt: number): void {
+  const range =
+    world.player.noise *
+    (1 + Math.min(HEAR_MAX_BONUS, enemy.roomIndex * HEAR_PER_ROOM));
+  const gap = distance(enemy.pos, world.player.pos);
+  if (gap >= range) {
+    enemy.hearing = Math.max(0, enemy.hearing - dt * DETECT_DECAY);
+    return;
+  }
+  enemy.hearing += (dt * (1 - gap / range)) / HEAR_TIME;
+  if (enemy.hearing < 1) return;
+  enemy.hearing = 0;
+  enemy.heard = { ...world.player.pos };
+  enemy.searchTimer = SEARCH_TIME;
+  enemy.route = [];
+  enemy.repathTimer = 0;
+}
+
+// vai ate onde ouviu e espera la; acabou o tempo, volta a patrulha
+function investigate(world: World, enemy: Enemy, heard: Vec2, dt: number) {
+  enemy.searchTimer -= dt;
+  if (enemy.searchTimer <= 0) {
+    enemy.heard = null;
+    enemy.route = [];
+    enemy.repathTimer = 0;
+    return;
+  }
+  if (distance(enemy.pos, heard) < WAYPOINT_REACH) return;
+  navigate(world, enemy, heard, ENEMY_KINDS[enemy.kind].patrolSpeed, dt);
+}
+
 function enterAlert(enemy: Enemy): void {
   enemy.state = 'alert';
+  enemy.hearing = 0;
+  enemy.heard = null;
   enemy.alertTimer = ALERT_DURATION;
   enemy.fireCooldown = FIRE_DELAY;
   // primeiro salto nao vem junto com o alerta
@@ -226,6 +268,7 @@ export function updateEnemies(world: World, dt: number): void {
       alert(world, enemy, dt);
       continue;
     }
+    listen(world, enemy, dt);
     if (canSee(world, enemy, world.player.pos)) {
       enemy.detection = Math.min(1, enemy.detection + dt / enemy.detectTime);
       enemy.facing = angleTo(enemy.pos, world.player.pos);
@@ -235,6 +278,11 @@ export function updateEnemies(world: World, dt: number): void {
     enemy.detection = Math.max(0, enemy.detection - dt * DETECT_DECAY);
     if (enemy.detection > 0) {
       enemy.state = 'suspicious';
+      continue;
+    }
+    if (enemy.heard) {
+      enemy.state = 'suspicious';
+      investigate(world, enemy, enemy.heard, dt);
       continue;
     }
     enemy.state = 'patrol';

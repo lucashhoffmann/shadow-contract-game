@@ -28,7 +28,7 @@ const LEGEND: [label: string, text: string][] = [
   ['Caixa', 'cobre de bala e quebra com tiro ou briga'],
   ['Adrenalina', 'cada eliminacao acelera voce por um instante'],
   ['Parede', 'bloqueia visao e bala'],
-  ['Zona verde', 'loja no fim do contrato. Precos mudam a cada visita'],
+  ['B', 'abrir e fechar o bau da loja, no fim do contrato'],
 ];
 
 // usado antes de cada run ("Como jogar") e na pausa ("Pausado")

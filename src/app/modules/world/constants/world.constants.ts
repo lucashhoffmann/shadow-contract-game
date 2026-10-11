@@ -32,6 +32,8 @@ export const DASH_SPEED = 9;
 export const DASH_COOLDOWN = 0.9;
 // quem morre derruba o cenario em volta
 export const PROP_BREAK_RADIUS = 1.5;
+// distancia do centro do bau em que a tecla B abre a loja
+export const CHEST_RANGE = 1.4;
 
 // inimigo
 export const ENEMY_RADIUS = 0.35;
@@ -87,6 +89,18 @@ export const ENEMY_DASH_FROM_ROOM = 2;
 export const ENEMY_DASH_INTERVAL = 4;
 export const ENEMY_DASH_PER_ROOM = 0.25;
 export const ENEMY_DASH_MIN_INTERVAL = 1.2;
+
+// audicao: raio do barulho de andar e de saltar. O inimigo ouve mais rapido
+// quanto mais perto; colado levaria HEAR_TIME. Fora do raio nao ouve nada:
+// e a folga que deixa chegar por tras andando.
+export const NOISE_WALK = 3;
+export const NOISE_DASH = 5;
+export const HEAR_TIME = 0.5;
+// ouvido afina por sala: raio cresce ate +HEAR_MAX_BONUS (fracao)
+export const HEAR_PER_ROOM = 0.05;
+export const HEAR_MAX_BONUS = 0.5;
+// quanto tempo investiga o barulho antes de voltar a patrulha
+export const SEARCH_TIME = 4;
 
 // economia: recompensa fixa por sala; quem sobe e o preco (shop.constants)
 export const KILL_MONEY = 40;

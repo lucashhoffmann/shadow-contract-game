@@ -1,6 +1,10 @@
 import { spawnRoom } from '@/app/modules/level/systems/level.system';
 import { SHOP_TEMPLATE } from '@/app/modules/level/templates/room.template';
-import { tileCenter } from '@/app/modules/level/utils/grid.util';
+import {
+  isSolidTile,
+  tileAt,
+  tileCenter,
+} from '@/app/modules/level/utils/grid.util';
 import {
   DEMAND_MARKUP,
   INFLATION_PER_SHOP,
@@ -15,10 +19,17 @@ import {
   canBuy,
   closeShop,
   rollMarket,
-  updateShopTrigger,
+  nearbyChest,
+  openChest,
 } from '@/app/modules/shop/systems/shop.system';
-import { PLAYER_MAX_HP } from '@/app/modules/world/constants/world.constants';
-import { createEmptyWorld } from '@/app/modules/world/systems/world.system';
+import {
+  FIXED_DT,
+  PLAYER_MAX_HP,
+} from '@/app/modules/world/constants/world.constants';
+import {
+  createEmptyWorld,
+  stepWorld,
+} from '@/app/modules/world/systems/world.system';
 import { createArenaWorld } from '@/test/world.fixture';
 
 function marketFor(seed: number, shops: number) {
@@ -143,44 +154,69 @@ describe('rollMarket', () => {
   });
 });
 
-describe('updateShopTrigger', () => {
+describe('openChest', () => {
+  // bau no tile (5, 5); o player chega pelo tile de baixo
   function shopWorld() {
     const world = createEmptyWorld(1);
     spawnRoom(world, 0, SHOP_TEMPLATE);
+    world.player.pos = tileCenter(0, 5, 6);
     return world;
   }
 
-  it('abre a loja ao pisar na zona, uma vez por sala', () => {
+  it('abre a loja perto do bau e reabre depois de fechar', () => {
     const world = shopWorld();
-    world.player.pos = tileCenter(0, 5, 5);
 
-    updateShopTrigger(world);
+    openChest(world);
     expect(world.status).toBe('shop');
 
     closeShop(world);
     expect(world.status).toBe('playing');
 
-    updateShopTrigger(world);
-    expect(world.status).toBe('playing');
-    expect(world.run.shops).toBe(1);
+    openChest(world);
+    expect(world.status).toBe('shop');
   });
 
-  it('sorteia precos novos ao abrir; a primeira loja nao tem inflacao', () => {
+  it('sorteia precos so na primeira abertura; a primeira loja nao tem inflacao', () => {
     const world = shopWorld();
     const before = world.market;
-    world.player.pos = tileCenter(0, 5, 5);
 
-    updateShopTrigger(world);
+    openChest(world);
+    const first = world.market;
+    expect(first).not.toBe(before);
+    expect(first.inflation).toBe(1);
+    expect(world.run.shops).toBe(1);
 
-    expect(world.market).not.toBe(before);
-    expect(world.market.inflation).toBe(1);
+    closeShop(world);
+    openChest(world);
+    expect(world.market).toBe(first);
     expect(world.run.shops).toBe(1);
   });
 
-  it('nao abre fora da zona', () => {
+  it('nao abre longe do bau nem em sala sem bau', () => {
     const world = shopWorld();
     world.player.pos = tileCenter(0, 5, 10);
-    updateShopTrigger(world);
+    expect(nearbyChest(world)).toBeUndefined();
+    openChest(world);
     expect(world.status).toBe('playing');
+
+    const arena = createArenaWorld();
+    openChest(arena);
+    expect(arena.status).toBe('playing');
+  });
+
+  it('bau bloqueia a passagem', () => {
+    const world = shopWorld();
+    expect(isSolidTile(tileAt(world, 5, 7))).toBe(true);
+  });
+
+  it('stepWorld so abre com o pulso da tecla B', () => {
+    const world = shopWorld();
+    const idle = { moveX: 0, moveY: 0, dash: false };
+
+    stepWorld(world, idle, FIXED_DT);
+    expect(world.status).toBe('playing');
+
+    stepWorld(world, { ...idle, open: true }, FIXED_DT);
+    expect(world.status).toBe('shop');
   });
 });

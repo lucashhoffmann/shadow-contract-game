@@ -57,6 +57,8 @@ export const DEFAULT_LOOK: PlayerLook = {
   hands: 1,
 };
 
+export const DEFAULT_BLOOD_COLOR = '#a61020';
+
 const COLOR = /^#[0-9a-f]{6}$/i;
 
 // descarta cor invalida e prende escala na faixa
@@ -81,7 +83,9 @@ type GameStore = {
   market: Market;
   best: number;
   look: PlayerLook;
+  bloodColor: string;
   setLook: (patch: Partial<PlayerLook>) => void;
+  setBloodColor: (color: string) => void;
   openCharacter: () => void;
   startRun: (seed?: number) => void;
   begin: () => void;
@@ -167,10 +171,14 @@ export const useGameStore = create<GameStore>()(
         market: createMarket(),
         best: 0,
         look: DEFAULT_LOOK,
+        bloodColor: DEFAULT_BLOOD_COLOR,
         // so antes da run: a engine le `look` uma vez, ao criar o renderer
         setLook: (patch) => {
           if (world) return;
           set({ look: mergeLook(get().look, patch) });
+        },
+        setBloodColor: (color) => {
+          if (COLOR.test(color)) set({ bloodColor: color });
         },
         openCharacter: () => {
           if (!world) set({ screen: 'character' });
@@ -213,14 +221,22 @@ export const useGameStore = create<GameStore>()(
     },
     {
       name: 'shadow-contract',
-      partialize: (state) => ({ best: state.best, look: state.look }),
+      partialize: (state) => ({
+        best: state.best,
+        look: state.look,
+        bloodColor: state.bloodColor,
+      }),
       // valor salvo passa pela mesma validacao de `setLook`
       merge: (saved, current) => {
-        const { best, look } = (saved ?? {}) as Partial<GameStore>;
+        const { best, look, bloodColor } = (saved ?? {}) as Partial<GameStore>;
         return {
           ...current,
           best: best ?? current.best,
           look: mergeLook(current.look, look ?? {}),
+          bloodColor:
+            typeof bloodColor === 'string' && COLOR.test(bloodColor)
+              ? bloodColor
+              : current.bloodColor,
         };
       },
     },

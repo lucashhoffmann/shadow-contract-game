@@ -1,4 +1,3 @@
-import { roomIndexAt, tileAt } from '@/app/modules/level/utils/grid.util';
 import {
   DEMAND_MARKUP,
   INFLATION_PER_SHOP,
@@ -7,12 +6,15 @@ import {
   PRICE_STEP,
   PRICE_VOLATILITY,
 } from '@/app/modules/shop/constants/shop.constants';
+import { CHEST_RANGE } from '@/app/modules/world/constants/world.constants';
 import type {
   ItemDef,
   ItemId,
   Market,
+  Room,
   World,
 } from '@/app/modules/world/types/world.types';
+import { distance } from '@/shared/utils/math.util';
 import { nextRandom } from '@/shared/utils/rng.util';
 
 function roundPrice(value: number): number {
@@ -23,6 +25,7 @@ function roundPrice(value: number): number {
 function priceAll(price: (item: ItemDef) => number): Record<ItemId, number> {
   return {
     pistol: price(ITEMS.pistol),
+    silenced: price(ITEMS.silenced),
     shotgun: price(ITEMS.shotgun),
     armor: price(ITEMS.armor),
   };
@@ -75,15 +78,24 @@ export function buyItem(world: World, id: ItemId): boolean {
   return true;
 }
 
-// pisar na zona 'S' abre a loja uma vez por sala, com precos novos
-export function updateShopTrigger(world: World): void {
-  const { x, y } = world.player.pos;
-  if (tileAt(world, Math.floor(x), Math.floor(y)) !== 'S') return;
-  const room = world.rooms.find((r) => r.index === roomIndexAt(y));
-  if (!room || room.shopVisited) return;
-  room.shopVisited = true;
-  rollMarket(world);
-  world.run.shops++;
+// sala cujo bau esta ao alcance do player
+export function nearbyChest(world: World): Room | undefined {
+  return world.rooms.find(
+    (room) =>
+      room.chest && distance(world.player.pos, room.chest) <= CHEST_RANGE,
+  );
+}
+
+// tecla B perto do bau abre a loja, quantas vezes quiser. Precos novos so na
+// primeira abertura da sala; reabrir mostra os mesmos
+export function openChest(world: World): void {
+  const room = nearbyChest(world);
+  if (!room) return;
+  if (!room.shopVisited) {
+    room.shopVisited = true;
+    rollMarket(world);
+    world.run.shops++;
+  }
   world.status = 'shop';
 }
 

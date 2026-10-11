@@ -1,5 +1,6 @@
 import { setJoystickInput } from '@/app/store/game-store/game.store';
 import { VirtualJoystick } from '@/resources/components/base/virtual-joystick/virtual-joystick.component';
+import { DamageVignette } from '@/resources/pages/game/components/damage-vignette.component';
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
 import { Hud } from '@/resources/pages/game/components/hud.component';
 import { LegendDialog } from '@/resources/pages/game/components/legend-dialog.component';
@@ -11,9 +12,11 @@ export function GamePage() {
     canvasRef,
     screen,
     hud,
+    hits,
     market,
     best,
     legend,
+    previews,
     buy,
     closeShop,
     restart,
@@ -26,7 +29,11 @@ export function GamePage() {
         ref={canvasRef}
         className='block h-full w-full'
       />
-      <Hud hud={hud} />
+      <DamageVignette hits={hits} />
+      <Hud
+        hud={hud}
+        previews={previews}
+      />
       <VirtualJoystick onMove={setJoystickInput} />
       <LegendDialog
         open={screen === 'intro' || screen === 'paused'}
@@ -36,6 +43,7 @@ export function GamePage() {
         open={screen === 'shop'}
         money={hud.money}
         market={market}
+        previews={previews}
         onBuy={buy}
         onClose={closeShop}
       />

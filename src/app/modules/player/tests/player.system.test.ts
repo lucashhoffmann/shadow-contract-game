@@ -7,6 +7,8 @@ import {
   DASH_SPEED,
   DASH_TIME,
   FIXED_DT,
+  NOISE_DASH,
+  NOISE_WALK,
   PLAYER_RADIUS,
   PLAYER_SPEED,
 } from '@/app/modules/world/constants/world.constants';
@@ -107,4 +109,17 @@ describe('movePlayer', () => {
     expect(world.player.pos.x).toBeGreaterThanOrEqual(1 + PLAYER_RADIUS - 1e-9);
     expect(world.player.pos.x).toBeLessThan(1.5);
   });
+});
+
+it('faz barulho ao andar e mais ao saltar; parado fica em silencio', () => {
+  const world = createArenaWorld();
+  walk(world, 1, 0, FIXED_DT);
+  expect(world.player.noise).toBe(NOISE_WALK);
+  walk(world, 0.5, 0, FIXED_DT);
+  expect(world.player.noise).toBe(NOISE_WALK / 2);
+  movePlayer(world, { moveX: 0, moveY: 0, dash: true }, FIXED_DT);
+  expect(world.player.noise).toBe(NOISE_DASH);
+  world.player.dash = 0;
+  walk(world, 0, 0, FIXED_DT);
+  expect(world.player.noise).toBe(0);
 });

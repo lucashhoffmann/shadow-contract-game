@@ -16,7 +16,7 @@ import {
 import { movePlayer } from '@/app/modules/player/systems/player.system';
 import {
   createMarket,
-  updateShopTrigger,
+  openChest,
 } from '@/app/modules/shop/systems/shop.system';
 import {
   ATTACK_COOLDOWN,
@@ -42,6 +42,7 @@ export function createEmptyWorld(seed: number): World {
       adrenaline: 0,
       dash: 0,
       dashCooldown: 0,
+      noise: 0,
       weapon: null,
     },
     enemies: [],
@@ -86,6 +87,6 @@ export function stepWorld(world: World, input: InputState, dt: number): void {
   updateCombat(world, dt);
   updateProjectiles(world, dt);
   collectPickups(world);
-  updateShopTrigger(world);
+  if (input.open) openChest(world);
   if (world.player.hp <= 0) world.status = 'dead';
 }

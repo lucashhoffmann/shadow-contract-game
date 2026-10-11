@@ -1,7 +1,7 @@
 import type { RoomTemplate } from '@/app/modules/world/types/world.types';
 
 // Linha 0 = fundo da sala (saida), ultima linha = entrada.
-// '#' parede, '.' chao, '$' dinheiro, 'S' zona de loja, 'o' caixa destrutivel.
+// '#' parede, '.' chao, '$' dinheiro, 'C' bau da loja, 'o' caixa destrutivel.
 // Regras em docs/contracts.md; level.test.ts valida todo template.
 
 export const START_TEMPLATE: RoomTemplate = {
@@ -34,8 +34,8 @@ export const SHOP_TEMPLATE: RoomTemplate = {
     '#.o.....o.#',
     '#.........#',
     '#.........#',
-    '#...SSS...#',
-    '#...SSS...#',
+    '#....C....#',
+    '#.........#',
     '#.........#',
     '#.........#',
     '#.........#',

@@ -1,12 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useGameStore } from '@/app/store/game-store/game.store';
+import {
+  DEFAULT_BLOOD_COLOR,
+  useGameStore,
+} from '@/app/store/game-store/game.store';
 import { HomePage } from '@/resources/pages/home/home.page';
 
 beforeEach(() => {
   useGameStore.getState().backToMenu();
-  useGameStore.setState({ best: 0 });
+  useGameStore.setState({ best: 0, bloodColor: DEFAULT_BLOOD_COLOR });
 });
 
 describe('HomePage', () => {
@@ -28,5 +31,16 @@ describe('HomePage', () => {
       screen.getByRole('button', { name: 'Configurar personagem' }),
     );
     expect(useGameStore.getState().screen).toBe('character');
+  });
+
+  it('configuracoes permitem escolher a cor do sangue', async () => {
+    render(<HomePage />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Configurações' }),
+    );
+    fireEvent.change(screen.getByLabelText('Cor do sangue'), {
+      target: { value: '#22aa44' },
+    });
+    expect(useGameStore.getState().bloodColor).toBe('#22aa44');
   });
 });
