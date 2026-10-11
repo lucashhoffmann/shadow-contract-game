@@ -3,14 +3,16 @@ import {
   KILL_MONEY,
 } from '@/app/modules/world/constants/world.constants';
 import {
+  beginRun,
   createWorld,
   stepWorld,
+  togglePause,
 } from '@/app/modules/world/systems/world.system';
 import type { InputState, World } from '@/app/modules/world/types/world.types';
 import { addEnemy, createArenaWorld } from '@/test/world.fixture';
 
-const IDLE: InputState = { moveX: 0, moveY: 0 };
-const FORWARD: InputState = { moveX: 0, moveY: 1 };
+const IDLE: InputState = { moveX: 0, moveY: 0, dash: false };
+const FORWARD: InputState = { moveX: 0, moveY: 1, dash: false };
 
 function run(world: World, input: InputState, seconds: number) {
   const steps = Math.round(seconds / FIXED_DT);
@@ -56,6 +58,28 @@ describe('stepWorld', () => {
     world.status = 'shop';
     run(world, FORWARD, 1);
     expect(world.player.pos).toEqual({ x: 5.5, y: 2.5 });
+  });
+
+  it('pausa congela e despausa retoma', () => {
+    const world = createArenaWorld();
+    togglePause(world);
+    expect(world.status).toBe('paused');
+    run(world, FORWARD, 1);
+    expect(world.player.pos.y).toBe(2.5);
+
+    togglePause(world);
+    run(world, FORWARD, 1);
+    expect(world.player.pos.y).toBeGreaterThan(2.5);
+  });
+
+  it('legenda inicial segura a simulacao ate beginRun', () => {
+    const world = createArenaWorld();
+    world.status = 'intro';
+    togglePause(world);
+    expect(world.status).toBe('intro');
+
+    beginRun(world);
+    expect(world.status).toBe('playing');
   });
 
   it('e deterministico para o mesmo seed e os mesmos inputs', () => {

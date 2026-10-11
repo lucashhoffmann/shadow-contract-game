@@ -1,7 +1,7 @@
 import type { RoomTemplate } from '@/app/modules/world/types/world.types';
 
 // Linha 0 = fundo da sala (saida), ultima linha = entrada.
-// '#' parede, '.' chao, '$' dinheiro, 'S' zona de loja.
+// '#' parede, '.' chao, '$' dinheiro, 'S' zona de loja, 'o' caixa destrutivel.
 // Regras em docs/contracts.md; level.test.ts valida todo template.
 
 export const START_TEMPLATE: RoomTemplate = {
@@ -31,7 +31,7 @@ export const SHOP_TEMPLATE: RoomTemplate = {
   tiles: [
     '####...####',
     '#.........#',
-    '#.........#',
+    '#.o.....o.#',
     '#.........#',
     '#.........#',
     '#...SSS...#',
@@ -55,13 +55,13 @@ export const COMBAT_TEMPLATES: RoomTemplate[] = [
       '#.........#',
       '#.........#',
       '#..##.##..#',
-      '#.........#',
+      '#.o.....o.#',
       '#....$....#',
       '#.........#',
       '#.........#',
       '#..##.##..#',
       '#.........#',
-      '#.........#',
+      '#...o.....#',
       '#.........#',
       '####...####',
     ],
@@ -89,13 +89,13 @@ export const COMBAT_TEMPLATES: RoomTemplate[] = [
       '#.##...##.#',
       '#.##...##.#',
       '#.........#',
-      '#.........#',
+      '#....o....#',
       '#...###...#',
       '#.........#',
       '#.........#',
       '#.##...##.#',
       '#.##...##.#',
-      '#.........#',
+      '#.o.....o.#',
       '####...####',
     ],
     enemies: [
@@ -126,7 +126,7 @@ export const COMBAT_TEMPLATES: RoomTemplate[] = [
       '#.........#',
       '#...#######',
       '#.........#',
-      '#.........#',
+      '#..o...o..#',
       '#.........#',
       '#.........#',
       '####...####',
@@ -154,12 +154,12 @@ export const COMBAT_TEMPLATES: RoomTemplate[] = [
       '#.........#',
       '#.........#',
       '#.###.###.#',
-      '#.#.....#.#',
+      '#.#o....#.#',
       '#.#..$..#.#',
       '#.#.....#.#',
       '#.###.###.#',
       '#.........#',
-      '#.........#',
+      '#.o.....o.#',
       '#.........#',
       '#.........#',
       '####...####',
@@ -188,7 +188,7 @@ export const COMBAT_TEMPLATES: RoomTemplate[] = [
       '#.........#',
       '#....#....#',
       '#....#....#',
-      '#.........#',
+      '#...o.o...#',
       '###.....###',
       '#.........#',
       '#....#....#',
@@ -223,7 +223,7 @@ export const COMBAT_TEMPLATES: RoomTemplate[] = [
       '#...#.#...#',
       '#.........#',
       '#.........#',
-      '#.........#',
+      '#.o.....o.#',
       '#...#.#...#',
       '#.........#',
       '#.$.....$.#',

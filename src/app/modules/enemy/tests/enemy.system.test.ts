@@ -71,11 +71,31 @@ describe('updateEnemies', () => {
     expect(enemy.detection).toBe(0);
   });
 
-  it('em alerta atira e tira vida do player', () => {
+  it('terno em alerta dispara balas na direcao do player', () => {
     const world = createArenaWorld();
-    addEnemy(world, 5.5, 5.5, -Math.PI / 2);
+    addEnemy(world, 5.5, 5.5, -Math.PI / 2, 'suit');
     run(world, 2);
+    expect(world.projectiles.length).toBeGreaterThan(0);
+    expect(world.projectiles[0].owner).toBe('enemy');
+    expect(world.projectiles[0].vel.y).toBeLessThan(0);
+    expect(world.player.hp).toBe(PLAYER_MAX_HP);
+  });
+
+  it('ninja em alerta corre ate o player e golpeia de perto, sem balas', () => {
+    const world = createArenaWorld();
+    const ninja = addEnemy(world, 5.5, 5.5, -Math.PI / 2, 'ninja');
+    run(world, 3);
+    expect(ninja.pos.y).toBeLessThan(4);
+    expect(world.projectiles).toHaveLength(0);
     expect(world.player.hp).toBeLessThan(PLAYER_MAX_HP);
+  });
+
+  it('entra em alerta ao levar tiro, mesmo sem ver o player', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 5.5, Math.PI / 2);
+    enemy.detection = 1;
+    run(world, FIXED_DT);
+    expect(enemy.state).toBe('alert');
   });
 
   it('desiste do alerta apos ALERT_DURATION sem linha de visao', () => {

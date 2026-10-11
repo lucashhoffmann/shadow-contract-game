@@ -3,6 +3,7 @@ import { spawnRoom } from '@/app/modules/level/systems/level.system';
 import { createEmptyWorld } from '@/app/modules/world/systems/world.system';
 import type {
   Enemy,
+  EnemyKind,
   RoomTemplate,
   World,
 } from '@/app/modules/world/types/world.types';
@@ -46,8 +47,9 @@ export function addEnemy(
   x: number,
   y: number,
   facing: number,
+  kind: EnemyKind = 'suit',
 ): Enemy {
-  const enemy = createEnemy(world, 0, [{ x, y }]);
+  const enemy = createEnemy(world, 0, [{ x, y }], kind);
   enemy.facing = facing;
   world.enemies.push(enemy);
   return enemy;

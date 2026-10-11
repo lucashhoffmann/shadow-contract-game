@@ -34,7 +34,9 @@ src
 ├── app
 │   ├── engine
 │   │   ├── game-engine.ts
+│   │   ├── character-preview.ts
 │   │   └── renderers
+│   │       ├── character.renderer.ts
 │   │       └── world.renderer.ts
 │   ├── modules
 │   │   ├── world
@@ -55,6 +57,7 @@ src
 │   ├── pages
 │   │   ├── app.tsx
 │   │   ├── home
+│   │   ├── character
 │   │   └── game
 │   └── main.tsx
 ├── shared
@@ -88,11 +91,11 @@ src/app/modules
 │   ├── systems/enemy.system.ts          visao, deteccao, FSM
 │   └── tests
 ├── combat
-│   ├── systems/combat.system.ts         ataque, morte, coleta
+│   ├── systems/combat.system.ts         ataque, balas, morte, coleta
 │   └── tests
 └── shop
     ├── constants/shop.constants.ts      catalogo de itens
-    ├── systems/shop.system.ts           compra e gatilho da loja
+    ├── systems/shop.system.ts           mercado, compra e gatilho da loja
     └── tests
 ```
 
@@ -104,11 +107,18 @@ src/resources/pages
 ├── home
 │   ├── home.page.tsx
 │   └── tests
+├── character
+│   ├── character.page.tsx
+│   ├── use-character.page.ts            cria preview 3D, le store
+│   ├── components
+│   │   └── look-editor.component.tsx    cores e tamanhos do player
+│   └── tests
 └── game
     ├── game.page.tsx
     ├── use-game.page.ts                 cria engine, le store
     ├── components
     │   ├── hud.component.tsx
+    │   ├── legend-dialog.component.tsx  legenda inicial e tela de pausa
     │   ├── shop-dialog.component.tsx
     │   └── game-over-dialog.component.tsx
     └── tests

@@ -8,6 +8,7 @@ import {
   START_TEMPLATE,
 } from '@/app/modules/level/templates/room.template';
 import {
+  breakPropAt,
   hasLineOfSight,
   tileCenter,
 } from '@/app/modules/level/utils/grid.util';
@@ -33,7 +34,7 @@ describe.each(ALL_TEMPLATES)('template $id', (template) => {
   it('tem ROOM_H linhas de ROOM_W tiles validos', () => {
     expect(template.tiles).toHaveLength(ROOM_H);
     for (const line of template.tiles) {
-      expect(line).toMatch(new RegExp(`^[#.$S]{${ROOM_W}}$`));
+      expect(line).toMatch(new RegExp(`^[#.$So]{${ROOM_W}}$`));
     }
   });
 
@@ -112,6 +113,16 @@ describe('geracao de salas', () => {
     expect(world.run.roomIndex).toBe(5);
   });
 
+  it('cria uma caixa por tile o e copia os tiles do template', () => {
+    const open = COMBAT_TEMPLATES.find((t) => t.id === 'open')!;
+    const world = createEmptyWorld(1);
+    spawnRoom(world, 1, open);
+    const crates = open.tiles.join('').split('o').length - 1;
+    expect(world.props).toHaveLength(crates);
+    expect(world.props.every((p) => !p.broken)).toBe(true);
+    expect(world.rooms[0].tiles).not.toBe(open.tiles);
+  });
+
   it('poe mais inimigos em salas avancadas', () => {
     const plaza = COMBAT_TEMPLATES.find((t) => t.id === 'plaza')!;
     const world = createEmptyWorld(1);
@@ -140,6 +151,16 @@ describe('grid e caminho', () => {
     const path = findPath(world, from, to);
     expect(path.some((p) => p.x > 8)).toBe(true);
     expect(path[path.length - 1]).toEqual(to);
+  });
+
+  it('caixa bloqueia caminho mas nao visao; quebrada, libera', () => {
+    const world = createArenaWorld({ 6: '#ooooooooo#' });
+    expect(hasLineOfSight(world, from, to)).toBe(true);
+    expect(findPath(world, from, to)).toEqual([]);
+
+    expect(breakPropAt(world, 2.5, 6.5)).toBe(true);
+    expect(breakPropAt(world, 2.5, 6.5)).toBe(false);
+    expect(findPath(world, from, to)).toHaveLength(8);
   });
 
   it('devolve vazio sem caminho', () => {

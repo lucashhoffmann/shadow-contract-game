@@ -2,10 +2,12 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { createGameEngine } from '@/app/engine/game-engine';
+import { createMarket } from '@/app/modules/shop/systems/shop.system';
 import type { Hud as HudData } from '@/app/store/game-store/game.store';
 import { useGameStore } from '@/app/store/game-store/game.store';
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
 import { Hud } from '@/resources/pages/game/components/hud.component';
+import { LegendDialog } from '@/resources/pages/game/components/legend-dialog.component';
 import { ShopDialog } from '@/resources/pages/game/components/shop-dialog.component';
 import { GamePage } from '@/resources/pages/game/game.page';
 
@@ -25,6 +27,10 @@ const HUD: HudData = {
   ammo: 4,
 };
 
+function segments(container: HTMLElement, state: string) {
+  return container.querySelectorAll(`[data-state="${state}"]`).length;
+}
+
 describe('Hud', () => {
   it('mostra vida, sala, dinheiro e arma', () => {
     render(<Hud hud={HUD} />);
@@ -37,9 +43,32 @@ describe('Hud', () => {
     expect(screen.getByText('Pistola x4')).toBeInTheDocument();
   });
 
-  it('avisa quando nao ha arma', () => {
+  it('mostra a espada quando nao ha arma de fogo', () => {
     render(<Hud hud={{ ...HUD, weaponId: null, ammo: 0 }} />);
-    expect(screen.getByText('Sem arma')).toBeInTheDocument();
+    expect(screen.getByText('Espada')).toBeInTheDocument();
+  });
+
+  it('barra de contrato marca salas feitas, a atual e as que faltam', () => {
+    const { container } = render(<Hud hud={{ ...HUD, room: 3 }} />);
+    expect(screen.getByText('Contrato 1')).toBeInTheDocument();
+    expect(segments(container, 'done')).toBe(2);
+    expect(segments(container, 'current')).toBe(1);
+    expect(segments(container, 'todo')).toBe(2);
+  });
+
+  it('barra de contrato: sala inicial vazia, loja fecha o contrato', () => {
+    const start = render(<Hud hud={{ ...HUD, room: 0 }} />);
+    expect(segments(start.container, 'todo')).toBe(5);
+    start.unmount();
+
+    const shop = render(<Hud hud={{ ...HUD, room: 5 }} />);
+    expect(screen.getByText('Contrato 1')).toBeInTheDocument();
+    expect(segments(shop.container, 'done')).toBe(4);
+    expect(screen.getByText('$')).toHaveAttribute('data-state', 'current');
+    shop.unmount();
+
+    render(<Hud hud={{ ...HUD, room: 7 }} />);
+    expect(screen.getByText('Contrato 2')).toBeInTheDocument();
   });
 });
 
@@ -50,6 +79,7 @@ describe('ShopDialog', () => {
       <ShopDialog
         open
         money={250}
+        market={createMarket()}
         onBuy={onBuy}
         onClose={vi.fn()}
       />,
@@ -61,12 +91,37 @@ describe('ShopDialog', () => {
     expect(onBuy).toHaveBeenCalledWith('pistol');
   });
 
+  it('mostra o preco do mercado, a variacao e a inflacao', () => {
+    const base = createMarket();
+    render(
+      <ShopDialog
+        open
+        money={250}
+        market={{
+          inflation: 1.12,
+          prices: { ...base.prices, pistol: 250, armor: 200 },
+        }}
+        onBuy={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Inflacao: \+12%/)).toBeInTheDocument();
+    const pistol = screen.getByRole('button', { name: /Pistola/ });
+    expect(pistol).toHaveTextContent('$ 250');
+    expect(pistol).toHaveTextContent('▲ 25%');
+    expect(screen.getByRole('button', { name: /Colete/ })).toHaveTextContent(
+      '▼ 20%',
+    );
+  });
+
   it('Continuar fecha a loja', async () => {
     const onClose = vi.fn();
     render(
       <ShopDialog
         open
         money={0}
+        market={createMarket()}
         onBuy={vi.fn()}
         onClose={onClose}
       />,
@@ -80,11 +135,34 @@ describe('ShopDialog', () => {
       <ShopDialog
         open={false}
         money={0}
+        market={createMarket()}
         onBuy={vi.fn()}
         onClose={vi.fn()}
       />,
     );
     expect(screen.queryByText('Escolha o equipamento')).not.toBeInTheDocument();
+  });
+});
+
+describe('LegendDialog', () => {
+  it('mostra a legenda e dispara a acao', async () => {
+    const onAction = vi.fn();
+    render(
+      <LegendDialog
+        open
+        title='Como jogar'
+        actionLabel='Comecar'
+        onAction={onAction}
+      />,
+    );
+
+    expect(screen.getByText('Como jogar')).toBeInTheDocument();
+    expect(screen.getByText('P')).toBeInTheDocument();
+    expect(screen.getByText('Ninja')).toBeInTheDocument();
+    expect(screen.getByText('Terno')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Comecar' }));
+
+    expect(onAction).toHaveBeenCalled();
   });
 });
 
@@ -129,6 +207,27 @@ describe('GamePage', () => {
     );
     unmount();
     expect(dispose).toHaveBeenCalled();
+  });
+
+  it('abre na legenda e Comecar solta o jogo', async () => {
+    render(<GamePage />);
+    expect(screen.getByText('Como jogar')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Comecar' }));
+
+    expect(useGameStore.getState().screen).toBe('playing');
+    expect(screen.queryByText('Como jogar')).not.toBeInTheDocument();
+  });
+
+  it('pausa mostra a legenda como Pausado e Continuar retoma', async () => {
+    render(<GamePage />);
+    act(() => useGameStore.getState().begin());
+    act(() => useGameStore.getState().togglePause());
+    expect(screen.getByText('Pausado')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(useGameStore.getState().screen).toBe('playing');
   });
 
   it('abre loja e game over conforme a tela do store', () => {

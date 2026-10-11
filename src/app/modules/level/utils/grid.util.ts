@@ -1,16 +1,26 @@
 import { ROOM_H, ROOM_W } from '@/app/modules/world/constants/world.constants';
-import type { Vec2, World } from '@/app/modules/world/types/world.types';
+import type { Prop, Vec2, World } from '@/app/modules/world/types/world.types';
 import { angleTo, clamp, distance } from '@/shared/utils/math.util';
 
 const RAY_STEP = 0.1;
 
+function roomAt(world: World, ty: number) {
+  const index = Math.floor(ty / ROOM_H);
+  return world.rooms.find((r) => r.index === index);
+}
+
 // fora das salas vivas tudo e parede
 export function tileAt(world: World, tx: number, ty: number): string {
   if (tx < 0 || tx >= ROOM_W) return '#';
-  const index = Math.floor(ty / ROOM_H);
-  const room = world.rooms.find((r) => r.index === index);
+  const room = roomAt(world, ty);
   if (!room) return '#';
-  return room.tiles[ROOM_H - 1 - (ty - index * ROOM_H)][tx];
+  return room.tiles[ROOM_H - 1 - (ty - room.index * ROOM_H)][tx];
+}
+
+// parede ('#') bloqueia tudo. Caixa ('o') bloqueia passagem e bala, mas e
+// baixa: nao bloqueia visao.
+export function isSolidTile(tile: string): boolean {
+  return tile === '#' || tile === 'o';
 }
 
 export function isWall(world: World, x: number, y: number): boolean {
@@ -34,7 +44,7 @@ export function circleHitsWall(
 ): boolean {
   for (let ty = Math.floor(y - radius); ty <= Math.floor(y + radius); ty++) {
     for (let tx = Math.floor(x - radius); tx <= Math.floor(x + radius); tx++) {
-      if (tileAt(world, tx, ty) !== '#') continue;
+      if (!isSolidTile(tileAt(world, tx, ty))) continue;
       const dx = x - clamp(x, tx, tx + 1);
       const dy = y - clamp(y, ty, ty + 1);
       if (dx * dx + dy * dy < radius * radius) return true;
@@ -74,4 +84,36 @@ export function castRay(
 export function hasLineOfSight(world: World, a: Vec2, b: Vec2): boolean {
   const d = distance(a, b);
   return castRay(world, a, angleTo(a, b), d) >= d;
+}
+
+// quebrar libera o tile: a sala guarda a propria copia de `tiles`
+export function breakProp(world: World, prop: Prop): void {
+  if (prop.broken) return;
+  prop.broken = true;
+  const tx = Math.floor(prop.pos.x);
+  const ty = Math.floor(prop.pos.y);
+  const room = roomAt(world, ty);
+  if (!room) return;
+  const row = ROOM_H - 1 - (ty - room.index * ROOM_H);
+  const line = room.tiles[row];
+  room.tiles[row] = line.slice(0, tx) + '.' + line.slice(tx + 1);
+}
+
+// devolve true se havia caixa inteira no ponto (e ela quebrou)
+export function breakPropAt(world: World, x: number, y: number): boolean {
+  const tx = Math.floor(x);
+  const ty = Math.floor(y);
+  if (tileAt(world, tx, ty) !== 'o') return false;
+  const prop = world.props.find(
+    (p) =>
+      !p.broken && Math.floor(p.pos.x) === tx && Math.floor(p.pos.y) === ty,
+  );
+  if (prop) breakProp(world, prop);
+  return true;
+}
+
+export function breakPropsNear(world: World, pos: Vec2, radius: number): void {
+  for (const prop of world.props) {
+    if (distance(prop.pos, pos) <= radius) breakProp(world, prop);
+  }
 }

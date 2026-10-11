@@ -2,7 +2,7 @@
 
 export type Vec2 = { x: number; y: number };
 
-export type InputState = { moveX: number; moveY: number };
+export type InputState = { moveX: number; moveY: number; dash: boolean };
 
 export type RoomKind = 'start' | 'combat' | 'shop';
 
@@ -21,13 +21,25 @@ export type Room = {
   shopVisited: boolean;
 };
 
+export type EnemyKind = 'ninja' | 'suit';
+
+export type EnemyStats = {
+  hp: number;
+  patrolSpeed: number;
+  chaseSpeed: number;
+  viewRange: number;
+  ranged: boolean;
+};
+
 export type EnemyState = 'patrol' | 'suspicious' | 'alert' | 'dead';
 
 export type Enemy = {
   id: number;
+  kind: EnemyKind;
   roomIndex: number;
   pos: Vec2;
   facing: number;
+  hp: number;
   state: EnemyState;
   detection: number;
   patrol: Vec2[];
@@ -38,6 +50,25 @@ export type Enemy = {
   fireCooldown: number;
   viewRange: number;
   detectTime: number;
+};
+
+export type Projectile = {
+  id: number;
+  owner: 'player' | 'enemy';
+  // arma que disparou: so muda o modelo da bala
+  weapon: WeaponId;
+  pos: Vec2;
+  vel: Vec2;
+  damage: number;
+  life: number;
+};
+
+// objeto de cenario destrutivel; ocupa um tile ('o') enquanto inteiro
+export type Prop = {
+  id: number;
+  roomIndex: number;
+  pos: Vec2;
+  broken: boolean;
 };
 
 export type Pickup = {
@@ -58,8 +89,14 @@ export type ItemDef = {
   price: number;
   range: number;
   ammo: number;
-  area: boolean;
+  pellets: number;
+  spread: number;
   bonusHp: number;
+};
+
+export type Market = {
+  inflation: number;
+  prices: Record<ItemId, number>;
 };
 
 export type Player = {
@@ -68,12 +105,26 @@ export type Player = {
   hp: number;
   maxHp: number;
   attackCooldown: number;
+  // segundos restantes do golpe de espada (so para animacao)
+  slash: number;
+  // segundos restantes do bonus de velocidade apos uma morte
+  adrenaline: number;
+  // segundos restantes do salto no ar
+  dash: number;
+  // segundos ate poder saltar de novo
+  dashCooldown: number;
   weapon: { id: WeaponId; ammo: number } | null;
 };
 
-export type Run = { money: number; roomIndex: number; kills: number };
+export type Run = {
+  money: number;
+  earned: number;
+  roomIndex: number;
+  kills: number;
+  shops: number;
+};
 
-export type WorldStatus = 'playing' | 'shop' | 'dead';
+export type WorldStatus = 'intro' | 'playing' | 'paused' | 'shop' | 'dead';
 
 export type World = {
   rngState: number;
@@ -81,7 +132,10 @@ export type World = {
   status: WorldStatus;
   player: Player;
   enemies: Enemy[];
+  projectiles: Projectile[];
+  props: Prop[];
   pickups: Pickup[];
   rooms: Room[];
   run: Run;
+  market: Market;
 };

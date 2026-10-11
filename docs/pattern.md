@@ -30,7 +30,8 @@ Regras:
 
 - `app/modules` nao importa `three`, React, DOM nem `store`
 - `three` so e importado em `app/engine`
-- `resources` nao importa `app/engine` fora de `use-game.page.ts`
+- `resources` so importa `app/engine` em hook de pagina que monta canvas:
+  `use-game.page.ts` e `use-character.page.ts`
 - `resources` nao muta `World`; so chama acoes do store
 - `shared` nao depende de `app` nem de `resources`
 - `resources/components/ui` nao contem regra de jogo

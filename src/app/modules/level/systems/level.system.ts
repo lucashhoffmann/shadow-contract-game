@@ -6,6 +6,8 @@ import {
 } from '@/app/modules/level/templates/room.template';
 import { roomIndexAt, tileCenter } from '@/app/modules/level/utils/grid.util';
 import {
+  NINJA_CHANCE,
+  NINJA_FROM_ROOM,
   ROOMS_AHEAD,
   ROOMS_BEHIND,
   ROOMS_PER_EXTRA_ENEMY,
@@ -35,7 +37,8 @@ export function spawnRoom(
     index,
     templateId: template.id,
     kind: template.kind,
-    tiles: template.tiles,
+    // copia: quebrar caixa edita os tiles desta sala, nao do template
+    tiles: [...template.tiles],
     shopVisited: false,
   });
 
@@ -47,11 +50,23 @@ export function spawnRoom(
     const patrol = template.enemies[i].path.map(([col, row]) =>
       tileCenter(index, col, row),
     );
-    world.enemies.push(createEnemy(world, index, patrol));
+    const kind =
+      index >= NINJA_FROM_ROOM && nextRandom(world) < NINJA_CHANCE
+        ? 'ninja'
+        : 'suit';
+    world.enemies.push(createEnemy(world, index, patrol, kind));
   }
 
   template.tiles.forEach((line, row) => {
     for (let col = 0; col < line.length; col++) {
+      if (line[col] === 'o') {
+        world.props.push({
+          id: world.nextId++,
+          roomIndex: index,
+          pos: tileCenter(index, col, row),
+          broken: false,
+        });
+      }
       if (line[col] !== '$') continue;
       world.pickups.push({
         id: world.nextId++,
@@ -76,4 +91,5 @@ export function updateRooms(world: World): void {
   world.rooms = world.rooms.filter((r) => r.index >= min);
   world.enemies = world.enemies.filter((e) => e.roomIndex >= min);
   world.pickups = world.pickups.filter((p) => p.roomIndex >= min);
+  world.props = world.props.filter((p) => p.roomIndex >= min);
 }

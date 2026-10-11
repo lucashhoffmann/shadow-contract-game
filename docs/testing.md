@@ -21,7 +21,8 @@ pnpm typecheck     # inclui os arquivos de teste (tsconfig.spec.json)
 | `app/engine`  | render three.js            | sem teste unitario; verificacao no navegador |
 
 jsdom nao tem WebGL. Teste de pagina que monta a engine usa
-`vi.mock('@/app/engine/game-engine')`.
+`vi.mock('@/app/engine/game-engine')`; a tela de personagem usa
+`vi.mock('@/app/engine/character-preview')`.
 
 ## Onde colocar
 
@@ -33,7 +34,8 @@ jsdom nao tem WebGL. Teste de pagina que monta a engine usa
 `src/test/world.fixture.ts`:
 
 - `createArenaWorld()`: uma sala aberta, fechada nas bordas, sem inimigos
-- `addEnemy(world, x, y, facing)`: inimigo parado olhando para `facing`
+- `addEnemy(world, x, y, facing, kind?)`: inimigo parado olhando para `facing`;
+  `kind` e `'suit'` por padrao
 
 Usar a fixture em vez de `createWorld` quando o teste precisa de geometria
 conhecida. Usar `createWorld(seed)` para testar geracao e integracao.
@@ -56,10 +58,13 @@ conhecida. Usar `createWorld(seed)` para testar geracao e integracao.
   deterministica, loja a cada `SHOP_EVERY` salas, no maximo 3 salas vivas
 - `player`: anda, nao atravessa parede, desliza na parede, diagonal nao e mais
   rapida
-- `enemy`: cone (angulo, alcance, parede), deteccao sobe e desce, alerta
-  atira
-- `combat`: melee so em inimigo nao alertado, arma gasta municao, morte solta
-  dinheiro, coleta soma
-- `shop`: compra debita, sem saldo nao compra, gatilho abre uma vez por sala
-- `world`: `stepWorld` integra tudo, congela fora de `playing`, morte muda
-  `status`
+- `enemy`: cone (angulo, alcance, parede), deteccao sobe e desce, terno
+  dispara bala, ninja golpeia de perto, tiro recebido alerta
+- `combat`: melee so em inimigo nao alertado e sem gastar municao, arma dispara
+  balas e gasta municao, bala para em parede, acerta por contato, some no fim
+  do alcance, morte solta dinheiro, coleta soma
+- `shop`: compra cobra o preco de mercado, sem saldo nao compra, precos
+  deterministicos por seed, oscilacao dentro da faixa, inflacao com teto,
+  recompra encarece, gatilho abre uma vez por sala
+- `world`: `stepWorld` integra tudo, congela em `intro`, `paused`, `shop` e
+  `dead`, morte muda `status`

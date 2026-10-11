@@ -16,9 +16,17 @@ describe('HomePage', () => {
     expect(screen.getByText('Recorde: sala 9')).toBeInTheDocument();
   });
 
-  it('Play inicia uma run', async () => {
+  it('Play inicia uma run, que abre na legenda', async () => {
     render(<HomePage />);
     await userEvent.click(screen.getByRole('button', { name: 'Play' }));
-    expect(useGameStore.getState().screen).toBe('playing');
+    expect(useGameStore.getState().screen).toBe('intro');
+  });
+
+  it('Configurar personagem abre a tela de personagem', async () => {
+    render(<HomePage />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Configurar personagem' }),
+    );
+    expect(useGameStore.getState().screen).toBe('character');
   });
 });

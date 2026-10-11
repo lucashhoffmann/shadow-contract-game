@@ -1,4 +1,4 @@
-import { tileAt } from '@/app/modules/level/utils/grid.util';
+import { isSolidTile, tileAt } from '@/app/modules/level/utils/grid.util';
 import type { Vec2, World } from '@/app/modules/world/types/world.types';
 
 const DIRS = [
@@ -15,7 +15,7 @@ const DIRS = [
 export function findPath(world: World, from: Vec2, to: Vec2): Vec2[] {
   const goalX = Math.floor(to.x);
   const goalY = Math.floor(to.y);
-  if (tileAt(world, goalX, goalY) === '#') return [];
+  if (isSolidTile(tileAt(world, goalX, goalY))) return [];
 
   const queue: [number, number][] = [[Math.floor(from.x), Math.floor(from.y)]];
   const parents = [-1];
@@ -34,7 +34,7 @@ export function findPath(world: World, from: Vec2, to: Vec2): Vec2[] {
       const nx = x + dx;
       const ny = y + dy;
       const key = `${nx},${ny}`;
-      if (seen.has(key) || tileAt(world, nx, ny) === '#') continue;
+      if (seen.has(key) || isSolidTile(tileAt(world, nx, ny))) continue;
       seen.add(key);
       parents.push(i);
       queue.push([nx, ny]);

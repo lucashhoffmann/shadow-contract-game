@@ -1,0 +1,306 @@
+import * as THREE from 'three';
+
+import type { EnemyKind, Vec2 } from '@/app/modules/world/types/world.types';
+import type { PlayerLook } from '@/app/store/game-store/game.store';
+
+// Monta personagens (player e inimigos) com pecas simples, em pose de descanso.
+// Nao poe na cena nem anima: isso e de quem usa (jogo ou preview).
+// Personagem: +x local e a frente, +z e a direita.
+
+const HEAD_Y = 1.1;
+const HIP_Y = 0.36;
+const SHOULDER_Y = 0.76;
+const SHADOW_Y = 0.02;
+const OUTLINE = 0.025;
+// [direita, esquerda] em z local
+export const SIDES = [1, -1];
+// em descanso a lamina aponta para tras e para fora, visivel de cima
+export const SWORD_REST_TURN = 0.5;
+export const SWORD_REST_TILT = 1.85;
+
+export type CharacterKind = 'player' | EnemyKind;
+
+// peca: geometria, material, posicao local, inclinacao em z e escala.
+// Pecas de cabeca usam posicao relativa ao centro da cabeca.
+type Part = [
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  x: number,
+  y: number,
+  z: number,
+  tilt?: number,
+  scale?: number,
+];
+
+export type Character = {
+  root: THREE.Group;
+  // inclina o corpo todo para frente ao correr
+  lean: THREE.Group;
+  // perna maior ergue o corpo para o pe continuar no chao
+  lift: number;
+  head: THREE.Group;
+  shadow: THREE.Mesh;
+  // pivos no quadril e no ombro, na ordem de SIDES
+  legs: THREE.Group[];
+  arms: THREE.Group[];
+  // braco direito que segura arma fica nesse angulo em vez de balancar
+  hold: number | null;
+  sword: THREE.Group | null;
+  last: Vec2 | null;
+  speed: number;
+  idle: number;
+};
+
+export type CharacterKit = {
+  make: (kind: CharacterKind) => Character;
+  dispose: () => void;
+};
+
+const size = new THREE.Vector3();
+
+// Cada peca ganha contorno: casca invertida, OUTLINE maior em cada eixo.
+// ponytail: 2 draw calls por peca; fundir geometrias se passar de ~30 inimigos
+function addParts(
+  group: THREE.Group,
+  parts: Part[],
+  outline: THREE.Material,
+): void {
+  for (const [geometry, material, x, y, z, tilt = 0, scale = 1] of parts) {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.rotation.z = tilt;
+    mesh.scale.setScalar(scale);
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    geometry.boundingBox?.getSize(size);
+    const hull = new THREE.Mesh(geometry, outline);
+    hull.scale.set(
+      1 + (2 * OUTLINE) / size.x,
+      1 + (2 * OUTLINE) / size.y,
+      1 + (2 * OUTLINE) / size.z,
+    );
+    mesh.add(hull);
+    group.add(mesh);
+  }
+}
+
+// Lamina de katana: perfil curvo com ponta, base na origem, crescendo em +y.
+// Fio em -z e dorso em +z; fina em x, para aparecer larga vista de cima.
+function katanaBlade(): THREE.BufferGeometry {
+  const profile = new THREE.Shape();
+  profile.moveTo(-0.035, 0);
+  profile.quadraticCurveTo(-0.05, 0.45, 0, 0.78);
+  profile.lineTo(0.075, 0.88);
+  profile.quadraticCurveTo(0.02, 0.45, 0.035, 0);
+  return new THREE.ExtrudeGeometry(profile, {
+    depth: 0.02,
+    bevelEnabled: false,
+  })
+    .translate(0, 0, -0.01)
+    .rotateY(-Math.PI / 2);
+}
+
+// `look` vale para o kit inteiro: aparencia nova pede kit novo
+export function createCharacterKit(look: PlayerLook): CharacterKit {
+  const geo = {
+    shadow: new THREE.CircleGeometry(0.38, 20),
+    // chibi: cabeca grande, tronco curto com ombros largos em z
+    torso: new THREE.CapsuleGeometry(0.2, 0.16, 4, 12).scale(0.85, 1, 1.15),
+    head: new THREE.SphereGeometry(0.3, 18, 14),
+    leg: new THREE.CapsuleGeometry(0.085, 0.14, 4, 8),
+    foot: new THREE.BoxGeometry(0.2, 0.08, 0.13),
+    arm: new THREE.CapsuleGeometry(0.075, 0.18, 4, 8),
+    hand: new THREE.SphereGeometry(0.085, 10, 8),
+    band: new THREE.TorusGeometry(0.287, 0.035, 8, 24).rotateX(Math.PI / 2),
+    face: new THREE.BoxGeometry(0.12, 0.1, 0.34),
+    eye: new THREE.BoxGeometry(0.03, 0.06, 0.05),
+    tail: new THREE.BoxGeometry(0.26, 0.05, 0.07),
+    blade: katanaBlade(),
+    grip: new THREE.CylinderGeometry(0.028, 0.028, 0.26, 8),
+    guard: new THREE.CylinderGeometry(0.085, 0.085, 0.025, 12),
+    hair: new THREE.SphereGeometry(0.315, 18, 8, 0, Math.PI * 2, 0, 1.4),
+    shirt: new THREE.BoxGeometry(0.05, 0.26, 0.16),
+    tie: new THREE.BoxGeometry(0.04, 0.22, 0.06),
+    gun: new THREE.BoxGeometry(0.09, 0.24, 0.07),
+  };
+  // rampa de 3 tons: sombra em degraus em vez de gradiente
+  const ramp = new THREE.DataTexture(
+    new Uint8Array([110, 190, 255]),
+    3,
+    1,
+    THREE.RedFormat,
+  );
+  ramp.needsUpdate = true;
+  const toon = (color: THREE.ColorRepresentation): THREE.Material =>
+    new THREE.MeshToonMaterial({ color, gradientMap: ramp });
+  const mat = {
+    outline: new THREE.MeshBasicMaterial({
+      color: 0x14141f,
+      side: THREE.BackSide,
+    }),
+    shadow: new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+    }),
+    playerCloth: toon(look.cloth),
+    playerAccent: toon(look.accent),
+    playerSkin: toon(look.skin),
+    gold: toon(0xd9a441),
+    dark: toon(0x1c1c28),
+    steel: toon(0xc8ccd8),
+    skin: toon(0xe8b796),
+    purple: toon(0x5a3f8a),
+    red: toon(0xd93636),
+    navy: toon(0x2c3e66),
+    white: toon(0xf2f2f2),
+  };
+
+  const eyes: Part[] = SIDES.map((side) => [
+    geo.eye,
+    mat.dark,
+    0.285,
+    -0.03,
+    side * 0.085,
+  ]);
+
+  // ninja: capuz com rosto a mostra e faixa com pontas soltas atras
+  function ninja(
+    cloth: THREE.Material,
+    accent: THREE.Material,
+    skin: THREE.Material,
+  ): { body: Part[]; head: Part[] } {
+    return {
+      body: [[geo.torso, cloth, 0, 0.6, 0]],
+      head: [
+        [geo.head, cloth, 0, 0, 0],
+        [geo.face, skin, 0.22, -0.03, 0],
+        ...eyes,
+        [geo.band, accent, 0, 0.09, 0],
+        [geo.tail, accent, -0.4, 0.09, 0.05, 0.35],
+        [geo.tail, accent, -0.4, 0.09, -0.05, -0.35],
+      ],
+    };
+  }
+
+  const CLOTH = { player: mat.playerCloth, ninja: mat.purple, suit: mat.navy };
+  // base da lamina no quadril, ponta atras da cabeca
+  const katanaOnBack: Part = [geo.blade, mat.steel, -0.1, 0.36, 0.08, 0.45];
+  // cabo na mao, guarda e lamina; a origem e o ponto de pegada
+  const katanaInHand: Part[] = [
+    [geo.grip, mat.dark, 0, 0.03, 0],
+    [geo.guard, mat.gold, 0, 0.165, 0],
+    [geo.blade, mat.steel, 0, 0.175, 0],
+  ];
+  const enemyNinja = ninja(mat.purple, mat.red, mat.skin);
+  const PARTS: Record<CharacterKind, { body: Part[]; head: Part[] }> = {
+    // player leva a espada na mao (grupo proprio, para o golpe)
+    player: ninja(mat.playerCloth, mat.playerAccent, mat.playerSkin),
+    ninja: { ...enemyNinja, body: [...enemyNinja.body, katanaOnBack] },
+    // terno: camisa e gravata na frente, cabelo; pistola vai no braco
+    suit: {
+      body: [
+        [geo.torso, mat.navy, 0, 0.6, 0],
+        [geo.shirt, mat.white, 0.15, 0.64, 0],
+        [geo.tie, mat.red, 0.165, 0.64, 0],
+      ],
+      head: [
+        [geo.head, mat.skin, 0, 0, 0],
+        [geo.hair, mat.dark, -0.03, 0, 0],
+        ...eyes,
+      ],
+    },
+  };
+  // angulo do braco direito: player segura a espada, terno aponta a pistola
+  const HOLD: Record<CharacterKind, number | null> = {
+    player: 0.5,
+    ninja: null,
+    suit: Math.PI / 2 - 0.1,
+  };
+
+  function make(kind: CharacterKind): Character {
+    const cloth = CLOTH[kind];
+    // so o player e configuravel
+    const scale = kind === 'player' ? look : { head: 1, legs: 1, hands: 1 };
+    const lift = HIP_Y * (scale.legs - 1);
+    const root = new THREE.Group();
+    const lean = new THREE.Group();
+    lean.position.y = lift;
+    const head = new THREE.Group();
+    // cresce para cima: o queixo quase nao sai do lugar
+    head.position.y = HEAD_Y + (scale.head - 1) * 0.25;
+    head.scale.setScalar(scale.head);
+    addParts(lean, PARTS[kind].body, mat.outline);
+    addParts(head, PARTS[kind].head, mat.outline);
+    const shadow = new THREE.Mesh(geo.shadow, mat.shadow);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = SHADOW_Y;
+    lean.add(head);
+    root.add(lean, shadow);
+
+    const limb = (y: number, z: number, parts: Part[]) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(0, y, z);
+      addParts(pivot, parts, mat.outline);
+      lean.add(pivot);
+      return pivot;
+    };
+    const legs = SIDES.map((side) => {
+      const pivot = limb(HIP_Y, side * 0.11, [
+        [geo.leg, cloth, 0, -0.155, 0],
+        [geo.foot, mat.dark, 0.05, -0.3, 0],
+      ]);
+      pivot.scale.setScalar(scale.legs);
+      return pivot;
+    });
+    const handMat = kind === 'suit' ? mat.skin : cloth;
+    const hold = HOLD[kind];
+    const arms = SIDES.map((side) => {
+      const parts: Part[] = [
+        [geo.arm, cloth, 0, -0.13, 0],
+        [geo.hand, handMat, 0, -0.3, 0, 0, scale.hands],
+      ];
+      if (kind === 'suit' && side === 1) {
+        parts.push([geo.gun, mat.dark, 0, -0.42, 0]);
+      }
+      const pivot = limb(SHOULDER_Y, side * 0.26, parts);
+      // bracos levemente abertos para fora
+      pivot.rotation.x = -side * 0.25;
+      if (side === 1 && hold !== null) pivot.rotation.z = hold;
+      return pivot;
+    });
+
+    let sword: THREE.Group | null = null;
+    if (kind === 'player') {
+      // pivo na mao direita (ver HOLD); a lamina cresce a partir do pivo
+      sword = new THREE.Group();
+      sword.position.set(0.14, 0.5, 0.33);
+      sword.rotation.set(0, SWORD_REST_TURN, SWORD_REST_TILT);
+      addParts(sword, katanaInHand, mat.outline);
+      lean.add(sword);
+    }
+    return {
+      root,
+      lean,
+      lift,
+      head,
+      shadow,
+      legs,
+      arms,
+      hold,
+      sword,
+      last: null,
+      speed: 0,
+      idle: 0,
+    };
+  }
+
+  return {
+    make,
+    dispose() {
+      for (const item of [ramp, ...Object.values(geo), ...Object.values(mat)]) {
+        item.dispose();
+      }
+    },
+  };
+}
