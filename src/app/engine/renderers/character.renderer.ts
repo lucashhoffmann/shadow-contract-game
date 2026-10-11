@@ -11,7 +11,13 @@ import type { PlayerLook } from '@/app/store/game-store/game.store';
 const HEAD_Y = 1.1;
 const HIP_Y = 0.36;
 const SHOULDER_Y = 0.76;
+const TORSO_Y = 0.6;
 const SHADOW_Y = 0.02;
+// bracos levemente abertos para fora
+export const ARM_OPEN = 0.25;
+// agachado: fracao da perna que o quadril desce, e a abertura que da isso
+const CROUCH_DROP = 0.45;
+const CROUCH_SPREAD = Math.acos(1 - CROUCH_DROP);
 const OUTLINE = 0.025;
 // [direita, esquerda] em z local
 export const SIDES = [1, -1];
@@ -267,8 +273,7 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
         parts.push([geo.gun, mat.dark, 0, -0.42, 0]);
       }
       const pivot = limb(SHOULDER_Y, side * 0.26, parts);
-      // bracos levemente abertos para fora
-      pivot.rotation.x = -side * 0.25;
+      pivot.rotation.x = -side * ARM_OPEN;
       if (side === 1 && hold !== null) pivot.rotation.z = hold;
       return pivot;
     });
@@ -338,4 +343,42 @@ export function poseAttack(character: Character, remaining: number): void {
     sword.rotation.y = SWORD_REST_TURN + windup * 0.55 - strike * 1.65;
     sword.rotation.z = SWORD_REST_TILT + windup * 0.25 - strike * 4.15;
   }
+}
+
+// Agachado (cobertura, saida e queda do salto): quadril desce e as pernas
+// abrem em passo, uma a frente e outra atras. `stride` (-1..1) e a fase da
+// passada. Devolve quanto o corpo desce.
+// ponytail: perna sem joelho; no meio da passada o pe afunda no chao, o que
+// nao aparece de cima. Dobrar joelho se a camera baixar.
+export function poseCrouch(
+  character: Character,
+  amount: number,
+  stride: number,
+): number {
+  const { legs, arms } = character;
+  SIDES.forEach((side, i) => {
+    legs[i].rotation.z +=
+      (side * CROUCH_SPREAD * stride - legs[i].rotation.z) * amount;
+  });
+  // braco livre vem a frente apoiar a mira
+  arms[1].rotation.z += (0.9 - arms[1].rotation.z) * amount;
+  return (HIP_Y + character.lift) * CROUCH_DROP * amount;
+}
+
+// Morto: estirado de brucos, bracos e pernas abertos. Supoe o root deitado
+// para frente (rotation.z = -PI/2); o tronco fica centrado na origem do root.
+export function poseDead(character: Character): void {
+  const { lean, body, head, arms, legs, sword } = character;
+  lean.rotation.z = 0;
+  lean.position.set(0, -TORSO_Y, 0);
+  body.rotation.set(0, 0, 0);
+  body.position.x = 0;
+  // rosto virado de lado
+  head.rotation.set(0, 0.9, 0);
+  // assimetrico de proposito: corpo caido, nao estrela
+  arms[0].rotation.set(-2.2, 0, 0);
+  arms[1].rotation.set(1.5, 0, 0);
+  legs[0].rotation.set(-0.5, 0, 0);
+  legs[1].rotation.set(0.3, 0, 0);
+  if (sword) sword.rotation.set(0, SWORD_REST_TURN, SWORD_REST_TILT);
 }

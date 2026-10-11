@@ -13,6 +13,7 @@ type LegendDialogProps = {
   title: string;
   actionLabel: string;
   onAction: () => void;
+  onRestart?: () => void;
 };
 
 const LEGEND: [label: string, text: string][] = [
@@ -36,6 +37,7 @@ export function LegendDialog({
   title,
   actionLabel,
   onAction,
+  onRestart,
 }: LegendDialogProps) {
   return (
     <Dialog
@@ -61,6 +63,14 @@ export function LegendDialog({
           ))}
         </dl>
         <DialogFooter>
+          {onRestart && (
+            <Button
+              variant='outline'
+              onClick={onRestart}
+            >
+              Reiniciar
+            </Button>
+          )}
           <Button onClick={onAction}>{actionLabel}</Button>
         </DialogFooter>
       </DialogContent>

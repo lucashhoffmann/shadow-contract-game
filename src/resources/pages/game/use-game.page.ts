@@ -23,9 +23,15 @@ export function useGamePage() {
   }, []);
 
   // a mesma legenda serve de abertura da run e de tela de pausa
+  const restart = () => startRun();
   const legend =
     screen === 'paused'
-      ? { title: 'Pausado', actionLabel: 'Continuar', onAction: togglePause }
+      ? {
+          title: 'Pausado',
+          actionLabel: 'Continuar',
+          onAction: togglePause,
+          onRestart: restart,
+        }
       : { title: 'Como jogar', actionLabel: 'Comecar', onAction: begin };
 
   return {
@@ -37,7 +43,7 @@ export function useGamePage() {
     legend,
     buy,
     closeShop,
-    restart: () => startRun(),
+    restart,
     backToMenu,
   };
 }

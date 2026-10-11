@@ -4,10 +4,18 @@ import {
   type Character,
   type CharacterKind,
   createCharacterKit,
+  ARM_OPEN,
   poseAttack,
+  poseCrouch,
+  poseDead,
   SIDES,
 } from '@/app/engine/renderers/character.renderer';
-import { castRay, tileCenter } from '@/app/modules/level/utils/grid.util';
+import {
+  castRay,
+  circleHitsWall,
+  nearbyProp,
+  tileCenter,
+} from '@/app/modules/level/utils/grid.util';
 import {
   DASH_TIME,
   ROOM_H,
@@ -43,9 +51,16 @@ const IDLE_DELAY = 0.8;
 const FOLLOW_RATE = 24;
 const SNAP_DISTANCE = 2;
 const JUMP_HEIGHT = 0.8;
-// altura do centro do tronco: a cambalhota gira em volta dele, nao dos pes
+// altura do centro do tronco: o mergulho gira em volta dele, nao dos pes
 const FLIP_PIVOT_Y = 0.6;
-const TUCK = 1.4;
+// no alto do salto o corpo fica quase deitado, bracos esticados a frente
+const DIVE_TILT = 1.3;
+const DIVE_REACH = 2.8;
+// parede ou caixa a menos disso do centro: agacha em cobertura
+const COVER_DISTANCE = 0.75;
+const CROUCH_LEAN = 0.35;
+// altura do root deitado: a cabeca encosta no chao
+const DEAD_Y = 0.3;
 const DEBRIS = [
   [-0.25, -0.2, 0.4],
   [0.28, -0.1, 1.9],
@@ -71,9 +86,15 @@ const COIN_STACKS = [
   [0.2, -0.17, 4],
 ];
 
-// quem salta: personagem, vento nas costas e quanto do giro do lean e
-// cambalhota (o resto e a inclinacao de correr)
-type Jumper = { character: Character; wind: THREE.Group; flip: number };
+// quem salta: personagem, vento nas costas, quanto do giro do lean e
+// mergulho ou agachamento (o resto e a inclinacao de correr) e quanto esta
+// agachado (0..1)
+type Jumper = {
+  character: Character;
+  wind: THREE.Group;
+  flip: number;
+  crouch: number;
+};
 type EnemyView = Jumper & {
   marker: THREE.Group;
   markerParts: THREE.Mesh[];
@@ -142,6 +163,7 @@ export function createWorldRenderer(
       .translate(-0.11, 0, 0),
     markerStem: new THREE.BoxGeometry(0.07, 0.24, 0.07),
     markerDot: new THREE.SphereGeometry(0.075, 10, 10),
+    prompt: new THREE.BoxGeometry(1, 1, 0.08),
     crate: new THREE.BoxGeometry(0.78, 0.62, 0.78),
     plank: new THREE.BoxGeometry(0.34, 0.06, 0.2),
     // meio aro deitado, aberto para frente (+x)
@@ -167,6 +189,7 @@ export function createWorldRenderer(
     }),
     wood: lambert(0xa8703c),
     woodDark: lambert(0x6e4726),
+    prompt: flat(0xffe477),
     brass: lambert(0xd9b84a),
     copper: lambert(0xd98a5a),
     shellRed: lambert(0xc8242c),
@@ -202,7 +225,8 @@ export function createWorldRenderer(
   // Anda: inclina para frente e balanca. Parado: cabeca olha para os lados.
   // A simulacao anda em passo fixo e o render nao: num frame sem passo a
   // posicao nao muda. Por isso posicao, giro e velocidade sao suavizados aqui,
-  // senao o corpo trava e a inclinacao pisca.
+  // senao o corpo trava e a inclinacao pisca. Devolve o quanto esta andando
+  // (0..1).
   function animate(
     character: Character,
     pos: Vec2,
@@ -210,7 +234,7 @@ export function createWorldRenderer(
     dt: number,
     time: number,
     maxLean: number,
-  ) {
+  ): number {
     const { root, lean, head, last } = character;
     // primeiro frame ou teleporte (run nova): encaixa sem deslizar
     const jumped =
@@ -243,6 +267,9 @@ export function createWorldRenderer(
     // passada: pernas alternadas, bracos no contratempo
     const swing = Math.sin(time * 11) * sway;
     SIDES.forEach((side, i) => {
+      // morto abre os membros; vivo volta ao repouso
+      character.legs[i].rotation.x = 0;
+      character.arms[i].rotation.x = -side * ARM_OPEN;
       character.legs[i].rotation.z = side * swing * 0.8;
       character.arms[i].rotation.z =
         i === 0 && character.hold !== null
@@ -255,6 +282,7 @@ export function createWorldRenderer(
         ? Math.sin((character.idle - IDLE_DELAY) * 2.2) * 0.9
         : 0;
     head.rotation.y += (look - head.rotation.y) * ease;
+    return sway;
   }
 
   const rooms = new Map<number, THREE.Group>();
@@ -376,7 +404,7 @@ export function createWorldRenderer(
   }
 
   // vento do salto, nas costas: arcos cada vez menores e riscos soltos atras.
-  // Fica no root, nao no lean: nao gira junto com a cambalhota.
+  // Fica no root, nao no lean: nao gira junto com o mergulho.
   function makeJumper(kind: CharacterKind): Jumper {
     const character = makeCharacter(kind);
     const wind = new THREE.Group();
@@ -394,14 +422,16 @@ export function createWorldRenderer(
     }
     wind.visible = false;
     character.root.add(wind);
-    return { character, wind, flip: 0 };
+    return { character, wind, flip: 0, crouch: 0 };
   }
 
-  // `animate` mais o salto: sobe e desce em arco, uma cambalhota para frente
-  // em volta do tronco, joelhos e braco livre recolhidos no meio do giro.
+  // `animate` mais o salto e a cobertura. Salto: sobe e desce em arco,
+  // mergulhando de frente em volta do tronco, bracos esticados e pernas
+  // soltas atras; sai e cai agachado. Perto de parede ou caixa: agacha.
   // `dash` e o tempo que falta no ar.
   function animateJumper(
     jumper: Jumper,
+    world: World,
     pos: Vec2,
     facing: number,
     dash: number,
@@ -410,28 +440,51 @@ export function createWorldRenderer(
     maxLean: number,
   ) {
     const { character, wind } = jumper;
-    const { lean } = character;
+    const { lean, legs, arms } = character;
     lean.rotation.z -= jumper.flip;
-    animate(character, pos, facing, dt, time, maxLean);
+    const sway = animate(character, pos, facing, dt, time, maxLean);
     const jumping = dash > 0;
     const air = jumping ? 1 - dash / DASH_TIME : 0;
     const arc = Math.sin(Math.PI * air);
-    jumper.flip = -2 * Math.PI * air;
+    const cover =
+      jumping || circleHitsWall(world, pos.x, pos.y, COVER_DISTANCE);
+    jumper.crouch += ((cover ? 1 : 0) - jumper.crouch) * Math.min(1, dt * 7);
+    const crouch = jumper.crouch * (1 - arc);
+    // passada agachada segue a da corrida; parado, perna esquerda a frente
+    const drop = poseCrouch(
+      character,
+      crouch,
+      -1 + (Math.sin(time * 11) + 1) * sway,
+    );
+    jumper.flip = -arc * DIVE_TILT - crouch * CROUCH_LEAN;
     lean.rotation.z += jumper.flip;
     lean.position.x = Math.sin(jumper.flip) * FLIP_PIVOT_Y;
     lean.position.y +=
-      (1 - Math.cos(jumper.flip)) * FLIP_PIVOT_Y + arc * JUMP_HEIGHT;
+      (1 - Math.cos(jumper.flip)) * FLIP_PIVOT_Y + arc * JUMP_HEIGHT - drop;
     character.shadow.scale.setScalar(1 - arc * 0.35);
-    if (jumping) {
-      for (const leg of character.legs) leg.rotation.z = arc * TUCK;
-      character.arms[1].rotation.z = arc * TUCK;
-    }
+    SIDES.forEach((side, i) => {
+      arms[i].rotation.z += (DIVE_REACH - arms[i].rotation.z) * arc;
+      legs[i].rotation.z += (-side * 0.45 - legs[i].rotation.z) * arc;
+    });
     // vento cresce e some com o arco
     wind.visible = jumping;
     wind.position.y = FLIP_PIVOT_Y + arc * JUMP_HEIGHT;
     wind.scale.setScalar(0.3 + arc * 0.7);
     wind.scale.x *= 1 + air * 0.8;
     wind.rotation.x = Math.sin(time * 30) * 0.15;
+  }
+
+  // morto: estirado de brucos, centrado em `pos`, sem giro nem vento
+  function layDead(jumper: Jumper, pos: Vec2, facing: number) {
+    const { character } = jumper;
+    character.root.position.set(pos.x, DEAD_Y * character.head.scale.x, -pos.y);
+    character.root.rotation.set(0, facing, -Math.PI / 2);
+    poseDead(character);
+    // se voltar a viver (run nova), encaixa sem deslizar
+    character.last = null;
+    jumper.flip = 0;
+    jumper.crouch = 0;
+    jumper.wind.visible = false;
   }
 
   function buildEnemy(kind: EnemyKind): EnemyView {
@@ -489,6 +542,18 @@ export function createWorldRenderer(
 
   const hero = makeJumper('player');
   const player = hero.character;
+  const prompt = new THREE.Group();
+  for (const [x, y, width, height] of [
+    [-0.11, 0, 0.07, 0.38],
+    [0, 0.155, 0.29, 0.07],
+    [-0.015, 0.02, 0.26, 0.07],
+  ]) {
+    const bar = new THREE.Mesh(geo.prompt, mat.prompt);
+    bar.position.set(x, y, 0);
+    bar.scale.set(width, height, 1);
+    prompt.add(bar);
+  }
+  scene.add(prompt);
   let lastTime = 0;
 
   return {
@@ -511,16 +576,32 @@ export function createWorldRenderer(
         scene.remove(view.group),
       );
 
-      animateJumper(
-        hero,
-        world.player.pos,
-        world.player.facing,
-        world.player.dash,
-        dt,
-        time,
-        world.player.adrenaline > 0 ? ADRENALINE_LEAN : RUN_LEAN,
-      );
-      poseAttack(player, world.player.slash);
+      const prop = world.status === 'playing' && nearbyProp(world);
+      prompt.visible = !!prop;
+      if (prop)
+        prompt.position.set(
+          prop.pos.x,
+          1.03 + Math.sin(time * 5) * 0.06,
+          -prop.pos.y,
+        );
+
+      const lost = world.status === 'dead';
+      if (lost) {
+        layDead(hero, world.player.pos, world.player.facing);
+      } else {
+        animateJumper(
+          hero,
+          world,
+          world.player.pos,
+          world.player.facing,
+          world.player.dash,
+          dt,
+          time,
+          world.player.adrenaline > 0 ? ADRENALINE_LEAN : RUN_LEAN,
+        );
+        poseAttack(player, world.player.slash);
+      }
+      player.shadow.visible = !lost;
 
       for (const enemy of world.enemies) {
         let view = enemies.get(enemy.id);
@@ -529,19 +610,12 @@ export function createWorldRenderer(
           enemies.set(enemy.id, view);
         }
         const dead = enemy.state === 'dead';
-        const { root, lean, head } = view.character;
         if (dead) {
-          root.position.set(enemy.pos.x, 0.3, -enemy.pos.y);
-          root.rotation.set(0, enemy.facing, Math.PI / 2);
-          lean.rotation.z = 0;
-          lean.position.set(0, 0, 0);
-          head.rotation.y = 0;
-          // morreu no ar: cai sem giro nem vento
-          view.flip = 0;
-          view.wind.visible = false;
+          layDead(view, enemy.pos, enemy.facing);
         } else {
           animateJumper(
             view,
+            world,
             enemy.pos,
             enemy.facing,
             enemy.dash,
@@ -550,7 +624,7 @@ export function createWorldRenderer(
             RUN_LEAN,
           );
           // inimigo nao fica olhando em volta: o cone mostra para onde ele ve
-          head.rotation.y = 0;
+          view.character.head.rotation.y = 0;
           poseAttack(view.character, enemy.attack);
           updateCone(world, enemy, view.cone);
         }
@@ -608,6 +682,7 @@ export function createWorldRenderer(
       reconcile(pickups, new Set(), removeMesh);
       reconcile(bullets, new Set(), removeMesh);
       scene.remove(player.root);
+      scene.remove(prompt);
       kit.dispose();
       for (const item of [
         ...Object.values(geo),

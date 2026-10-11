@@ -55,11 +55,19 @@ Transicoes de `status`:
 ## `InputState`
 
 ```ts
-type InputState = { moveX: number; moveY: number; dash: boolean }; // cada eixo em -1..1
+type InputState = {
+  moveX: number;
+  moveY: number;
+  dash: boolean;
+  interact?: boolean;
+}; // cada eixo em -1..1
 ```
 
 `moveY = 1` anda para frente. Teclado e joystick somam no mesmo objeto; a
 simulacao normaliza se o vetor passar de 1.
+`interact` e um pulso da tecla F: quebra a caixa intacta mais proxima dentro de
+`MELEE_RANGE`, vira o player para ela e anima o golpe de espada. Fora de
+`playing`, o pulso e ignorado. O F modelado aparece sobre a caixa ao alcance.
 
 `dash` (espaco) dispara o salto de esquiva: `DASH_TIME` segundos a `DASH_SPEED`
 em linha reta, para onde o input aponta ou, sem input, para `facing`. No ar o

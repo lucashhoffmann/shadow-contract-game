@@ -30,6 +30,40 @@ describe('createWorld', () => {
 });
 
 describe('stepWorld', () => {
+  it('F quebra so a caixa intacta mais proxima ao alcance e anima o golpe', () => {
+    const world = createArenaWorld({ 9: '#....oo...#' });
+    world.player.pos = { x: 5.9, y: 2.6 };
+
+    stepWorld(world, { ...IDLE, interact: true }, FIXED_DT);
+
+    expect(
+      world.props
+        .filter((prop) => prop.roomIndex === 0)
+        .map((prop) => prop.broken),
+    ).toEqual([true, false]);
+    expect(world.rooms[0].tiles[9]).toBe('#.....o...#');
+    expect(world.player.slash).toBeGreaterThan(0);
+    expect(world.player.facing).toBeCloseTo(Math.atan2(3.5 - 2.6, 5.5 - 5.9));
+
+    stepWorld(world, IDLE, FIXED_DT);
+    expect(
+      world.props
+        .filter((prop) => prop.roomIndex === 0)
+        .map((prop) => prop.broken),
+    ).toEqual([true, false]);
+  });
+
+  it('F fora do alcance ou com jogo pausado nao quebra a caixa', () => {
+    const world = createArenaWorld({ 8: '#....o....#' });
+    stepWorld(world, { ...IDLE, interact: true }, FIXED_DT);
+    expect(world.props[0].broken).toBe(false);
+
+    world.player.pos.y = 3.5;
+    world.status = 'paused';
+    stepWorld(world, { ...IDLE, interact: true }, FIXED_DT);
+    expect(world.props[0].broken).toBe(false);
+  });
+
   it('player chega por tras, mata o inimigo e coleta o dinheiro', () => {
     const world = createArenaWorld();
     const enemy = addEnemy(world, 5.5, 8.5, Math.PI / 2);

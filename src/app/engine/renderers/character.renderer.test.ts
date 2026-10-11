@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import {
   createCharacterKit,
   poseAttack,
+  poseCrouch,
+  poseDead,
+  SIDES,
   SWORD_REST_TILT,
 } from '@/app/engine/renderers/character.renderer';
 import { SLASH_TIME } from '@/app/modules/world/constants/world.constants';
@@ -47,5 +50,30 @@ it('terno recua o corpo e o braco ao disparar', () => {
   poseAttack(character, SLASH_TIME * 0.4);
   expect(character.body.position.x).toBeLessThan(0);
   expect(character.arms[0].rotation.z).toBeLessThan(character.hold!);
+  kit.dispose();
+});
+
+it('agachado abre as pernas em passo e desce o corpo', () => {
+  const kit = createCharacterKit(DEFAULT_LOOK);
+  const character = kit.make('suit');
+  expect(poseCrouch(character, 0, -1)).toBe(0);
+  expect(poseCrouch(character, 1, -1)).toBeGreaterThan(0.1);
+  // parado: perna esquerda a frente, direita atras
+  expect(character.legs[1].rotation.z).toBeGreaterThan(0.5);
+  expect(character.legs[0].rotation.z).toBeLessThan(-0.5);
+  kit.dispose();
+});
+
+it('morto fica estirado com bracos e pernas abertos para fora', () => {
+  const kit = createCharacterKit(DEFAULT_LOOK);
+  const character = kit.make('ninja');
+  poseAttack(character, SLASH_TIME * 0.4);
+  poseDead(character);
+  SIDES.forEach((side, i) => {
+    expect(Math.sign(character.arms[i].rotation.x)).toBe(-side);
+    expect(Math.sign(character.legs[i].rotation.x)).toBe(-side);
+  });
+  expect(character.body.rotation.y).toBe(0);
+  expect(character.sword!.rotation.z).toBe(SWORD_REST_TILT);
   kit.dispose();
 });

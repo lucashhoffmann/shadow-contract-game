@@ -8,7 +8,11 @@ import {
   spawnRoom,
   updateRooms,
 } from '@/app/modules/level/systems/level.system';
-import { breakProp, nearbyProp, tileCenter } from '@/app/modules/level/utils/grid.util';
+import {
+  breakProp,
+  nearbyProp,
+  tileCenter,
+} from '@/app/modules/level/utils/grid.util';
 import { movePlayer } from '@/app/modules/player/systems/player.system';
 import {
   createMarket,

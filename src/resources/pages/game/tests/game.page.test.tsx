@@ -230,6 +230,20 @@ describe('GamePage', () => {
     expect(useGameStore.getState().screen).toBe('playing');
   });
 
+  it('pausa oferece Reiniciar, que volta para a abertura de uma nova run', async () => {
+    render(<GamePage />);
+    expect(
+      screen.queryByRole('button', { name: 'Reiniciar' }),
+    ).not.toBeInTheDocument();
+    act(() => useGameStore.getState().begin());
+    act(() => useGameStore.getState().togglePause());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reiniciar' }));
+
+    expect(useGameStore.getState().screen).toBe('intro');
+    expect(screen.getByText('Como jogar')).toBeInTheDocument();
+  });
+
   it('abre loja e game over conforme a tela do store', () => {
     render(<GamePage />);
     expect(screen.queryByText('Escolha o equipamento')).not.toBeInTheDocument();
