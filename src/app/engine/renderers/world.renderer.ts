@@ -93,6 +93,8 @@ const CARDINALS = [
   [0, 1],
   [0, -1],
 ];
+// voltas da shuriken no ar (rad/s)
+const SHURIKEN_SPIN = 28;
 // F da facada: acima da cabeca e do marcador do inimigo
 const KNIFE_PROMPT_Y = 2.2;
 // altura maxima do corpo lancado por um golpe so
@@ -115,6 +117,8 @@ const FLOATER_RISE = 0.8;
 // mini zoom: cresce ate FLOATER_POP nesse trecho inicial, depois assenta
 const FLOATER_POP = 1.45;
 const FLOATER_POP_END = 0.18;
+// destaques escritos sobre o numero, e a cor de cada um
+const FLOATER_BANNER = { HEADSHOT: '#ff9a1f', OVERKILL: '#d457ff' };
 // cor pelo tamanho do golpe: forte em vermelho, medio em amarelo, fraco em
 // verde; erro em claro, para nao parecer acerto
 const FLOATER_STRONG = 30;
@@ -142,6 +146,22 @@ const DOOR_SLIDE = 1.45;
 // giro da tampa do bau aberta, em torno da dobradica
 const CHEST_OPEN = -1.9;
 const BLOOD_GROW_TIME = 2.5;
+// explosao ao matar: notas de dinheiro e gotas de sangue saltam do inimigo,
+// caem com gravidade e somem encolhendo. So visual
+const BURST = {
+  bills: 22,
+  drops: 16,
+  // velocidade para os lados e para cima, em unidades por segundo
+  spread: 3.2,
+  lift: 4.6,
+  gravity: 13,
+  // segundos no ar e no chao antes de sumir; o fim e o encolher
+  billLife: 1.7,
+  dropLife: 1.1,
+  fade: 0.35,
+};
+// aparencias do objeto destrutivel; so visual (ver buildProp)
+const PROP_VARIANTS = ['crate', 'sideboard', 'barrel', 'plant'] as const;
 const DEBRIS = [
   [-0.25, -0.2, 0.4],
   [0.28, -0.1, 1.9],
@@ -211,6 +231,8 @@ type EnemyView = Jumper & {
   cone: THREE.Mesh;
   blood: THREE.Mesh;
   deathAt: number | null;
+  // ja soltou a explosao de notas e sangue da morte
+  burst: boolean;
 };
 
 export type WorldRenderer = {
@@ -305,17 +327,32 @@ const WALLPAPERS: ((x: number, y: number) => boolean)[] = [
 const HUE_START = 0.65;
 const HUE_STEP = 0.618034;
 
-// parede de um nivel (contrato): tom e desenho proprios. So visual e fixo por
-// nivel, entao a mesma run mostra sempre a mesma sequencia.
-function wallpaper(level: number): {
-  material: THREE.Material;
-  texture: THREE.Texture;
-} {
-  const hue = (HUE_START + level * HUE_STEP) % 1;
-  const colors = [0.4, 0.52].map((light) =>
-    new THREE.Color().setHSL(hue, 0.5, light).convertLinearToSRGB(),
+// piso: um desenho por tile (a textura repete uma vez por unidade de mundo)
+const FLOORPAPERS: ((x: number, y: number) => boolean)[] = [
+  // ladrilho: rejunte na borda de cada tile
+  (x, y) => x === 0 || y === 0,
+  // xadrez
+  (x, y) => (Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0,
+  // tabuas corridas, emendas desencontradas
+  (x, y) => y % 4 === 0 || (x + Math.floor(y / 4) * 5) % 16 === 0,
+  // losango no centro de cada tile
+  (x, y) => Math.abs(x - 8) + Math.abs(y - 8) < 5,
+  // pastilhas
+  (x, y) => x % 4 === 0 || y % 4 === 0,
+];
+
+type Paper = { material: THREE.Material; texture: THREE.Texture };
+
+// textura de WALLPAPER_SIZE px com duas cores, repetindo nos dois eixos
+function paper(
+  draw: (x: number, y: number) => boolean,
+  hue: number,
+  saturation: number,
+  lights: number[],
+): Paper {
+  const colors = lights.map((light) =>
+    new THREE.Color().setHSL(hue, saturation, light).convertLinearToSRGB(),
   );
-  const draw = WALLPAPERS[level % WALLPAPERS.length];
   const data = new Uint8Array(WALLPAPER_SIZE * WALLPAPER_SIZE * 4);
   for (let y = 0; y < WALLPAPER_SIZE; y++) {
     for (let x = 0; x < WALLPAPER_SIZE; x++) {
@@ -328,6 +365,46 @@ function wallpaper(level: number): {
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.needsUpdate = true;
   return { material: new THREE.MeshLambertMaterial({ map: texture }), texture };
+}
+
+// parede e piso de um nivel (contrato): tom e desenhos proprios. So visual e
+// fixo por nivel, entao a mesma run mostra sempre a mesma sequencia.
+function wallpaper(level: number): { wall: Paper; floor: Paper } {
+  const hue = (HUE_START + level * HUE_STEP) % 1;
+  // piso no tom da parede, mas escuro, pouco saturado e de pouco contraste:
+  // personagens, cones e sangue continuam se destacando
+  const floor = paper(
+    FLOORPAPERS[level % FLOORPAPERS.length],
+    hue,
+    0.22,
+    [0.3, 0.36],
+  );
+  floor.texture.repeat.set(ROOM_W, ROOM_H);
+  return {
+    wall: paper(WALLPAPERS[level % WALLPAPERS.length], hue, 0.5, [0.4, 0.52]),
+    floor,
+  };
+}
+
+// shuriken: estrela de 4 pontas com furo no meio, fina e deitada
+function shurikenGeometry(): THREE.BufferGeometry {
+  const star = new THREE.Shape();
+  for (let i = 0; i < 8; i++) {
+    const radius = i % 2 ? 0.07 : 0.22;
+    const angle = (i * Math.PI) / 4;
+    star[i ? 'lineTo' : 'moveTo'](
+      Math.cos(angle) * radius,
+      Math.sin(angle) * radius,
+    );
+  }
+  star.holes.push(new THREE.Path().absarc(0, 0, 0.03, 0, Math.PI * 2, true));
+  return new THREE.ExtrudeGeometry(star, {
+    depth: 0.03,
+    bevelEnabled: false,
+    curveSegments: 6,
+  })
+    .translate(0, 0, -0.015)
+    .rotateX(-Math.PI / 2);
 }
 
 // coracao gordinho de poucas faces: contorno extrudado com chanfro largo
@@ -395,6 +472,28 @@ function dashGeometry(): THREE.BufferGeometry {
   );
 }
 
+// mira (item de headshot): aro com cruz, extrudado e deitado para a camera
+function crosshairGeometry(): THREE.BufferGeometry {
+  const ring = new THREE.Shape().absarc(0, 0, 0.26, 0, Math.PI * 2, false);
+  ring.holes.push(new THREE.Path().absarc(0, 0, 0.19, 0, Math.PI * 2, true));
+  const bar = (w: number, h: number) =>
+    new THREE.Shape(
+      [
+        [-w, -h],
+        [w, -h],
+        [w, h],
+        [-w, h],
+      ].map(([x, y]) => new THREE.Vector2(x, y)),
+    );
+  return new THREE.ExtrudeGeometry([ring, bar(0.36, 0.035), bar(0.035, 0.36)], {
+    depth: 0.08,
+    bevelEnabled: false,
+    curveSegments: 10,
+  })
+    .center()
+    .rotateX(-0.75);
+}
+
 function lambert(color: number): THREE.Material {
   return new THREE.MeshLambertMaterial({ color });
 }
@@ -440,7 +539,9 @@ export function createWorldRenderer(
     heart: heartGeometry(),
     shield: shieldGeometry(),
     dash: dashGeometry(),
+    headshot: crosshairGeometry(),
     // municao ao longo de +x, ponta na frente
+    shuriken: shurikenGeometry(),
     bulletCase: new THREE.CylinderGeometry(0.05, 0.05, 0.17, 8)
       .rotateZ(-Math.PI / 2)
       .translate(-0.045, 0, 0),
@@ -484,6 +585,15 @@ export function createWorldRenderer(
     blood: new THREE.CircleGeometry(1, 16),
     crate: new THREE.BoxGeometry(0.78, 0.62, 0.78),
     plank: new THREE.BoxGeometry(0.34, 0.06, 0.2),
+    // nota de dinheiro e a faixa clara do meio
+    bill: new THREE.BoxGeometry(0.36, 0.02, 0.18),
+    billBand: new THREE.BoxGeometry(0.13, 0.025, 0.185),
+    // cilindro de raio 1 e altura 1, escalado por quem usa (barril, vaso)
+    drum: new THREE.CylinderGeometry(1, 1, 1, 10),
+    // folha: lamina pontuda saindo da origem para cima
+    leaf: new THREE.ConeGeometry(0.07, 0.44, 4)
+      .scale(1, 1, 0.35)
+      .translate(0, 0.22, 0),
     // meio aro deitado, aberto para frente (+x)
     gust: new THREE.TorusGeometry(0.42, 0.035, 6, 14, Math.PI)
       .rotateX(Math.PI / 2)
@@ -491,7 +601,6 @@ export function createWorldRenderer(
     streak: new THREE.BoxGeometry(0.5, 0.02, 0.03),
   };
   const mat = {
-    floor: lambert(0x4a4f6a),
     chestLight: lambert(0xdcb980),
     chestLock: lambert(0x9aa0aa),
     doorFrame: lambert(0xd4d6da),
@@ -519,6 +628,10 @@ export function createWorldRenderer(
       color: 0x39d0ff,
       flatShading: true,
     }),
+    headshot: new THREE.MeshLambertMaterial({
+      color: 0xff3b3b,
+      flatShading: true,
+    }),
     coin: new THREE.MeshLambertMaterial({
       color: MONEY.color,
       flatShading: true,
@@ -532,6 +645,13 @@ export function createWorldRenderer(
     }),
     wood: lambert(0xa8703c),
     woodDark: lambert(0x6e4726),
+    bill: flat(0x35d267),
+    billBand: flat(0xb8f5c6),
+    cabinet: lambert(0xe8734f),
+    cabinetDark: lambert(0xa94f33),
+    barrel: lambert(0x8b2f3a),
+    pot: lambert(0x9c4a2a),
+    leaf: new THREE.MeshLambertMaterial({ color: 0x3f9a4a, flatShading: true }),
     prompt: lambert(0xffe066),
     promptSide: lambert(0xd9931f),
     promptBorder: flat(0x1b1d3a),
@@ -545,6 +665,10 @@ export function createWorldRenderer(
     copper: lambert(0xd98a5a),
     shellRed: lambert(0xc8242c),
     bulletEnemy: flat(0xff4040),
+    shuriken: new THREE.MeshLambertMaterial({
+      color: 0xc8ccd8,
+      flatShading: true,
+    }),
     wind: new THREE.MeshBasicMaterial({
       color: 0xd6f4ff,
       transparent: true,
@@ -647,6 +771,85 @@ export function createWorldRenderer(
   const bullets = new Map<number, THREE.Group>();
   const removeMesh = (mesh: THREE.Object3D) => scene.remove(mesh);
 
+  // particulas da explosao ao matar
+  const particles: {
+    mesh: THREE.Object3D;
+    velocity: THREE.Vector3;
+    spin: THREE.Vector3;
+    life: number;
+  }[] = [];
+
+  function burst(pos: Vec2) {
+    const launch = (mesh: THREE.Object3D, life: number, speed: number) => {
+      const angle = Math.random() * Math.PI * 2;
+      const out = (0.35 + Math.random() * 0.65) * BURST.spread * speed;
+      mesh.position.set(pos.x, 0.7 + Math.random() * 0.3, -pos.y);
+      mesh.rotation.set(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+      );
+      scene.add(mesh);
+      particles.push({
+        mesh,
+        velocity: new THREE.Vector3(
+          Math.cos(angle) * out,
+          (0.5 + Math.random() * 0.5) * BURST.lift,
+          Math.sin(angle) * out,
+        ),
+        spin: new THREE.Vector3(
+          (Math.random() - 0.5) * 16,
+          (Math.random() - 0.5) * 16,
+          (Math.random() - 0.5) * 16,
+        ),
+        // some um pouco fora de sincronia com as outras
+        life: life * (0.75 + Math.random() * 0.25),
+      });
+    };
+    for (let i = 0; i < BURST.bills; i++) {
+      const bill = new THREE.Group();
+      bill.add(
+        new THREE.Mesh(geo.bill, mat.bill),
+        new THREE.Mesh(geo.billBand, mat.billBand),
+      );
+      launch(bill, BURST.billLife, 1);
+    }
+    for (let i = 0; i < BURST.drops; i++) {
+      const drop = new THREE.Mesh(geo.box, mat.blood);
+      drop.userData.size = 0.05 + Math.random() * 0.07;
+      launch(drop, BURST.dropLife, 1.3);
+    }
+  }
+
+  function updateParticles(dt: number) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const particle = particles[i];
+      const { mesh, velocity, spin } = particle;
+      particle.life -= dt;
+      if (particle.life <= 0) {
+        scene.remove(mesh);
+        particles.splice(i, 1);
+        continue;
+      }
+      if (mesh.position.y > 0.03) {
+        velocity.y -= BURST.gravity * dt;
+        mesh.position.addScaledVector(velocity, dt);
+        mesh.rotation.x += spin.x * dt;
+        mesh.rotation.y += spin.y * dt;
+        mesh.rotation.z += spin.z * dt;
+      }
+      if (mesh.position.y <= 0.03) {
+        // pousou: deita no chao e para
+        mesh.position.y = 0.03;
+        mesh.rotation.x = 0;
+        mesh.rotation.z = 0;
+      }
+      mesh.scale.setScalar(
+        (mesh.userData.size ?? 1) * Math.min(1, particle.life / BURST.fade),
+      );
+    }
+  }
+
   // texto de dano: uma textura por texto ("+1", "Errou!"), um sprite por aviso
   const floaterTextures = new Map<string, THREE.Texture>();
   const floaters = new Map<number, THREE.Sprite>();
@@ -660,9 +863,12 @@ export function createWorldRenderer(
   function floaterTexture(
     amount: number,
     onPlayer?: boolean,
+    // destaque em cima do numero: 'HEADSHOT' ou 'OVERKILL'
+    banner?: keyof typeof FLOATER_BANNER,
   ): THREE.Texture | null {
     const text = amount > 0 ? `${onPlayer ? '-' : '+'}${amount}` : 'Errou!';
-    const cached = floaterTextures.get(text);
+    const key = banner ? `${banner}${text}` : text;
+    const cached = floaterTextures.get(key);
     if (cached) return cached;
     const canvas = document.createElement('canvas');
     [canvas.width, canvas.height] = FLOATER_CANVAS;
@@ -677,11 +883,22 @@ export function createWorldRenderer(
     context.strokeStyle = '#1b0508';
     context.fillStyle = floaterColor(amount, onPlayer);
     const [x, y] = [canvas.width / 2, canvas.height / 2 + 4];
-    context.strokeText(text, x, y);
-    context.fillText(text, x, y);
+    if (banner) {
+      // duas linhas: o destaque em cima e o numero menor embaixo
+      context.font = FLOATER_FONT.replace(/^\d+/, '50');
+      context.strokeText(text, x, y + 30);
+      context.fillText(text, x, y + 30);
+      context.font = FLOATER_FONT.replace(/^\d+/, '46');
+      context.fillStyle = FLOATER_BANNER[banner];
+      context.strokeText(banner, x, y - 28);
+      context.fillText(banner, x, y - 28);
+    } else {
+      context.strokeText(text, x, y);
+      context.fillText(text, x, y);
+    }
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    floaterTextures.set(text, texture);
+    floaterTextures.set(key, texture);
     return texture;
   }
 
@@ -690,7 +907,7 @@ export function createWorldRenderer(
     sprite.material.dispose();
   }
 
-  // parede de cada nivel ja visto, por indice do nivel
+  // parede e piso de cada nivel ja visto, por indice do nivel
   const wallpapers = new Map<number, ReturnType<typeof wallpaper>>();
   // folhas da porta de cada sala que tem porta, por indice da sala; `y` e a
   // face da parede onde ela fica
@@ -805,7 +1022,15 @@ export function createWorldRenderer(
 
   function buildRoom(room: Room): THREE.Group {
     const group = new THREE.Group();
-    const floor = new THREE.Mesh(geo.floor, mat.floor);
+    // um contrato = um nivel: SHOP_EVERY salas com a mesma parede e piso
+    const level = Math.max(0, Math.floor((room.index - 1) / SHOP_EVERY));
+    let papers = wallpapers.get(level);
+    if (!papers) {
+      papers = wallpaper(level);
+      wallpapers.set(level, papers);
+    }
+    const floor = new THREE.Mesh(geo.floor, papers.floor.material);
+    floor.name = 'floor';
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(ROOM_W / 2, 0, -(room.index + 0.5) * ROOM_H);
     group.add(floor);
@@ -834,16 +1059,9 @@ export function createWorldRenderer(
       chestLids.set(room.index, chest.lid);
     }
 
-    // um contrato = um nivel: SHOP_EVERY salas com a mesma parede
-    const level = Math.max(0, Math.floor((room.index - 1) / SHOP_EVERY));
-    let paper = wallpapers.get(level);
-    if (!paper) {
-      paper = wallpaper(level);
-      wallpapers.set(level, paper);
-    }
     const instanced = new THREE.InstancedMesh(
       geo.wall,
-      paper.material,
+      papers.wall.material,
       walls.length,
     );
     const matrix = new THREE.Matrix4();
@@ -867,6 +1085,13 @@ export function createWorldRenderer(
   // escopeta: cartucho vermelho com base de latao
   function buildBullet(bullet: Projectile): THREE.Group {
     const group = new THREE.Group();
+    if (bullet.shuriken) {
+      // gira no proprio eixo enquanto voa (sync)
+      group.name = 'shuriken';
+      group.add(new THREE.Mesh(geo.shuriken, mat.shuriken));
+      scene.add(group);
+      return group;
+    }
     if (bullet.weapon === 'shotgun') {
       group.add(
         new THREE.Mesh(geo.shellHull, mat.shellRed),
@@ -938,26 +1163,84 @@ export function createWorldRenderer(
   }
 
   // caixa inteira, ou tabuas espalhadas no chao depois de quebrar
+  // Objeto destrutivel do cenario. A aparencia e so visual e sai do id: a
+  // simulacao trata todos igual (ocupa o tile, quebra, pode soltar item).
   function buildProp(prop: Prop): THREE.Group {
     const group = new THREE.Group();
     group.position.set(prop.pos.x, 0, -prop.pos.y);
+    // sorteio fixo por id: o mesmo objeto tem sempre a mesma cara
+    const pick = Math.abs(Math.sin(prop.id * 12.9898) * 43758.5453) % 1;
+    const variant = PROP_VARIANTS[Math.floor(pick * PROP_VARIANTS.length)];
+    const [main, trim] = {
+      crate: [mat.wood, mat.woodDark],
+      sideboard: [mat.cabinet, mat.cabinetDark],
+      barrel: [mat.barrel, mat.chestLock],
+      plant: [mat.pot, mat.leaf],
+    }[variant];
     if (prop.broken) {
+      // destrocos na cor do que quebrou
       DEBRIS.forEach(([x, z, turn], i) => {
-        const plank = new THREE.Mesh(
-          geo.plank,
-          i % 2 ? mat.wood : mat.woodDark,
-        );
+        const plank = new THREE.Mesh(geo.plank, i % 2 ? main : trim);
         plank.position.set(x, 0.04 + i * 0.012, z);
         plank.rotation.y = turn + prop.id;
         group.add(plank);
       });
-    } else {
+      scene.add(group);
+      return group;
+    }
+    const part = (
+      geometry: THREE.BufferGeometry,
+      material: THREE.Material,
+      [w, h, d]: number[],
+      [x, y, z]: number[],
+    ) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.scale.set(w, h, d);
+      mesh.position.set(x, y, z);
+      group.add(mesh);
+      return mesh;
+    };
+    // folhas abertas em leque, saindo de (x, y, z)
+    const leaves = (x: number, y: number, z: number, size: number) => {
+      for (let i = 0; i < 5; i++) {
+        const leaf = part(geo.leaf, mat.leaf, [size, size, size], [x, y, z]);
+        leaf.rotation.set(0.55, (i / 5) * Math.PI * 2 + prop.id, 0, 'YXZ');
+      }
+    };
+    if (variant === 'crate') {
       const crate = new THREE.Mesh(geo.crate, mat.wood);
       crate.position.y = 0.31;
       const lid = new THREE.Mesh(geo.plank, mat.woodDark);
       lid.scale.set(2.3, 1, 0.9);
       lid.position.y = 0.64;
       group.add(crate, lid);
+    } else if (variant === 'sideboard') {
+      // aparador com tampo, pes e um vaso de planta em cima
+      part(geo.box, mat.cabinet, [0.9, 0.46, 0.5], [0, 0.31, 0]);
+      part(geo.box, mat.cabinetDark, [0.94, 0.05, 0.54], [0, 0.565, 0]);
+      for (const [x, z] of [
+        [-0.38, -0.19],
+        [0.38, -0.19],
+        [-0.38, 0.19],
+        [0.38, 0.19],
+      ]) {
+        part(geo.box, mat.cabinetDark, [0.07, 0.08, 0.07], [x, 0.04, z]);
+      }
+      part(geo.drum, mat.pot, [0.14, 0.16, 0.14], [-0.2, 0.67, 0]);
+      leaves(-0.2, 0.74, 0, 1.1);
+      // de lado em metade dos casos
+      group.rotation.y = prop.id % 2 ? Math.PI / 2 : 0;
+    } else if (variant === 'barrel') {
+      part(geo.drum, mat.barrel, [0.33, 0.72, 0.33], [0, 0.36, 0]);
+      for (const y of [0.16, 0.56]) {
+        part(geo.drum, mat.chestLock, [0.345, 0.05, 0.345], [0, y, 0]);
+      }
+      part(geo.drum, mat.cabinetDark, [0.28, 0.02, 0.28], [0, 0.725, 0]);
+    } else {
+      // vaso grande de chao
+      part(geo.drum, mat.pot, [0.26, 0.34, 0.26], [0, 0.17, 0]);
+      part(geo.drum, mat.cabinetDark, [0.29, 0.05, 0.29], [0, 0.34, 0]);
+      leaves(0, 0.36, 0, 1.5);
     }
     scene.add(group);
     return group;
@@ -1151,6 +1434,7 @@ export function createWorldRenderer(
       cone,
       blood,
       deathAt: null,
+      burst: false,
     };
   }
 
@@ -1242,6 +1526,10 @@ export function createWorldRenderer(
     sync(world, time) {
       const dt = lastTime ? Math.min(0.1, time - lastTime) : 0;
       lastTime = time;
+      // congela junto com o jogo: pausado ou na loja, nada cai
+      if (world.status === 'playing' || world.status === 'dead') {
+        updateParticles(dt);
+      }
 
       for (const room of world.rooms) {
         if (!rooms.has(room.index)) rooms.set(room.index, buildRoom(room));
@@ -1297,7 +1585,15 @@ export function createWorldRenderer(
       for (const floater of world.floaters) {
         let sprite = floaters.get(floater.id);
         if (!sprite) {
-          const map = floaterTexture(floater.amount, floater.onPlayer);
+          const map = floaterTexture(
+            floater.amount,
+            floater.onPlayer,
+            floater.headshot
+              ? 'HEADSHOT'
+              : floater.overkill
+                ? 'OVERKILL'
+                : undefined,
+          );
           if (!map) continue;
           sprite = new THREE.Sprite(
             new THREE.SpriteMaterial({
@@ -1316,7 +1612,9 @@ export function createWorldRenderer(
           t < FLOATER_POP_END
             ? 0.5 + (t / FLOATER_POP_END) * (FLOATER_POP - 0.5)
             : Math.max(1, FLOATER_POP - (t - FLOATER_POP_END) * 2.5);
-        sprite.scale.set(FLOATER_SIZE[0] * pop, FLOATER_SIZE[1] * pop, 1);
+        // golpe com destaque aparece maior que golpe comum
+        const size = pop * (floater.headshot || floater.overkill ? 1.5 : 1);
+        sprite.scale.set(FLOATER_SIZE[0] * size, FLOATER_SIZE[1] * size, 1);
         sprite.position.set(
           floater.pos.x,
           FLOATER_Y + t * FLOATER_RISE,
@@ -1398,11 +1696,17 @@ export function createWorldRenderer(
 
       for (const enemy of world.enemies) {
         let view = enemies.get(enemy.id);
+        const dead = enemy.state === 'dead';
         if (!view) {
           view = buildEnemy(enemy.kind);
+          // quem ja aparece morto nao explode de novo
+          view.burst = dead;
           enemies.set(enemy.id, view);
         }
-        const dead = enemy.state === 'dead';
+        if (dead && !view.burst) {
+          view.burst = true;
+          burst(enemy.pos);
+        }
         if (dead) {
           // a poca so comeca quando o corpo pousa
           if (view.deathAt === null && enemy.launch === 0) view.deathAt = time;
@@ -1517,6 +1821,7 @@ export function createWorldRenderer(
           bullets.set(bullet.id, mesh);
         }
         mesh.position.set(bullet.pos.x, BULLET_Y, -bullet.pos.y);
+        if (bullet.shuriken) mesh.rotation.y = time * SHURIKEN_SPIN;
       }
       reconcile(
         bullets,
@@ -1537,11 +1842,15 @@ export function createWorldRenderer(
       knifePrompt.removeFromParent();
       held.dispose();
       reconcile(floaters, new Set(), removeFloater);
+      for (const particle of particles) scene.remove(particle.mesh);
+      particles.length = 0;
       for (const texture of floaterTextures.values()) texture.dispose();
       kit.dispose();
-      for (const paper of wallpapers.values()) {
-        paper.material.dispose();
-        paper.texture.dispose();
+      for (const papers of wallpapers.values()) {
+        for (const { material, texture } of [papers.wall, papers.floor]) {
+          material.dispose();
+          texture.dispose();
+        }
       }
       for (const item of [
         ...Object.values(geo),

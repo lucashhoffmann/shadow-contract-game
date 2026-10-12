@@ -119,6 +119,11 @@ function WeaponCard({ hud, previews }: Pick<HudProps, 'hud' | 'previews'>) {
             <span className='text-xs opacity-60'>/{weapon.ammo}</span>
           </p>
         )}
+        {weapon && (
+          <p className='text-[10px] leading-tight font-black text-orange-300 uppercase'>
+            Headshot {hud.headshot}%
+          </p>
+        )}
       </div>
     </div>
   );

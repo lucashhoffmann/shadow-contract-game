@@ -30,6 +30,7 @@ import {
 import {
   ATTACK_COOLDOWN,
   DASH_MAX,
+  HEADSHOT_BASE,
   IDLE_MAX_ENEMIES,
   IDLE_WARNING_DELAY,
   IDLE_WARNING_INTERVAL,
@@ -79,6 +80,7 @@ export function createEmptyWorld(
       dashes: DASH_MAX,
       noise: 0,
       crouching: false,
+      headshot: HEADSHOT_BASE,
       weapon: null,
       arsenal: [],
     },

@@ -6,7 +6,6 @@ import {
 } from '@/app/modules/enemy/systems/enemy.system';
 import {
   ALERT_DURATION,
-  DASH_SPEED,
   DASH_TIME,
   DETECT_TIME,
   ENEMY_DASH_FROM_ROOM,
@@ -19,6 +18,9 @@ import {
   NOISE_WALK,
   SENSE_MAX_BONUS,
   SENSE_RANGE,
+  SHURIKEN_DAMAGE,
+  SHURIKEN_FROM_LEVEL,
+  SHURIKEN_INTERVAL,
   SHOP_EVERY,
   PLAYER_MAX_HP,
 } from '@/app/modules/world/constants/world.constants';
@@ -283,21 +285,69 @@ describe('updateEnemies', () => {
     expect(Math.cos(enemy.facing)).toBeLessThan(-0.9);
   });
 
-  it('ninja em alerta salta para cima do player e pousa sem atravessar', () => {
+  it('ninja da o bote quando o salto alcanca, pousa colado e golpeia logo', () => {
     const world = createArenaWorld();
-    world.player.pos = { x: 5.5, y: 10.5 };
+    world.player.pos = { x: 5.5, y: 6 };
     const enemy = addEnemy(world, 5.5, 2.5, Math.PI / 2, 'ninja');
     enemy.dashEvery = 1;
     enemy.detection = 1;
-    // alerta, meia recarga, e o salto comeca
-    run(world, 0.5 + 2 * FIXED_DT);
-    expect(enemy.dash).toBeGreaterThan(0);
-    const from = enemy.pos.y;
 
-    run(world, DASH_TIME);
-    expect(enemy.dash).toBe(0);
-    expect(enemy.pos.y).toBeCloseTo(from + DASH_SPEED * DASH_TIME, 0);
+    let jumped = false;
+    for (let i = 0; i < 90 && world.player.hp === PLAYER_MAX_HP; i++) {
+      updateEnemies(world, FIXED_DT);
+      if (enemy.dash > 0) jumped = true;
+    }
+    expect(jumped).toBe(true);
+    expect(world.player.hp).toBeLessThan(PLAYER_MAX_HP);
+    // nao atravessou o player
     expect(enemy.pos.y).toBeLessThan(world.player.pos.y);
+  });
+
+  it('ninja longe demais para o salto alcancar corre em vez de saltar', () => {
+    const world = createArenaWorld();
+    world.player.pos = { x: 5.5, y: 11.5 };
+    const enemy = addEnemy(world, 5.5, 1.5, Math.PI / 2, 'ninja');
+    enemy.dashEvery = 0.2;
+    enemy.detection = 1;
+    run(world, 0.6);
+    expect(enemy.dash).toBe(0);
+    expect(enemy.pos.y).toBeGreaterThan(2.5);
+  });
+
+  it('bote do ninja corrige o rumo para o player que saiu da frente', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 3, Math.PI / 2, 'ninja');
+    enemy.state = 'alert';
+    enemy.alertTimer = 5;
+    enemy.dash = DASH_TIME;
+    world.player.pos = { x: 8.5, y: 6 };
+    run(world, DASH_TIME / 2);
+    expect(enemy.facing).toBeLessThan(Math.PI / 2);
+    expect(enemy.pos.x).toBeGreaterThan(5.5);
+  });
+
+  it('ninja de nivel alto arremessa shuriken de longe; de nivel baixo nao', () => {
+    const thrown = (roomIndex: number) => {
+      const world = createArenaWorld();
+      world.player.pos = { x: 5.5, y: 7.5 };
+      // posicao da arena de teste, nivel da sala pedida
+      const enemy = createEnemy(
+        world,
+        roomIndex,
+        [{ x: 5.5, y: 2.5 }],
+        'ninja',
+      );
+      world.enemies.push(enemy);
+      enemy.dashEvery = 0;
+      enemy.detection = 1;
+      run(world, SHURIKEN_INTERVAL);
+      return world.projectiles.filter((p) => p.shuriken);
+    };
+    const stars = thrown(SHOP_EVERY * SHURIKEN_FROM_LEVEL);
+    expect(stars.length).toBeGreaterThan(0);
+    expect(stars[0]).toMatchObject({ owner: 'enemy', damage: SHURIKEN_DAMAGE });
+    expect(stars[0].vel.y).toBeGreaterThan(0);
+    expect(thrown(SHOP_EVERY * (SHURIKEN_FROM_LEVEL - 1))).toHaveLength(0);
   });
 
   it('ninja nao salta com caixa ou bau no trajeto, e nunca entra no tile', () => {

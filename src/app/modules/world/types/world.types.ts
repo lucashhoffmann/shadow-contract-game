@@ -81,6 +81,8 @@ export type Enemy = {
   dashEvery: number;
   // morto de um golpe so: segundos restantes do voo para frente; 0 = parado
   launch: number;
+  // segundos ate o ninja poder arremessar outra shuriken
+  throwCooldown: number;
   // 0..1: quanto ja ouviu do player; cheio, vai investigar
   hearing: number;
   // onde ouviu o player; null = nada a investigar
@@ -103,6 +105,10 @@ export type Projectile = {
   travelled: number;
   // id do inimigo que atirou: o aviso de dano ou erro sobe sobre ele
   shooter?: number;
+  // estrela arremessada por ninja: so muda o modelo
+  shuriken?: boolean;
+  // bala do player que saiu como headshot: `damage` ja vem multiplicado
+  headshot?: boolean;
 };
 
 // objeto de cenario destrutivel; ocupa um tile ('o') enquanto inteiro
@@ -115,7 +121,14 @@ export type Prop = {
 
 // dinheiro, coracao (cura), escudo, salto ou municao; os quatro ultimos saem
 // de caixa quebrada
-export type PickupKind = 'money' | 'heart' | 'shield' | 'dash' | 'ammo';
+export type PickupKind =
+  | 'money'
+  | 'heart'
+  | 'shield'
+  | 'dash'
+  | 'ammo'
+  // mira: soma pontos percentuais na chance de headshot
+  | 'headshot';
 
 export type Pickup = {
   id: number;
@@ -178,6 +191,8 @@ export type Player = {
   // agachado neste passo: mais lento, menos barulho e so e ouvido ate o
   // nivel branco
   crouching: boolean;
+  // chance (0 a 1) de cada bala disparada ser headshot
+  headshot: number;
   // arma de fogo na mao; null = espada. Sem bala continua na mao, so nao
   // atira
   weapon: Weapon | null;
@@ -224,6 +239,10 @@ export type Floater = {
   // golpe do inimigo contra o player, mostrado sobre o inimigo que bateu
   // (senao, golpe do player, sobre o inimigo que apanhou)
   onPlayer?: boolean;
+  // tiro do player que foi headshot
+  headshot?: boolean;
+  // execucao furtiva: agachado e pelas costas
+  overkill?: boolean;
   // segundos desde que apareceu; some em FLOATER_TIME
   age: number;
 };

@@ -32,9 +32,12 @@ import {
   SHIELD_MAX,
   SEARCH_TIME,
   FLOATER_MISS_GAP,
+  HEADSHOT_MAX,
+  HEADSHOT_MULT,
   FLOATER_TIME,
   SHOT_TIME,
   SLASH_TIME,
+  STEALTH_BACK_ANGLE,
   SWORD_DAMAGE,
 } from '@/app/modules/world/constants/world.constants';
 import type {
@@ -44,7 +47,7 @@ import type {
   WeaponId,
   World,
 } from '@/app/modules/world/types/world.types';
-import { angleTo, distance } from '@/shared/utils/math.util';
+import { angleDiff, angleTo, distance } from '@/shared/utils/math.util';
 import { nextRandom } from '@/shared/utils/rng.util';
 
 export function spawnProjectile(
@@ -57,8 +60,9 @@ export function spawnProjectile(
   range: number,
   weapon: WeaponId = 'pistol',
   shooter?: number,
-): void {
-  world.projectiles.push({
+  headshot = false,
+): Projectile {
+  const projectile: Projectile = {
     id: world.nextId++,
     owner,
     weapon,
@@ -69,7 +73,10 @@ export function spawnProjectile(
     life: (range * BULLET_RANGE_MARGIN) / speed,
     range,
     travelled: 0,
-  });
+    ...(headshot && { headshot }),
+  };
+  world.projectiles.push(projectile);
+  return projectile;
 }
 
 // numero de dano sobre o alvo; `amount` 0 mostra "Errou!". Erros em rajada
@@ -79,6 +86,8 @@ function addFloater(
   pos: Vec2,
   amount: number,
   onPlayer = false,
+  // destaque escrito sobre o numero
+  tag?: 'headshot' | 'overkill',
 ): void {
   if (
     amount === 0 &&
@@ -92,6 +101,7 @@ function addFloater(
     amount,
     age: 0,
     ...(onPlayer && { onPlayer }),
+    ...(tag && { [tag]: true }),
   });
 }
 
@@ -147,19 +157,33 @@ export function damageEnemy(
   world: World,
   enemy: Enemy,
   damage: number,
-  source: 'Facada' | 'Tiro' | 'Execução',
+  source: 'Facada' | 'Tiro' | 'Headshot' | 'Execução' | 'Overkill',
 ): void {
   const dealt = Math.min(damage, enemy.hp);
   // um golpe so, de vida cheia a zero
   const oneHit = enemy.hp === ENEMY_KINDS[enemy.kind].hp && damage >= enemy.hp;
-  addFloater(world, enemy.pos, dealt);
+  addFloater(
+    world,
+    enemy.pos,
+    dealt,
+    false,
+    // overkill: execucao furtiva, ou qualquer golpe que leva a vida cheia a
+    // zero de uma vez (vale mais que o destaque de headshot)
+    source === 'Overkill' || oneHit
+      ? 'overkill'
+      : source === 'Headshot'
+        ? 'headshot'
+        : undefined,
+  );
   world.run.stats.damageDealt += dealt;
   world.run.events.push({
     at: world.run.seconds,
     text:
-      source === 'Execução'
-        ? `Execução furtiva: ${dealt} de dano.`
-        : `${source} acertou: ${dealt} de dano.`,
+      source === 'Overkill'
+        ? `Overkill: execução agachado pelas costas, ${dealt} de dano.`
+        : source === 'Execução'
+          ? `Execução furtiva: ${dealt} de dano.`
+          : `${source} acertou: ${dealt} de dano.`,
   });
   enemy.hp -= damage;
   if (enemy.hp > 0) {
@@ -266,8 +290,18 @@ export function updateCombat(world: World, dt: number, knife = false): void {
     }
     world.run.stats.meleeHits++;
     // execucao tira toda a vida que restava
-    if (unaware) damageEnemy(world, unaware, unaware.hp, 'Execução');
-    else
+    if (unaware) {
+      // overkill: a execucao veio agachado e pelas costas do inimigo
+      const behind =
+        Math.abs(angleDiff(unaware.facing, angleTo(unaware.pos, player.pos))) >
+        STEALTH_BACK_ANGLE;
+      damageEnemy(
+        world,
+        unaware,
+        unaware.hp,
+        player.crouching && behind ? 'Overkill' : 'Execução',
+      );
+    } else
       damageEnemy(world, struck, attackDamage(world, SWORD_DAMAGE), 'Facada');
     return;
   }
@@ -283,15 +317,19 @@ export function updateCombat(world: World, dt: number, knife = false): void {
   for (let i = 0; i < item.pellets; i++) {
     const offset =
       item.pellets === 1 ? 0 : (i / (item.pellets - 1) - 0.5) * item.spread;
+    // cada bala sorteia o proprio headshot no disparo
+    const headshot = nextRandom(world) < player.headshot;
     spawnProjectile(
       world,
       'player',
       player.pos,
       aim + offset,
       PLAYER_BULLET_SPEED,
-      attackDamage(world, item.damage),
+      attackDamage(world, item.damage) * (headshot ? HEADSHOT_MULT : 1),
       item.range,
       player.weapon.id,
+      undefined,
+      headshot,
     );
   }
   world.run.stats.projectilesFired += item.pellets;
@@ -345,7 +383,7 @@ export function updateProjectiles(world: World, dt: number): void {
       world,
       hit,
       Math.max(1, Math.round(bullet.damage * rangeFalloff(bullet))),
-      'Tiro',
+      bullet.headshot ? 'Headshot' : 'Tiro',
     );
     return false;
   });
@@ -361,6 +399,19 @@ export function collectPickups(world: World): void {
       world.run.events.push({
         at: world.run.seconds,
         text: `Coletou $${pickup.value}.`,
+      });
+      return false;
+    }
+    // mira: soma pontos percentuais no headshot; no teto, fica no chao
+    if (pickup.kind === 'headshot') {
+      if (player.headshot >= HEADSHOT_MAX) return true;
+      player.headshot = Math.min(
+        HEADSHOT_MAX,
+        Math.round(player.headshot * 100 + pickup.value) / 100,
+      );
+      world.run.events.push({
+        at: world.run.seconds,
+        text: `Mira melhorada: headshot em ${Math.round(player.headshot * 100)}%.`,
       });
       return false;
     }

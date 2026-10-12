@@ -35,9 +35,18 @@ import {
   LAUNCH_TIME,
   HEARING_YELLOW,
   NINJA_DAMAGE,
+  NINJA_DASH_TURN,
+  NINJA_LUNGE_STRIKE,
   NINJA_REACH,
   REPATH_INTERVAL,
   SEARCH_TIME,
+  SHURIKEN_DAMAGE,
+  SHURIKEN_FIRST,
+  SHURIKEN_FROM_LEVEL,
+  SHURIKEN_INTERVAL,
+  SHURIKEN_MIN_GAP,
+  SHURIKEN_RANGE,
+  SHURIKEN_SPEED,
   SENSE_MAX_BONUS,
   SENSE_PER_CONTRACT,
   SENSE_RANGE,
@@ -54,7 +63,7 @@ import type {
   Vec2,
   World,
 } from '@/app/modules/world/types/world.types';
-import { angleDiff, angleTo, distance } from '@/shared/utils/math.util';
+import { angleDiff, angleTo, clamp, distance } from '@/shared/utils/math.util';
 import { nextRandom } from '@/shared/utils/rng.util';
 
 const NODE_REACH = 0.1;
@@ -122,6 +131,7 @@ export function createEnemy(
     heard: null,
     searchTimer: 0,
     launch: 0,
+    throwCooldown: 0,
   };
 }
 
@@ -241,6 +251,7 @@ function enterAlert(enemy: Enemy): void {
   enemy.fireCooldown = FIRE_DELAY;
   // primeiro salto nao vem junto com o alerta
   enemy.dashCooldown = enemy.dashEvery / 2;
+  enemy.throwCooldown = SHURIKEN_FIRST;
   enemy.route = [];
   enemy.repathTimer = 0;
 }
@@ -265,6 +276,11 @@ function alert(world: World, enemy: Enemy, dt: number): void {
   const reach = stats.ranged ? FIRE_RANGE : NINJA_REACH;
   const gap = distance(enemy.pos, player.pos);
   if (enemy.dash > 0) {
+    // bote do ninja acompanha o player que tenta sair da frente
+    if (!stats.ranged) {
+      const turn = angleDiff(angleTo(enemy.pos, player.pos), enemy.facing);
+      enemy.facing += clamp(turn, -NINJA_DASH_TURN * dt, NINJA_DASH_TURN * dt);
+    }
     const step =
       DASH_SPEED * enemy.intelligence.dash * Math.min(dt, enemy.dash);
     enemy.dash = Math.max(0, enemy.dash - dt);
@@ -279,17 +295,46 @@ function alert(world: World, enemy: Enemy, dt: number): void {
     // ninja pousa ao alcancar o player, em vez de passar por ele
     if (!stats.ranged && distance(enemy.pos, player.pos) <= reach) {
       enemy.dash = 0;
+      // pousou colado: o golpe vem logo, sem esperar a recarga inteira
+      enemy.fireCooldown = Math.min(enemy.fireCooldown, NINJA_LUNGE_STRIKE);
     }
     return;
   }
   enemy.dashCooldown = Math.max(0, enemy.dashCooldown - dt);
-  // longe: salta para cima do player. Terno ja no alcance: salta de lado,
-  // para sair da mira. Ninja no alcance nao salta, golpeia.
+  enemy.throwCooldown = Math.max(0, enemy.throwCooldown - dt);
+  // ninja de nivel alto arremessa shuriken de longe e segue se aproximando
+  if (
+    !stats.ranged &&
+    Math.ceil(enemy.roomIndex / SHOP_EVERY) >= SHURIKEN_FROM_LEVEL &&
+    enemy.throwCooldown === 0 &&
+    los &&
+    gap >= SHURIKEN_MIN_GAP &&
+    gap <= SHURIKEN_RANGE
+  ) {
+    enemy.facing = angleTo(enemy.pos, player.pos);
+    spawnProjectile(
+      world,
+      'enemy',
+      enemy.pos,
+      enemy.facing,
+      SHURIKEN_SPEED,
+      SHURIKEN_DAMAGE,
+      SHURIKEN_RANGE,
+      'pistol',
+      enemy.id,
+    ).shuriken = true;
+    enemy.throwCooldown = SHURIKEN_INTERVAL;
+    enemy.attack = SLASH_TIME;
+  }
+  // Ninja fora do alcance do golpe: bote para cima do player, so quando o
+  // salto chega nele (de mais longe, corre). Terno: longe salta para cima,
+  // ja no alcance de tiro salta de lado, para sair da mira.
   if (
     enemy.dashEvery > 0 &&
     enemy.dashCooldown === 0 &&
     los &&
-    (gap > reach || stats.ranged)
+    (stats.ranged ||
+      (gap > reach && gap <= DASH_SPEED * enemy.intelligence.dash * DASH_TIME))
   ) {
     const toward = angleTo(enemy.pos, player.pos);
     const side = nextRandom(world) < 0.5 ? 1 : -1;

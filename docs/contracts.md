@@ -86,6 +86,8 @@ type InputState = {
 
 `moveY = 1` anda para frente. Teclado e joystick somam no mesmo objeto; a
 simulacao normaliza se o vetor passar de 1.
+Em tela de toque ou janela estreita, o joystick aparece no centro inferior durante o
+jogo; tocar e arrastar no disco move o personagem, soltar zera o movimento.
 `interact` e um pulso da tecla F: quebra a caixa intacta mais proxima dentro de
 `MELEE_RANGE`, vira o player para ela e anima o golpe de espada. Fora de
 `playing`, o pulso e ignorado. O F modelado aparece sobre a caixa ao alcance.
@@ -181,6 +183,12 @@ Estados:
   inimigo). `updateEnemies` anda o corpo `LAUNCH_DISTANCE` nesse tempo,
   freando ate parar; parede segura. Morte em mais de um golpe nao lanca. A
   engine anima o voo e o tombo por `enemy.launch`
+- shuriken: `ninja` de nivel (contrato) `SHURIKEN_FROM_LEVEL` em diante, em
+  `alert` com linha de visao e entre `SHURIKEN_MIN_GAP` e `SHURIKEN_RANGE` do
+  player, arremessa um `Projectile` com `shuriken: true` a cada
+  `SHURIKEN_INTERVAL` (`throwCooldown`; a primeira sai `SHURIKEN_FIRST` apos
+  o alerta), sem parar de se aproximar. Vale como
+  bala inimiga: `SHURIKEN_DAMAGE`, para em parede e caixa
 - o inimigo ve o player no cone ate `viewRange`, ou em qualquer direcao a ate
   `senseRange(enemy)`: `SENSE_RANGE` mais `SENSE_PER_CONTRACT` por contrato
   (`roomIndex / SHOP_EVERY`), ate `+SENSE_MAX_BONUS`. Os dois pedem linha de
@@ -219,8 +227,10 @@ Estados:
   `ENEMY_DASH_MIN_INTERVAL`; `0` = nao salta
   - so salta com o trajeto inteiro livre: parede, caixa, bau ou porta selada
     no caminho cancelam o salto, e ele contorna andando
-  - fora do alcance de ataque: salta na direcao do player; `ninja` pousa ao
-    chegar em `NINJA_REACH`
+  - `suit` fora do alcance de tiro: salta na direcao do player
+  - `ninja` (bote): so salta se o salto alcanca o player (de mais longe,
+    corre); no ar vira para o player ate `NINJA_DASH_TURN` rad/s; pousa ao
+    chegar em `NINJA_REACH` e golpeia em ate `NINJA_LUNGE_STRIKE` segundos
   - `suit` ja no alcance de tiro: salta de lado (lado sorteado por `rngState`)
   - tenta primeiro um lado livre; se ambos estiverem bloqueados, combate sem
     saltar. O multiplicador de dash aumenta velocidade e frequencia
@@ -241,6 +251,7 @@ type Projectile = {
   range: number; // alcance da arma
   travelled: number; // distancia ja percorrida
   shooter?: number; // id do inimigo que atirou
+  shuriken?: boolean; // estrela de ninja: so muda o modelo
 };
 ```
 
@@ -268,10 +279,13 @@ type Prop = { id: number; roomIndex: number; pos: Vec2; broken: boolean };
 - quebra quando uma bala (de qualquer dono) entra no tile, ou quando alguem
   morre a ate `PROP_BREAK_RADIUS`
 - quebrar troca o tile por `.` e marca `broken`; a engine desenha destrocos
+- a aparencia varia (caixa, aparador com planta, barril, vaso), escolhida
+  pela engine a partir do `id`. E so visual: a simulacao trata todos igual
 - ao quebrar, sorteia (`rngState`) um `Pickup` pela tabela `LOOT`
   (`level/utils/grid.util.ts`): cada item ocupa a sua `chance` da reta de 0 a
   1, em ordem (`heart` `LOOT_HEART_CHANCE`, `shield` `LOOT_SHIELD_CHANCE`,
-  `dash` `LOOT_DASH_CHANCE`, `ammo` `LOOT_AMMO_CHANCE`); o que sobra e caixa
+  `dash` `LOOT_DASH_CHANCE`, `ammo` `LOOT_AMMO_CHANCE`, `headshot`
+  `LOOT_HEADSHOT_CHANCE`); o que sobra e caixa
   vazia. Item com `when` (municao: so com o player armado) que nao vale no
   momento tambem vira caixa vazia. Um segundo sorteio
   define o valor. Item novo entra no fim da tabela, para nao mudar o que as
@@ -280,7 +294,7 @@ type Prop = { id: number; roomIndex: number; pos: Vec2; broken: boolean };
 ## `Pickup`
 
 ```ts
-type PickupKind = 'money' | 'heart' | 'shield' | 'dash' | 'ammo';
+type PickupKind = 'money' | 'heart' | 'shield' | 'dash' | 'ammo' | 'headshot';
 type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
 ```
 
@@ -296,6 +310,10 @@ type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
   esta com a espada, na primeira do arsenal com espaco, ate `ItemDef.ammo` (30 em
   toda arma de fogo). `value` e um inteiro de `AMMO_LOOT_MIN` a
   `AMMO_LOOT_MAX`. So sai de caixa com alguma arma de fogo no arsenal
+- `headshot` (mira): soma `value` pontos percentuais em `player.headshot`,
+  ate `HEADSHOT_MAX`; no teto fica no chao. `value` vai de
+  `HEADSHOT_LOOT_MIN` a `HEADSHOT_LOOT_MAX`. So sai com arma de fogo no
+  arsenal e em caixa do nivel (contrato) `HEADSHOT_FROM_LEVEL` em diante
 - `heart` com vida cheia, `shield` com escudo no teto, `dash` com os saltos
   cheios e `ammo` sem arma ou com todas cheias ficam no chao
 - todo dano no player passa por `damagePlayer`: gasta `shield` antes de `hp`
@@ -313,6 +331,12 @@ O player comeca com a espada e nunca a perde.
     normalmente entre 10% e 30%, com 25% de chance de pico entre 45% e 70%
   - cada erro alerta o alvo; as mudancas de chance entram em `run.events`
   - inimigo que nao esta `alert`: morre na hora
+  - overkill: marca `Floater.overkill` (desenhado como "OVERKILL" sobre o
+    numero) em dois casos: execucao com `player.crouching` e pelas costas
+    (fora de `STEALTH_BACK_ANGLE` para cada lado de `enemy.facing`), ou
+    qualquer golpe que leva a vida cheia do inimigo a zero de uma vez (+60),
+    inclusive headshot, que nesse caso mostra overkill. Nao muda dano nem
+    recompensa
   - inimigo `alert`: leva `SWORD_DAMAGE` com variacao de ataque
 - senao, com arma de fogo: mira no inimigo vivo mais proximo dentro de `range`
   e com linha de visao, dispara `pellets` balas abertas em `spread` radianos,
@@ -363,6 +387,11 @@ type Floater = {
   verde
 - dano base: espada `SWORD_DAMAGE` (30); bala `ItemDef.damage` (pistolas
   30, chumbo da escopeta 15). Inimigo tem 60 de vida
+- headshot: cada bala do player sorteia, no disparo, `player.headshot`
+  (comeca em `HEADSHOT_BASE`) de sair com o dano vezes `HEADSHOT_MULT`
+  (`Projectile.headshot`). O acerto gera `Floater.headshot`, desenhado como
+  "HEADSHOT" sobre o numero; `hud.headshot` mostra a chance em %. Espada e
+  execucao nao tem headshot
 - dano da bala cai com a distancia: cheio ate `FALLOFF_START` do alcance da
   arma, depois desce em linha ate `FALLOFF_MIN` no alcance maximo
   (`Projectile.travelled / range`). Bala inimiga nao perde dano
@@ -539,8 +568,12 @@ function createGameEngine(canvas: HTMLCanvasElement): { dispose(): void };
     engine desenha as folhas pelo mesmo criterio
   - fechada, segura bala (de qualquer dono) e visao: `isWall` conta porta
     fechada como parede, entao cone, linha de visao e mira param nela
-- parede muda a cada contrato (nivel): tom e papel de parede derivados so do
+- parede e piso mudam a cada contrato (nivel): tom, papel de parede e
+  desenho do piso (uma repeticao por tile) derivados so do
   indice do nivel (`wallpaper` em `world.renderer.ts`), sem campo no `World`
+- ao matar (inimigo passa a `dead`), a engine solta uma explosao de notas de
+  dinheiro e gotas de sangue, junto com o zoom e o blur da camera. So
+  visual: nao da dinheiro (quem da e o `Pickup` da morte)
 - animacao so visual, derivada do `World` a cada frame: inclinar ao andar,
   cabeca olhando para os lados quando parado, golpe de espada, zoom com blur
   quando `run.kills` sobe

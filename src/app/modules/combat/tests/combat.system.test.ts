@@ -20,6 +20,9 @@ import {
   FALLOFF_MIN,
   FIXED_DT,
   FLOATER_TIME,
+  HEADSHOT_BASE,
+  HEADSHOT_MAX,
+  HEADSHOT_MULT,
   KILL_MONEY,
   LAUNCH_TIME,
   PLAYER_BULLET_SPEED,
@@ -667,6 +670,7 @@ describe('dano do player', () => {
   it('cada bala disparada sorteia o proprio dano no disparo', () => {
     const world = createArenaWorld();
     world.run.attackVariance = { min: 1, max: 1.5 };
+    world.player.headshot = 0;
     world.player.weapon = { id: 'shotgun', ammo: 2 };
     addEnemy(world, 5.5, 5.5, UP);
 
@@ -823,5 +827,163 @@ describe('item de municao', () => {
     world.player.weapon = { id: 'pistol', ammo: ITEMS.pistol.ammo };
     collectPickups(world);
     expect(world.pickups).toHaveLength(1);
+  });
+});
+
+describe('headshot', () => {
+  function fire(chance: number) {
+    const world = createArenaWorld();
+    world.run.attackVariance = { min: 1, max: 1 };
+    world.player.headshot = chance;
+    world.player.weapon = { id: 'pistol', ammo: 5 };
+    const enemy = addEnemy(world, 5.5, 4.5, UP);
+    updateCombat(world, FIXED_DT);
+    return { world, enemy, bullet: world.projectiles[0] };
+  }
+
+  it('comeca com a chance base', () => {
+    expect(createArenaWorld().player.headshot).toBe(HEADSHOT_BASE);
+  });
+
+  it('bala headshot sai com o dano multiplicado e marca o aviso', () => {
+    const { world, enemy, bullet } = fire(1);
+    expect(bullet.headshot).toBe(true);
+    expect(bullet.damage).toBe(ITEMS.pistol.damage * HEADSHOT_MULT);
+
+    // ja ferido: o headshot mata, mas nao e vida cheia a zero de uma vez
+    enemy.hp = ENEMY_KINDS.suit.hp / 2;
+    fly(world, 1);
+    expect(enemy.state).toBe('dead');
+    expect(world.floaters.at(-1)).toMatchObject({
+      amount: ENEMY_KINDS.suit.hp / 2,
+      headshot: true,
+    });
+    expect(
+      world.run.events.some((event) => event.text.startsWith('Headshot')),
+    ).toBe(true);
+  });
+
+  it('sem chance, a bala sai normal e o aviso nao marca headshot', () => {
+    const { world, bullet } = fire(0);
+    expect(bullet.headshot).toBeUndefined();
+    expect(bullet.damage).toBe(ITEMS.pistol.damage);
+
+    fly(world, 1);
+    expect(world.floaters.at(-1)?.headshot).toBeUndefined();
+  });
+
+  it('item de mira soma pontos percentuais ate o teto e depois fica no chao', () => {
+    const world = createArenaWorld();
+    const drop = (value: number) =>
+      world.pickups.push({
+        id: world.nextId++,
+        kind: 'headshot',
+        roomIndex: 0,
+        pos: { ...world.player.pos },
+        value,
+      });
+
+    drop(5);
+    collectPickups(world);
+    expect(world.player.headshot).toBeCloseTo(HEADSHOT_BASE + 0.05);
+    expect(world.pickups).toHaveLength(0);
+
+    drop(90);
+    collectPickups(world);
+    expect(world.player.headshot).toBe(HEADSHOT_MAX);
+
+    drop(5);
+    collectPickups(world);
+    expect(world.pickups).toHaveLength(1);
+  });
+});
+
+describe('overkill', () => {
+  // inimigo desavisado colado no player; `facing` diz para onde ele olha
+  function execute(crouching: boolean, facing: number, hp?: number) {
+    const world = createArenaWorld();
+    world.run.meleeMissChance = 0;
+    world.run.nextMeleeChanceAt = Infinity;
+    world.player.crouching = crouching;
+    const enemy = addEnemy(world, 5.5, 3.3, facing);
+    if (hp !== undefined) enemy.hp = hp;
+    updateCombat(world, FIXED_DT);
+    return { world, enemy, floater: world.floaters.at(-1) };
+  }
+  const DOWN_AT_PLAYER = -Math.PI / 2;
+
+  it('execucao agachado e pelas costas marca overkill', () => {
+    const { world, enemy, floater } = execute(true, UP);
+    expect(enemy.state).toBe('dead');
+    expect(floater).toMatchObject({
+      amount: ENEMY_KINDS.suit.hp,
+      overkill: true,
+    });
+    expect(
+      world.run.events.some((event) => event.text.startsWith('Overkill')),
+    ).toBe(true);
+  });
+
+  it('inimigo ja ferido: em pe, ou de frente, e execucao comum', () => {
+    for (const { enemy, floater } of [
+      execute(false, UP, 30),
+      execute(true, DOWN_AT_PLAYER, 30),
+    ]) {
+      expect(enemy.state).toBe('dead');
+      expect(floater).toMatchObject({ amount: 30 });
+      expect(floater?.overkill).toBeUndefined();
+    }
+  });
+
+  it('inimigo ja ferido: agachado e pelas costas ainda e overkill', () => {
+    const { floater } = execute(true, UP, 30);
+    expect(floater).toMatchObject({ amount: 30, overkill: true });
+  });
+
+  it('qualquer golpe que tira a vida cheia de uma vez e overkill', () => {
+    // execucao em pe e de frente: +60
+    for (const { floater } of [
+      execute(false, UP),
+      execute(false, DOWN_AT_PLAYER),
+    ]) {
+      expect(floater).toMatchObject({
+        amount: ENEMY_KINDS.suit.hp,
+        overkill: true,
+      });
+    }
+
+    // headshot que mata de uma vez mostra overkill, nao headshot
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 4.5, UP);
+    spawnProjectile(
+      world,
+      'player',
+      world.player.pos,
+      UP,
+      PLAYER_BULLET_SPEED,
+      ENEMY_KINDS.suit.hp,
+      12,
+      'pistol',
+      undefined,
+      true,
+    );
+    fly(world, 1);
+    expect(enemy.state).toBe('dead');
+    expect(world.floaters.at(-1)).toMatchObject({ overkill: true });
+    expect(world.floaters.at(-1)?.headshot).toBeUndefined();
+  });
+
+  it('inimigo em alerta nao e executado, entao nao ha overkill', () => {
+    const world = createArenaWorld();
+    world.run.meleeMissChance = 0;
+    world.run.nextMeleeChanceAt = Infinity;
+    world.player.crouching = true;
+    const enemy = addEnemy(world, 5.5, 3.3, UP);
+    enemy.state = 'alert';
+
+    updateCombat(world, FIXED_DT);
+
+    expect(enemy.state).toBe('alert');
+    expect(world.floaters.at(-1)?.overkill).toBeUndefined();
   });
 });

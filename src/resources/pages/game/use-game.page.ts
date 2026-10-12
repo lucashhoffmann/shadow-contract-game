@@ -47,9 +47,15 @@ export function useGamePage() {
           title: 'Pausado',
           actionLabel: 'Continuar',
           onAction: togglePause,
+          onMenu: backToMenu,
           onRestart: restart,
         }
-      : { title: 'Como jogar', actionLabel: 'Comecar', onAction: begin };
+      : {
+          title: 'Como jogar',
+          actionLabel: 'Comecar',
+          onAction: begin,
+          onMenu: backToMenu,
+        };
 
   return {
     canvasRef,

@@ -6,12 +6,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/resources/components/ui/dialog';
+import { cn } from '@/shared/lib/utils';
 
 type LegendDialogProps = {
   open: boolean;
   title: string;
   actionLabel: string;
   onAction: () => void;
+  // volta para a tela inicial, largando a run
+  onMenu: () => void;
   onRestart?: () => void;
 };
 
@@ -21,7 +24,7 @@ const SECTIONS: [title: string, entries: Entry[]][] = [
   [
     'Controles',
     [
-      ['WASD / setas / arrastar', 'mover'],
+      ['WASD / setas / joystick', 'mover'],
       [
         'Espaco',
         'salto de esquiva. Livre na sala inicial; depois gasta 1 dos 6',
@@ -60,6 +63,10 @@ const SECTIONS: [title: string, entries: Entry[]][] = [
         'atira sozinho de longe; colado no inimigo, so ataca no F (faca)',
       ],
       ['Tiro', 'perde forca com a distancia; escopeta so resolve de perto'],
+      [
+        'Headshot',
+        'chance de a bala dar dano dobrado; a mira das caixas aumenta',
+      ],
       ['Numeros', '+ e o dano que voce causou; - vermelho e o que ele te deu'],
       ['Adrenalina', 'cada eliminacao acelera voce por um instante'],
     ],
@@ -82,12 +89,16 @@ const SECTIONS: [title: string, entries: Entry[]][] = [
 const CHUNKY =
   'font-display text-outline cursor-pointer rounded-2xl border-4 border-white px-6 py-2 text-xl text-white uppercase shadow-[0_5px_0_#14141f] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none';
 
+// botoes secundarios: menores que a acao principal
+const SMALL = 'px-4 py-1.5 text-base';
+
 // usado antes de cada run ("Como jogar") e na pausa ("Pausado")
 export function LegendDialog({
   open,
   title,
   actionLabel,
   onAction,
+  onMenu,
   onRestart,
 }: LegendDialogProps) {
   return (
@@ -134,7 +145,26 @@ export function LegendDialog({
             </section>
           ))}
         </div>
-        <DialogFooter className='flex-row items-center justify-center gap-3 pb-2 sm:justify-center'>
+        <DialogFooter className='flex-row flex-wrap items-center justify-center gap-3 pb-2 sm:justify-center'>
+          <button
+            type='button'
+            className={cn(CHUNKY, SMALL, 'bg-[#5b5f7a]')}
+            onClick={onMenu}
+          >
+            Inicio
+          </button>
+          <button
+            type='button'
+            className={cn(CHUNKY, SMALL, 'bg-[#5b5f7a]')}
+            // entra ou sai da tela cheia; navegador sem suporte ignora
+            onClick={() =>
+              document.fullscreenElement
+                ? document.exitFullscreen?.()
+                : document.documentElement.requestFullscreen?.()
+            }
+          >
+            Tela cheia
+          </button>
           {onRestart && (
             <button
               type='button'

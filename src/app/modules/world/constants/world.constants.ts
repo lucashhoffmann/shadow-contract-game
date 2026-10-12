@@ -25,6 +25,9 @@ export const ATTACK_COOLDOWN = 0.5;
 export const PICKUP_RADIUS = 0.7;
 // espada: executa desavisado; em alerta tira SWORD_DAMAGE por golpe
 export const SWORD_DAMAGE = 30;
+// overkill: execucao agachado e pelas costas. "Costas" e fora deste angulo
+// para cada lado da direcao em que o inimigo olha
+export const STEALTH_BACK_ANGLE = Math.PI / 2;
 export const MELEE_MISS_INTERVAL = 5;
 export const MELEE_MISS_PEAK_RATE = 0.25;
 export const MELEE_MISS_BASE = 0.1;
@@ -82,6 +85,22 @@ export const NINJA_FROM_ROOM = 2;
 export const NINJA_CHANCE = 0.4;
 export const NINJA_REACH = 0.9;
 export const NINJA_DAMAGE = 25;
+// bote do ninja: so salta se o salto alcanca o player, corrige o rumo no ar
+// (rad/s) e, ao pousar colado, golpeia quase na hora
+export const NINJA_DASH_TURN = 2.5;
+export const NINJA_LUNGE_STRIKE = 0.15;
+// shuriken: a partir desse nivel (contrato) o ninja em alerta arremessa de
+// longe enquanto se aproxima
+export const SHURIKEN_FROM_LEVEL = 10;
+export const SHURIKEN_INTERVAL = 2.2;
+// a primeira sai logo ao entrar em alerta: correndo, ele chega perto antes
+// de uma recarga inteira
+export const SHURIKEN_FIRST = 0.3;
+export const SHURIKEN_SPEED = 9;
+export const SHURIKEN_DAMAGE = 15;
+export const SHURIKEN_RANGE = 6;
+// de perto nao arremessa: parte para o golpe
+export const SHURIKEN_MIN_GAP = 2;
 export const VIEW_HALF_ANGLE = Math.PI / 5;
 export const DETECT_TIME = 0.6;
 export const DETECT_DECAY = 0.5;
@@ -152,6 +171,16 @@ export const LOOT_DASH_CHANCE = 0.2;
 // quantos saltos um item de salto repoe
 export const DASH_LOOT_MIN = 1;
 export const DASH_LOOT_MAX = 6;
+// headshot: chance de cada bala do player dar dano multiplicado. Comeca em
+// HEADSHOT_BASE; o item de mira (caixa, a partir do nivel HEADSHOT_FROM_LEVEL,
+// com arma de fogo) soma pontos percentuais ate HEADSHOT_MAX
+export const HEADSHOT_BASE = 0.1;
+export const HEADSHOT_MAX = 0.5;
+export const HEADSHOT_MULT = 2;
+export const HEADSHOT_FROM_LEVEL = 3;
+export const LOOT_HEADSHOT_CHANCE = 0.06;
+export const HEADSHOT_LOOT_MIN = 3;
+export const HEADSHOT_LOOT_MAX = 8;
 // municao: so sai de caixa com o player armado
 export const LOOT_AMMO_CHANCE = 0.15;
 export const AMMO_LOOT_MIN = 4;

@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 
 import { createWorldRenderer } from '@/app/engine/renderers/world.renderer';
-import { FIXED_DT } from '@/app/modules/world/constants/world.constants';
+import {
+  FIXED_DT,
+  ROOM_H,
+  ROOM_W,
+} from '@/app/modules/world/constants/world.constants';
 import { stepWorld } from '@/app/modules/world/systems/world.system';
 import {
   DEFAULT_BLOOD_COLOR,
@@ -140,5 +144,20 @@ it('coracao e escudo de caixa flutuam acima do chao e somem ao coletar', () => {
   world.pickups = [];
   renderer.sync(world, 1.1);
   expect(scene.getObjectByName('heartPickup')).toBeUndefined();
+  renderer.dispose();
+});
+
+it('piso tem textura que repete uma vez por tile', () => {
+  const world = createArenaWorld();
+  const scene = new THREE.Scene();
+  const renderer = createWorldRenderer(
+    scene,
+    DEFAULT_LOOK,
+    DEFAULT_BLOOD_COLOR,
+  );
+  renderer.sync(world, 1);
+  const floor = scene.getObjectByName('floor') as THREE.Mesh;
+  const { map } = floor.material as THREE.MeshLambertMaterial;
+  expect(map?.repeat.toArray()).toEqual([ROOM_W, ROOM_H]);
   renderer.dispose();
 });

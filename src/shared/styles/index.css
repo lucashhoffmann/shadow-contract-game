@@ -48,6 +48,46 @@
   }
 }
 
+/* dica do joystick: o botao percorre um infinito (lemniscata) em volta do
+   centro, em laco, ate o primeiro toque */
+@keyframes joystick-hint {
+  0%,
+  50%,
+  100% {
+    transform: translate(-50%, -50%);
+  }
+  12.5% {
+    transform: translate(calc(-50% + 16px), calc(-50% - 11px));
+  }
+  25% {
+    transform: translate(calc(-50% + 22px), -50%);
+  }
+  37.5% {
+    transform: translate(calc(-50% + 16px), calc(-50% + 11px));
+  }
+  62.5% {
+    transform: translate(calc(-50% - 16px), calc(-50% - 11px));
+  }
+  75% {
+    transform: translate(calc(-50% - 22px), -50%);
+  }
+  87.5% {
+    transform: translate(calc(-50% - 16px), calc(-50% + 11px));
+  }
+}
+
+.joystick-hint {
+  animation: joystick-hint 2.8s linear infinite;
+}
+
+/* joystick so em aparelho de toque. Janela estreita no computador nao conta:
+   la o controle e o teclado */
+@media (pointer: coarse) {
+  .virtual-joystick {
+    display: block;
+  }
+}
+
 :root {
   --radius: 0.75rem;
   --background: #1f2033;
@@ -70,8 +110,11 @@
 }
 
 @layer base {
+  /* Travas de mobile, as mesmas do web-gest */
   * {
     @apply border-border;
+    /* sem o clarao azul do navegador ao tocar */
+    -webkit-tap-highlight-color: transparent;
   }
 
   html,
@@ -80,12 +123,39 @@
     height: 100%;
   }
 
+  /* sem zoom de duplo toque nem espera de 300 ms no toque */
+  html,
+  #root,
+  main {
+    touch-action: manipulation;
+  }
+
+  /* o jogo trava mais que o web-gest: nenhum gesto do navegador sobre a
+     tela, senao arrastar o joystick rolaria ou daria zoom na pagina */
   body {
     @apply bg-background text-foreground;
     margin: 0;
     overflow: hidden;
     touch-action: none;
     user-select: none;
+  }
+
+  /* iOS da zoom na pagina ao focar campo com letra menor que 16px */
+  input,
+  textarea,
+  select,
+  [contenteditable='true'] {
+    font-size: 16px !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 

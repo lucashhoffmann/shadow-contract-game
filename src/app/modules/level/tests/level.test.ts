@@ -23,6 +23,9 @@ import { findPath } from '@/app/modules/level/utils/pathfinding.util';
 import {
   AMMO_LOOT_MAX,
   AMMO_LOOT_MIN,
+  HEADSHOT_FROM_LEVEL,
+  HEADSHOT_LOOT_MAX,
+  HEADSHOT_LOOT_MIN,
   HEART_MAX,
   HEART_MIN,
   IDLE_WARNING_DELAY,
@@ -370,5 +373,38 @@ describe('municao em caixa', () => {
     const values = loot(true);
     expect(Math.min(...values)).toBe(AMMO_LOOT_MIN);
     expect(Math.max(...values)).toBe(AMMO_LOOT_MAX);
+  });
+});
+
+describe('item de mira em caixa', () => {
+  // 800 caixas quebradas na sala `roomIndex`
+  function loot(roomIndex: number, armed: boolean) {
+    const world = createArenaWorld();
+    if (armed) world.player.arsenal.push({ id: 'pistol', ammo: 0 });
+    for (let i = 0; i < 800; i++) {
+      breakProp(world, {
+        id: i,
+        roomIndex,
+        pos: { x: 5.5, y: 5.5 },
+        broken: false,
+      });
+    }
+    return world.pickups
+      .filter((p) => p.kind === 'headshot')
+      .map((p) => p.value);
+  }
+  // primeira sala do nivel HEADSHOT_FROM_LEVEL
+  const from = (HEADSHOT_FROM_LEVEL - 1) * SHOP_EVERY + 1;
+
+  it('so sai a partir do nivel 3, e so com arma de fogo', () => {
+    expect(loot(from - 1, true)).toHaveLength(0);
+    expect(loot(from, false)).toHaveLength(0);
+    expect(loot(from, true).length).toBeGreaterThan(20);
+  });
+
+  it('vem de HEADSHOT_LOOT_MIN a HEADSHOT_LOOT_MAX pontos', () => {
+    const values = loot(from, true);
+    expect(Math.min(...values)).toBe(HEADSHOT_LOOT_MIN);
+    expect(Math.max(...values)).toBe(HEADSHOT_LOOT_MAX);
   });
 });

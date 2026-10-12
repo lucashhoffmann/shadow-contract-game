@@ -44,6 +44,8 @@ export type Hud = {
   kills: number;
   weaponId: WeaponId | null;
   ammo: number;
+  // chance de headshot das balas, em porcentagem inteira
+  headshot: number;
 };
 
 // aparencia do player: so visual, nao entra no World
@@ -173,6 +175,7 @@ const EMPTY_HUD: Hud = {
   kills: 0,
   weaponId: null,
   ammo: 0,
+  headshot: 0,
 };
 
 const SCREEN_BY_STATUS: Record<WorldStatus, Screen> = {
@@ -209,6 +212,7 @@ function readHud(w: World): Hud {
     kills: w.run.kills,
     weaponId: w.player.weapon?.id ?? null,
     ammo: w.player.weapon?.ammo ?? 0,
+    headshot: Math.round(w.player.headshot * 100),
   };
 }
 

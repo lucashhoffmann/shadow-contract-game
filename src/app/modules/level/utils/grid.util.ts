@@ -1,4 +1,7 @@
 import {
+  HEADSHOT_FROM_LEVEL,
+  HEADSHOT_LOOT_MAX,
+  HEADSHOT_LOOT_MIN,
   HEART_MAX,
   AMMO_LOOT_MAX,
   AMMO_LOOT_MIN,
@@ -10,6 +13,7 @@ import {
   LOOT_HEART_CHANCE,
   LOOT_AMMO_CHANCE,
   LOOT_DASH_CHANCE,
+  LOOT_HEADSHOT_CHANCE,
   LOOT_SHIELD_CHANCE,
   MELEE_RANGE,
   ROOM_H,
@@ -226,7 +230,7 @@ const LOOT: {
   chance: number;
   value: (world: World, roll: number) => number;
   // so sai quando isso vale; senao a faixa dele conta como caixa vazia
-  when?: (world: World) => boolean;
+  when?: (world: World, prop: Prop) => boolean;
 }[] = [
   {
     // cura pouca na maioria das vezes: `roll` ao quadrado puxa para baixo
@@ -262,13 +266,25 @@ const LOOT: {
     value: (_world, roll) =>
       AMMO_LOOT_MIN + Math.floor(roll * (AMMO_LOOT_MAX - AMMO_LOOT_MIN + 1)),
   },
+  {
+    // mira: so para quem tem arma de fogo, em caixa do nivel
+    // HEADSHOT_FROM_LEVEL em diante (nivel = contrato)
+    kind: 'headshot',
+    chance: LOOT_HEADSHOT_CHANCE,
+    when: (world, prop) =>
+      (world.player.weapon !== null || world.player.arsenal.length > 0) &&
+      Math.floor((prop.roomIndex - 1) / SHOP_EVERY) + 1 >= HEADSHOT_FROM_LEVEL,
+    value: (_world, roll) =>
+      HEADSHOT_LOOT_MIN +
+      Math.floor(roll * (HEADSHOT_LOOT_MAX - HEADSHOT_LOOT_MIN + 1)),
+  },
 ];
 
 function dropLoot(world: World, prop: Prop): void {
   let roll = nextRandom(world);
   for (const loot of LOOT) {
     if (roll < loot.chance) {
-      if (loot.when && !loot.when(world)) return;
+      if (loot.when && !loot.when(world, prop)) return;
       world.pickups.push({
         id: world.nextId++,
         kind: loot.kind,

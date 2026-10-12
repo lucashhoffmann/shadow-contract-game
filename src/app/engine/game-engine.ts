@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 import { createWorldRenderer } from '@/app/engine/renderers/world.renderer';
-import { FIXED_DT } from '@/app/modules/world/constants/world.constants';
+import {
+  DASH_TIME,
+  FIXED_DT,
+} from '@/app/modules/world/constants/world.constants';
 import type { InputState } from '@/app/modules/world/types/world.types';
 import {
   getWorld,
@@ -18,7 +21,9 @@ const CAMERA_FOV = 45;
 // soco de camera ao matar e ao levar dano: zoom curto com blur que se desfaz
 const PUNCH_TIME = 0.35;
 const PUNCH_ZOOM = 3.5;
-const PUNCH_BLUR = 1.2;
+const PUNCH_BLUR = 3;
+// blur de velocidade no dash do player: cresce e some junto com o salto
+const DASH_BLUR = 2.2;
 const CAMERA_FOLLOW_RATE = 14;
 const CAMERA_SNAP_DISTANCE = 3;
 
@@ -134,8 +139,12 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     punch = Math.max(0, punch - frameTime / PUNCH_TIME);
     camera.fov = CAMERA_FOV - PUNCH_ZOOM * punch;
     camera.updateProjectionMatrix();
-    canvas.style.filter =
-      punch > 0.02 ? `blur(${(punch * PUNCH_BLUR).toFixed(1)}px)` : '';
+    const { dash } = world.player;
+    const rush =
+      dash > 0 ? Math.sin(Math.PI * (1 - dash / DASH_TIME)) * DASH_BLUR : 0;
+    // o mais forte dos dois vale; nao somam
+    const blur = Math.max(punch * PUNCH_BLUR, rush);
+    canvas.style.filter = blur > 0.05 ? `blur(${blur.toFixed(1)}px)` : '';
 
     // camera segue suavizada, como o personagem (ver world.renderer animate)
     const { x, y } = world.player.pos;

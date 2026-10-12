@@ -43,7 +43,7 @@ export function GamePage() {
         previews={previews}
         onSelectWeapon={selectWeapon}
       />
-      <VirtualJoystick onMove={setJoystickInput} />
+      {screen === 'playing' && <VirtualJoystick onMove={setJoystickInput} />}
       <LegendDialog
         open={screen === 'intro' || screen === 'paused'}
         {...legend}

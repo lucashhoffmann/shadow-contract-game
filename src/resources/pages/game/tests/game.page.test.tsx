@@ -42,6 +42,7 @@ const HUD: HudData = {
   kills: 2,
   weaponId: 'pistol',
   ammo: 4,
+  headshot: 15,
 };
 
 function segments(container: HTMLElement, state: string) {
@@ -66,6 +67,7 @@ describe('Hud', () => {
     expect(screen.getByText('$ 250')).toBeInTheDocument();
     expect(screen.getByText('Pistola')).toBeInTheDocument();
     expect(screen.getByLabelText('Balas: 4 de 30')).toBeInTheDocument();
+    expect(screen.getByText('Headshot 15%')).toBeInTheDocument();
   });
 
   it.each(['pistol', 'silenced', 'shotgun'] as const)(
@@ -98,6 +100,7 @@ describe('Hud', () => {
     expect(screen.getByText('Espada')).toBeInTheDocument();
     expect(container.querySelector('img')).toHaveAttribute('src', 'data:sword');
     expect(screen.queryByLabelText(/Balas/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Headshot/)).not.toBeInTheDocument();
   });
 
   it('mostra os saltos guardados em tracos, de 6', () => {
@@ -372,6 +375,7 @@ describe('LegendDialog', () => {
         open
         title='Como jogar'
         actionLabel='Comecar'
+        onMenu={vi.fn()}
         onAction={onAction}
       />,
     );
@@ -479,11 +483,49 @@ describe('GamePage', () => {
   it('abre na legenda e Comecar solta o jogo', async () => {
     render(<GamePage />);
     expect(screen.getByText('Como jogar')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Joystick')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Comecar' }));
 
     expect(useGameStore.getState().screen).toBe('playing');
     expect(screen.queryByText('Como jogar')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Joystick')).toBeInTheDocument();
+  });
+
+  it('Inicio volta para o menu, na abertura e na pausa', async () => {
+    render(<GamePage />);
+    act(() => useGameStore.getState().startRun(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Inicio' }));
+    expect(useGameStore.getState().screen).toBe('menu');
+
+    act(() => useGameStore.getState().startRun(1));
+    act(() => useGameStore.getState().begin());
+    act(() => useGameStore.getState().togglePause());
+    await userEvent.click(screen.getByRole('button', { name: 'Inicio' }));
+    expect(useGameStore.getState().screen).toBe('menu');
+  });
+
+  it('Tela cheia entra e sai da tela cheia', async () => {
+    const enter = vi.fn();
+    const exit = vi.fn();
+    document.documentElement.requestFullscreen = enter;
+    document.exitFullscreen = exit;
+    render(<GamePage />);
+    act(() => useGameStore.getState().startRun(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tela cheia' }));
+    expect(enter).toHaveBeenCalled();
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: document.documentElement,
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Tela cheia' }));
+    expect(exit).toHaveBeenCalled();
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null,
+    });
   });
 
   it('pausa mostra a legenda como Pausado e Continuar retoma', async () => {
