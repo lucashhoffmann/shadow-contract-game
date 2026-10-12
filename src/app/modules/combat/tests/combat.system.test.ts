@@ -1,6 +1,7 @@
 import {
   collectPickups,
   damagePlayer,
+  killEnemy,
   spawnProjectile,
   updateCombat,
   updateFloaters,
@@ -17,6 +18,8 @@ import {
   ENEMY_BULLET_DAMAGE,
   ENEMY_BULLET_SPEED,
   ENEMY_KINDS,
+  ENEMY_LOOT_CHANCE,
+  ENEMY_LOOT_OFFSET,
   FALLOFF_MIN,
   FIXED_DT,
   FLOATER_TIME,
@@ -34,6 +37,7 @@ import {
 } from '@/app/modules/world/constants/world.constants';
 import { createEmptyWorld } from '@/app/modules/world/systems/world.system';
 import type { World } from '@/app/modules/world/types/world.types';
+import { distance } from '@/shared/utils/math.util';
 import { addEnemy, createArenaWorld } from '@/test/world.fixture';
 
 const UP = Math.PI / 2;
@@ -985,5 +989,65 @@ describe('overkill', () => {
 
     expect(enemy.state).toBe('alert');
     expect(world.floaters.at(-1)?.overkill).toBeUndefined();
+  });
+});
+
+describe('saque do inimigo morto', () => {
+  // mata `count` inimigos no meio da arena, um por mundo, cada um com seu
+  // sorteio; devolve o que cada morte deixou no chao
+  function kills(count: number) {
+    return Array.from({ length: count }, (_, i) => {
+      const world = createArenaWorld();
+      world.rngState = 1000 + i * 7919;
+      const enemy = addEnemy(world, 5.5, 6.5, UP);
+      killEnemy(world, enemy);
+      return { enemy, pickups: world.pickups };
+    });
+  }
+
+  it('dinheiro cai sempre; item da tabela das caixas so as vezes', () => {
+    const drops = kills(600);
+    for (const { pickups } of drops) {
+      expect(pickups[0]).toMatchObject({ kind: 'money', value: KILL_MONEY });
+      expect(pickups.length).toBeLessThanOrEqual(2);
+    }
+    const withItem = drops.filter(({ pickups }) => pickups.length === 2);
+    const share = withItem.length / drops.length;
+    // nunca mais que a chance de sortear; menos, porque a tabela tambem da nada
+    expect(share).toBeGreaterThan(0.05);
+    expect(share).toBeLessThan(ENEMY_LOOT_CHANCE);
+    // vem da tabela das caixas, com as mesmas condicoes: sem arma de fogo
+    // nao sai municao nem mira, e sai mais de um tipo de item
+    const kinds = new Set(withItem.map(({ pickups }) => pickups[1].kind));
+    expect(kinds.size).toBeGreaterThan(1);
+    for (const kind of ['money', 'ammo', 'headshot'] as const) {
+      expect(kinds.has(kind)).toBe(false);
+    }
+  });
+
+  it('o item cai ao lado do corpo, nunca dentro de parede ou caixa', () => {
+    for (const { enemy, pickups } of kills(300)) {
+      const item = pickups[1];
+      if (!item) continue;
+      expect(distance(item.pos, enemy.pos)).toBeLessThanOrEqual(
+        ENEMY_LOOT_OFFSET + 1e-9,
+      );
+      expect(item.roomIndex).toBe(enemy.roomIndex);
+    }
+
+    // encurralado num corredor de 1 tile: se o lado e parede, cai no corpo
+    const world = createArenaWorld({
+      5: '#####.#####',
+      6: '#####.#####',
+      7: '#####.#####',
+    });
+    for (let i = 0; i < 200; i++) {
+      world.rngState = 50 + i * 104729;
+      world.pickups = [];
+      const enemy = addEnemy(world, 5.2, 6.5, UP);
+      killEnemy(world, enemy);
+      const item = world.pickups[1];
+      if (item) expect(Math.floor(item.pos.x)).toBe(5);
+    }
   });
 });

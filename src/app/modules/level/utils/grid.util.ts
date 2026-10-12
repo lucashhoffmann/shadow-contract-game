@@ -226,12 +226,15 @@ export function nearbyProp(world: World): Prop | undefined {
 // `chance` da reta de 0 a 1; o que sobra e caixa vazia) e outro, `roll`, define
 // o valor. Tudo pelo `rngState`: reproduzivel por seed.
 // Item novo entra no fim, para nao trocar o que as faixas anteriores soltam.
+// onde o saque cai: a caixa quebrada, ou o lugar onde o inimigo morreu
+type LootSpot = { roomIndex: number; pos: Vec2 };
+
 const LOOT: {
   kind: PickupKind;
   chance: number;
   value: (world: World, roll: number) => number;
   // so sai quando isso vale; senao a faixa dele conta como caixa vazia
-  when?: (world: World, prop: Prop) => boolean;
+  when?: (world: World, at: LootSpot) => boolean;
 }[] = [
   {
     // cura pouca na maioria das vezes: `roll` ao quadrado puxa para baixo
@@ -277,25 +280,27 @@ const LOOT: {
     // HEADSHOT_FROM_LEVEL em diante (nivel = contrato)
     kind: 'headshot',
     chance: LOOT_HEADSHOT_CHANCE,
-    when: (world, prop) =>
+    when: (world, at) =>
       (world.player.weapon !== null || world.player.arsenal.length > 0) &&
-      Math.floor((prop.roomIndex - 1) / SHOP_EVERY) + 1 >= HEADSHOT_FROM_LEVEL,
+      Math.floor((at.roomIndex - 1) / SHOP_EVERY) + 1 >= HEADSHOT_FROM_LEVEL,
     value: (_world, roll) =>
       HEADSHOT_LOOT_MIN +
       Math.floor(roll * (HEADSHOT_LOOT_MAX - HEADSHOT_LOOT_MIN + 1)),
   },
 ];
 
-function dropLoot(world: World, prop: Prop): void {
+// Sorteia a tabela e, se sair item, larga em `at`. Usado pela caixa quebrada
+// e pelo inimigo morto (combat.system): os dois soltam as mesmas coisas.
+export function dropLoot(world: World, at: LootSpot): void {
   let roll = nextRandom(world);
   for (const loot of LOOT) {
     if (roll < loot.chance) {
-      if (loot.when && !loot.when(world, prop)) return;
+      if (loot.when && !loot.when(world, at)) return;
       world.pickups.push({
         id: world.nextId++,
         kind: loot.kind,
-        roomIndex: prop.roomIndex,
-        pos: { ...prop.pos },
+        roomIndex: at.roomIndex,
+        pos: { ...at.pos },
         value: loot.value(world, nextRandom(world)),
       });
       return;

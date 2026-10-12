@@ -349,7 +349,9 @@ O player comeca com a espada e nunca a perde.
   e com linha de visao, dispara `pellets` balas abertas em `spread` radianos,
   gasta 1 de municao; municao zerada nao remove a arma: ela fica na mao e
   no arsenal, so nao atira
-- inimigo morto solta `Pickup` de `KILL_MONEY`
+- inimigo morto solta `Pickup` de `KILL_MONEY`. Alem disso, com chance
+  `ENEMY_LOOT_CHANCE`, sorteia a mesma tabela `LOOT` das caixas (`dropLoot`),
+  que ainda pode dar nada; o item cai a `ENEMY_LOOT_OFFSET` do corpo
 - cada morte da `ADRENALINE_TIME` segundos de velocidade multiplicada por
   `ADRENALINE_BOOST`
 - `player.slash` conta o tempo do golpe; so a engine usa, para animar

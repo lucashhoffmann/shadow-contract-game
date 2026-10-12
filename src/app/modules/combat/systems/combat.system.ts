@@ -1,8 +1,11 @@
 import {
   breakPropAt,
   breakPropsNear,
+  dropLoot,
   hasLineOfSight,
+  isSolidTile,
   isWall,
+  tileAt,
 } from '@/app/modules/level/utils/grid.util';
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import {
@@ -11,6 +14,8 @@ import {
   BULLET_RADIUS,
   BULLET_RANGE_MARGIN,
   DASH_MAX,
+  ENEMY_LOOT_CHANCE,
+  ENEMY_LOOT_OFFSET,
   ENEMY_RADIUS,
   FALLOFF_MIN,
   FALLOFF_START,
@@ -130,6 +135,22 @@ export function killEnemy(world: World, enemy: Enemy): void {
     roomIndex: enemy.roomIndex,
     pos: { ...enemy.pos },
     value: KILL_MONEY,
+  });
+  // alem do dinheiro, as vezes um item da tabela das caixas
+  if (nextRandom(world) >= ENEMY_LOOT_CHANCE) return;
+  // ao lado do corpo, para nao ficar em cima das moedas; se ali for parede
+  // ou caixa, cai no proprio corpo
+  const angle = nextRandom(world) * Math.PI * 2;
+  const beside = {
+    x: enemy.pos.x + Math.cos(angle) * ENEMY_LOOT_OFFSET,
+    y: enemy.pos.y + Math.sin(angle) * ENEMY_LOOT_OFFSET,
+  };
+  const free = !isSolidTile(
+    tileAt(world, Math.floor(beside.x), Math.floor(beside.y)),
+  );
+  dropLoot(world, {
+    roomIndex: enemy.roomIndex,
+    pos: free ? beside : { ...enemy.pos },
   });
 }
 

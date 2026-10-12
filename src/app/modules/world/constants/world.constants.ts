@@ -163,6 +163,13 @@ export const HEAR_MAX_BONUS = 0.5;
 // quanto tempo investiga o barulho antes de voltar a patrulha
 export const SEARCH_TIME = 4;
 
+// Inimigo morto: chance de sortear um item na mesma tabela das caixas (alem
+// do dinheiro, que cai sempre). 0 = nunca solta item; 1 = sempre sorteia.
+// Mesmo sorteando, a tabela ainda pode dar "nada", como numa caixa vazia.
+export const ENEMY_LOOT_CHANCE = 0.35;
+// distancia do corpo em que o item cai, para nao ficar em cima do dinheiro
+export const ENEMY_LOOT_OFFSET = 0.45;
+
 // caixa quebrada: chance de soltar coracao ou escudo (senao, nada).
 // Valores em fracao de `maxHp`.
 export const LOOT_HEART_CHANCE = 0.25;
