@@ -182,6 +182,11 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       axis(keys, ['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) +
       joystickInput.moveY;
     input.dash = keys.has('Space') || joystickInput.dash;
+    // botao de ataque do toque: pulso unico, como a tecla F
+    if (joystickInput.interact) {
+      joystickInput.interact = false;
+      if (getWorld()?.status === 'playing') input.interact = true;
+    }
     input.crouch =
       keys.has('ControlLeft') ||
       keys.has('ControlRight') ||

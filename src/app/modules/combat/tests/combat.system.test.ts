@@ -33,6 +33,7 @@ import {
   PLAYER_MAX_HP,
   SHIELD_MAX,
   SHOT_TIME,
+  DASH_COOLDOWN,
   SLASH_TIME,
   SWORD_CRIT_CHANCE,
   SWORD_CRIT_FOCUS,
@@ -1141,5 +1142,64 @@ describe('alcance da espada', () => {
     armed.player.weapon = { id: 'pistol', ammo: 5 };
     addEnemy(armed, 5.5, 2.5 + gap, -Math.PI / 2);
     expect(meleeTarget(armed)).toBeUndefined();
+  });
+});
+
+describe('golpe furtivo', () => {
+  // inimigo em alerta colado acima do player, olhando para `facing`; o
+  // player golpeia agachado, com ou sem F
+  function strike(facing: number, press: boolean, seed: number, hp = 60) {
+    const world = createArenaWorld();
+    world.rngState = seed;
+    // erro certo para quem esta em pe: agachado tem que ignorar
+    world.run.meleeMissChance = 1;
+    world.run.nextMeleeChanceAt = Infinity;
+    const enemy = addEnemy(world, 5.5, 3.3, facing, 'fat');
+    enemy.hp = hp;
+    enemy.state = 'alert';
+    world.player.crouching = true;
+    fight(world, { moveX: 0, moveY: 0, dash: false, interact: press }, 0);
+    return { enemy, hit: world.floaters[0] };
+  }
+
+  it('agachado nunca erra; com F o critico e certo', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      // de frente para o player (que esta abaixo dele)
+      expect(strike(-Math.PI / 2, false, seed).hit.amount).toBeGreaterThan(0);
+      expect(strike(-Math.PI / 2, true, seed).hit.critical).toBe(true);
+    }
+  });
+
+  it('agachado, com F e pelas costas: overkill mata na hora, ate o gordo', () => {
+    const { enemy, hit } = strike(Math.PI / 2, true, 1, 120);
+    expect(enemy.hp).toBeLessThanOrEqual(0);
+    expect(hit).toMatchObject({ amount: 120, overkill: true });
+    // sem F nao e overkill: so o golpe comum (ou o critico da sorte)
+    expect(strike(Math.PI / 2, false, 1, 120).enemy.hp).toBeGreaterThan(0);
+  });
+});
+
+describe('golpe de salto', () => {
+  function strike(state: 'patrol' | 'alert', press: boolean, seed: number) {
+    const world = createArenaWorld();
+    world.rngState = seed;
+    world.run.meleeMissChance = 1;
+    world.run.nextMeleeChanceAt = Infinity;
+    // de frente para o player
+    const enemy = addEnemy(world, 5.5, 3.3, -Math.PI / 2, 'fat');
+    enemy.state = state;
+    world.player.dashCooldown = DASH_COOLDOWN;
+    fight(world, { moveX: 0, moveY: 0, dash: false, interact: press }, 0);
+    return { enemy, hit: world.floaters[0] };
+  }
+
+  it('nunca erra; com F o critico e certo; desavisado leva overkill', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(strike('alert', false, seed).hit.amount).toBeGreaterThan(0);
+      expect(strike('alert', true, seed).hit.critical).toBe(true);
+      const sneak = strike('patrol', false, seed);
+      expect(sneak.enemy.hp).toBeLessThanOrEqual(0);
+      expect(sneak.hit.overkill).toBe(true);
+    }
   });
 });

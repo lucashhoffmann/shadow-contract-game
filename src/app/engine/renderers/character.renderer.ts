@@ -69,6 +69,10 @@ export type Character = {
   last: Vec2 | null;
   speed: number;
   idle: number;
+  // golpe de espada em curso: qual jeito (indice em SWINGS; -1 = ainda nao
+  // golpeou) e quanto faltava no quadro anterior, para notar golpe novo
+  swing: number;
+  attackLeft: number;
 };
 
 export type CharacterKit = {
@@ -363,6 +367,8 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
       last: null,
       speed: 0,
       idle: 0,
+      swing: -1,
+      attackLeft: 0,
     };
   }
 
@@ -378,8 +384,130 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
 }
 
 // Pose compartilhada pelo player e pelo ninja; o terno usa o mesmo tempo para o recuo.
-export function poseAttack(character: Character, remaining: number): void {
+// Jeitos de golpear com a espada. Cada golpe novo sorteia um diferente do
+// anterior, para a luta nao repetir o mesmo movimento. Cada numero e quanto a
+// peca gira (rad) ou anda no auge da preparacao (`wind...`) e do golpe.
+type Swing = {
+  // tronco: giro na preparacao e no golpe, inclinada para frente e avanco
+  windTwist: number;
+  twist: number;
+  lean: number;
+  lunge: number;
+  // braco da espada: abre de lado e sobe/recua na preparacao; no golpe,
+  // cruza e desce/estende
+  windSide: number;
+  armSide: number;
+  windRaise: number;
+  armStrike: number;
+  // lamina: quanto deita para tras na preparacao, e quanto vira e varre
+  windTilt: number;
+  swordTurn: number;
+  swordSweep: number;
+  // voltas inteiras do corpo durante o golpe (giro); 0 = nao gira
+  spin: number;
+};
+export const SWINGS: Swing[] = [
+  // corte lateral, de fora para dentro
+  {
+    windTwist: -0.3,
+    twist: 0.48,
+    lean: 0.16,
+    lunge: 0.12,
+    windSide: 0.55,
+    armSide: 0.65,
+    windRaise: -0.6,
+    armStrike: 0.95,
+    windTilt: 0.25,
+    swordTurn: 1.65,
+    swordSweep: 4.15,
+    spin: 0,
+  },
+  // reves: o mesmo corte, de dentro para fora
+  {
+    windTwist: 0.36,
+    twist: -0.5,
+    lean: 0.12,
+    lunge: 0.1,
+    windSide: -0.5,
+    armSide: -0.6,
+    windRaise: -0.3,
+    armStrike: 0.9,
+    windTilt: 0.25,
+    swordTurn: -1.2,
+    swordSweep: 4,
+    spin: 0,
+  },
+  // golpe de cima: ergue a espada sobre a cabeca e desce reto
+  {
+    windTwist: -0.05,
+    twist: 0.1,
+    lean: 0.34,
+    lunge: 0.16,
+    windSide: 0.1,
+    armSide: 0.05,
+    windRaise: 1.9,
+    armStrike: 0.6,
+    windTilt: 0.9,
+    swordTurn: 0.5,
+    swordSweep: 4.3,
+    spin: 0,
+  },
+  // giro: uma volta inteira com a espada aberta para o lado, varrendo em
+  // volta. (No lugar da estocada: de ponta para frente a lamina sumia atras
+  // da cabeca, com a camera por cima e por tras.)
+  {
+    windTwist: -0.25,
+    twist: 0,
+    lean: 0.1,
+    lunge: 0.06,
+    windSide: 0.6,
+    armSide: 0.9,
+    windRaise: -0.3,
+    armStrike: 1.0,
+    windTilt: 0.2,
+    swordTurn: 0.4,
+    swordSweep: 3.1,
+    spin: 1,
+  },
+];
+// quem atira (terno) nao golpeia: e o recuo do disparo, sempre igual
+const RECOIL: Swing = {
+  windTwist: -0.3,
+  twist: 0.12,
+  lean: -0.08,
+  lunge: -0.08,
+  windSide: 0.55,
+  armSide: 0.1,
+  windRaise: -0.6,
+  armStrike: -0.32,
+  windTilt: 0,
+  swordTurn: 0,
+  swordSweep: 0,
+  spin: 0,
+};
+
+// `spinning`: o golpe que comeca agora e o giro (golpe de salto do player)
+export function poseAttack(
+  character: Character,
+  remaining: number,
+  spinning = false,
+): void {
   const { body, head, arms, legs, sword } = character;
+  // golpe novo (o tempo que falta subiu): sorteia outro jeito. O primeiro
+  // golpe de cada personagem e sempre o corte lateral. Golpe de salto e
+  // sempre o giro.
+  if (remaining > character.attackLeft && sword) {
+    character.swing = spinning
+      ? SWINGS.findIndex((swing) => swing.spin > 0)
+      : character.swing < 0
+        ? 0
+        : (character.swing +
+            1 +
+            Math.floor(Math.random() * (SWINGS.length - 1))) %
+          SWINGS.length;
+  }
+  character.attackLeft = remaining;
+  const how = sword ? SWINGS[Math.max(0, character.swing)] : RECOIL;
   const phase = Math.max(0, Math.min(1, 1 - remaining / SLASH_TIME));
   const windup =
     remaining > 0 && phase < 0.5 ? Math.sin(Math.PI * phase * 2) : 0;
@@ -387,24 +515,30 @@ export function poseAttack(character: Character, remaining: number): void {
     remaining > 0 && phase > 0.2
       ? Math.sin((Math.PI * (phase - 0.2)) / 0.8)
       : 0;
-  body.rotation.y = -windup * 0.3 + strike * (sword ? 0.48 : 0.12);
-  body.rotation.z = windup * 0.1 - strike * (sword ? 0.16 : -0.08);
-  body.position.x = -windup * 0.08 + strike * (sword ? 0.12 : -0.08);
+  // giro: a volta acompanha o golpe inteiro, saindo e chegando devagar
+  const turned = remaining > 0 ? phase * phase * (3 - 2 * phase) : 0;
+  body.rotation.y =
+    windup * how.windTwist +
+    strike * how.twist +
+    turned * Math.PI * 2 * how.spin;
+  body.rotation.z = windup * 0.1 - strike * how.lean;
+  body.position.x = -windup * 0.08 + strike * how.lunge;
   head.rotation.z = -strike * 0.1;
-  arms[0].rotation.y = windup * 0.55 - strike * (sword ? 0.65 : 0.1);
+  arms[0].rotation.y = windup * how.windSide - strike * how.armSide;
   arms[1].rotation.y = -windup * 0.18;
   if (remaining <= 0) {
     if (sword) sword.rotation.set(0, SWORD_REST_TURN, SWORD_REST_TILT);
     return;
   }
   arms[0].rotation.z =
-    (character.hold ?? 0) - windup * 0.6 + strike * (sword ? 0.95 : -0.32);
+    (character.hold ?? 0) + windup * how.windRaise + strike * how.armStrike;
   arms[1].rotation.z += windup * 0.25 + strike * (sword ? 0.45 : 0.12);
   legs[0].rotation.z -= strike * 0.28;
   legs[1].rotation.z += strike * 0.2;
   if (sword) {
-    sword.rotation.y = SWORD_REST_TURN + windup * 0.55 - strike * 1.65;
-    sword.rotation.z = SWORD_REST_TILT + windup * 0.25 - strike * 4.15;
+    sword.rotation.y = SWORD_REST_TURN + windup * 0.55 - strike * how.swordTurn;
+    sword.rotation.z =
+      SWORD_REST_TILT + windup * how.windTilt - strike * how.swordSweep;
   }
 }
 

@@ -4,6 +4,7 @@ import {
   createCharacterKit,
   poseAttack,
   poseCrouch,
+  SWINGS,
   poseDead,
   SIDES,
   SWORD_REST_TILT,
@@ -81,4 +82,71 @@ it('morto fica estirado com bracos e pernas abertos para fora', () => {
   expect(character.body.rotation.y).toBe(0);
   expect(character.sword!.rotation.z).toBe(SWORD_REST_TILT);
   kit.dispose();
+});
+
+describe('golpes de espada variados', () => {
+  // faz `count` golpes inteiros e anota o jeito de cada um
+  function swings(count: number) {
+    const kit = createCharacterKit(DEFAULT_LOOK);
+    const character = kit.make('player');
+    const used: number[] = [];
+    for (let i = 0; i < count; i++) {
+      poseAttack(character, SLASH_TIME);
+      used.push(character.swing);
+      // o jeito nao muda no meio do golpe
+      poseAttack(character, SLASH_TIME * 0.5);
+      expect(character.swing).toBe(used.at(-1));
+      poseAttack(character, 0);
+    }
+    kit.dispose();
+    return used;
+  }
+
+  it('cada golpe novo usa um jeito diferente do anterior', () => {
+    const used = swings(60);
+    expect(used[0]).toBe(0);
+    for (let i = 1; i < used.length; i++) expect(used[i]).not.toBe(used[i - 1]);
+    // em 60 golpes aparecem todos
+    expect(new Set(used).size).toBe(SWINGS.length);
+  });
+
+  it('os jeitos sao mesmo diferentes: lado do corte, altura do braco, volta inteira', () => {
+    const kit = createCharacterKit(DEFAULT_LOOK);
+    const pose = (swing: number, left: number) => {
+      const character = kit.make('player');
+      character.swing = swing;
+      character.attackLeft = SLASH_TIME;
+      poseAttack(character, SLASH_TIME * left);
+      return character;
+    };
+    // reves gira o tronco para o outro lado do corte lateral
+    expect(pose(0, 0.4).body.rotation.y).toBeGreaterThan(0);
+    expect(pose(1, 0.4).body.rotation.y).toBeLessThan(0);
+    // golpe de cima ergue o braco na preparacao; o lateral recua
+    const overhead = pose(2, 0.85);
+    expect(overhead.arms[0].rotation.z).toBeGreaterThan(overhead.hold! + 1);
+    expect(pose(0, 0.85).arms[0].rotation.z).toBeLessThan(overhead.hold!);
+    // giro: no meio do golpe o corpo esta de costas, e a espada aberta
+    const spin = pose(3, 0.5);
+    expect(Math.abs(spin.body.rotation.y - Math.PI)).toBeLessThan(0.4);
+    // comeca e termina de frente
+    expect(pose(3, 0.98).body.rotation.y).toBeLessThan(0.3);
+    expect(pose(3, 0.02).body.rotation.y).toBeGreaterThan(Math.PI * 2 - 0.3);
+    kit.dispose();
+  });
+
+  it('todo jeito volta ao repouso no fim', () => {
+    const kit = createCharacterKit(DEFAULT_LOOK);
+    SWINGS.forEach((_, swing) => {
+      const character = kit.make('ninja');
+      character.swing = swing;
+      character.attackLeft = SLASH_TIME;
+      poseAttack(character, SLASH_TIME * 0.4);
+      poseAttack(character, 0);
+      expect(character.body.rotation.y).toBe(0);
+      expect(character.body.position.x).toBe(0);
+      expect(character.sword!.rotation.z).toBe(SWORD_REST_TILT);
+    });
+    kit.dispose();
+  });
 });

@@ -343,7 +343,17 @@ export function updateCombat(world: World, dt: number, knife = false): void {
     player.slash = SLASH_TIME;
     player.attackCooldown = ATTACK_COOLDOWN;
     world.run.stats.meleeAttempts++;
-    if (nextRandom(world) < world.run.meleeMissChance) {
+    // Golpe agachado ou de salto (no ar ou logo depois de pousar, enquanto
+    // o salto recarrega) nunca erra. Com o foco do F, esse golpe em quem esta
+    // em alerta e critico certo; pelas costas dele, mata na hora (overkill),
+    // como a execucao de quem nao viu nada.
+    const lunge = player.dashCooldown > 0;
+    const sure = player.crouching || lunge;
+    const sneak = sure && player.focus > 0;
+    const behind =
+      Math.abs(angleDiff(struck.facing, angleTo(struck.pos, player.pos))) >
+      STEALTH_BACK_ANGLE;
+    if (!sure && nextRandom(world) < world.run.meleeMissChance) {
       struck.detection = 1;
       addFloater(world, struck.pos, 0);
       world.run.events.push({
@@ -355,22 +365,25 @@ export function updateCombat(world: World, dt: number, knife = false): void {
     world.run.stats.meleeHits++;
     // execucao tira toda a vida que restava
     if (unaware) {
-      // overkill: a execucao veio agachado e pelas costas do inimigo
-      const behind =
-        Math.abs(angleDiff(unaware.facing, angleTo(unaware.pos, player.pos))) >
-        STEALTH_BACK_ANGLE;
+      // overkill: a execucao veio agachado e pelas costas do inimigo, ou de
+      // salto, de qualquer lado
       damageEnemy(
         world,
         unaware,
         unaware.hp,
-        player.crouching && behind ? 'overkill' : 'execution',
+        lunge || (player.crouching && behind) ? 'overkill' : 'execution',
       );
+    } else if (sneak && behind) {
+      player.focus = 0;
+      damageEnemy(world, struck, struck.hp, 'overkill');
     } else {
-      // critico: mais provavel com o foco do F, que este golpe gasta
+      // critico: mais provavel com o foco do F, que este golpe gasta; certo
+      // se o F veio agachado
       const damage = attackDamage(world, SWORD_DAMAGE);
       const critical =
+        sneak ||
         nextRandom(world) <
-        (player.focus > 0 ? SWORD_CRIT_FOCUS : SWORD_CRIT_CHANCE);
+          (player.focus > 0 ? SWORD_CRIT_FOCUS : SWORD_CRIT_CHANCE);
       player.focus = 0;
       damageEnemy(
         world,

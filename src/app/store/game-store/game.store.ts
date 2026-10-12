@@ -339,6 +339,12 @@ export function setJoystickCrouch(on: boolean): void {
   joystickInput.crouch = on;
 }
 
+// botao de ataque na tela de toque: um pulso, vale como apertar o F. A
+// engine consome no proximo quadro
+export function pressJoystickAttack(): void {
+  joystickInput.interact = true;
+}
+
 // em passos de 5%: o HUD nao redesenha a cada frame
 function timeLeft(seconds: number, total: number): number {
   return seconds > 0 ? Math.ceil((seconds / total) * 20) / 20 : 0;

@@ -201,3 +201,39 @@ it('botao de agachar liga num toque, desliga no outro e solta ao sair', () => {
   unmount();
   expect(onCrouch).toHaveBeenLastCalledWith(false);
 });
+
+it('botao de ataque e maior que os de salto e agachar, e nao mexe no joystick', () => {
+  const onMove = vi.fn();
+  const onAttack = vi.fn();
+  render(
+    <VirtualJoystick
+      onMove={onMove}
+      onDash={vi.fn()}
+      onCrouch={vi.fn()}
+      onAttack={onAttack}
+    />,
+  );
+  const attack = screen.getByRole('button', { name: 'Atacar' });
+  // tamanho pelas classes: 20 (5rem) contra 16 (4rem)
+  expect(attack).toHaveClass('size-20');
+  expect(screen.getByRole('button', { name: 'Saltar' })).toHaveClass('size-16');
+  expect(screen.getByRole('button', { name: 'Agachar' })).toHaveClass(
+    'size-16',
+  );
+
+  fireEvent.pointerDown(attack, { pointerId: 3 });
+  fireEvent.pointerUp(attack, { pointerId: 3 });
+  // um toque, um golpe
+  expect(onAttack).toHaveBeenCalledTimes(1);
+  expect(onMove).not.toHaveBeenCalled();
+});
+
+it('sem acao de ataque o botao nao aparece', () => {
+  render(
+    <VirtualJoystick
+      onMove={vi.fn()}
+      onDash={vi.fn()}
+    />,
+  );
+  expect(screen.queryByRole('button', { name: 'Atacar' })).toBeNull();
+});

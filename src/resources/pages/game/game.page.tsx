@@ -1,5 +1,6 @@
 import {
   getWorld,
+  pressJoystickAttack,
   setJoystickCrouch,
   setJoystickDash,
   setJoystickInput,
@@ -105,6 +106,7 @@ export function GamePage() {
           onMove={setJoystickInput}
           onDash={setJoystickDash}
           onCrouch={setJoystickCrouch}
+          onAttack={pressJoystickAttack}
         />
       )}
       <LegendDialog

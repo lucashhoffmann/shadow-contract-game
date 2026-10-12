@@ -462,6 +462,13 @@ O player comeca com a espada e nunca a perde.
     contra quem esta `alert`, com arma na mao e a propria facada. O proximo
     golpe com foco usa `SWORD_CRIT_FOCUS` e gasta o foco. Enquanto o F vale
     para o combate, nao quebra caixa. A engine mostra o F sobre o inimigo.
+  - furtivo e salto: golpe com `player.crouching`, ou de salto
+    (`player.dashCooldown > 0`: no ar ou logo depois de pousar), nunca erra
+    (nao sorteia `meleeMissChance`). Com `focus`, esse golpe em inimigo
+    `alert` e critico certo; se alem disso vier pelas costas dele (mesma
+    regra de `STEALTH_BACK_ANGLE`), tira toda a vida que restava e marca
+    overkill. Golpe de salto em inimigo que nao esta `alert` marca overkill
+    de qualquer lado
     O mesmo F poe `player.clash` em `CRIT_FOCUS_TIME` (so visual, o golpe
     nao gasta): enquanto dura, a engine da um zoom curto e blur leve
     (`CLASH_ZOOM`, `CLASH_BLUR`)

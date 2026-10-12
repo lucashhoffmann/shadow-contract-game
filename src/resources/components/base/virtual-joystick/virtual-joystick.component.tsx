@@ -1,4 +1,4 @@
-import { ChevronsDown, ChevronsUp } from 'lucide-react';
+import { ChevronsDown, ChevronsUp, Sword } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { cn } from '@/shared/lib/utils';
@@ -11,6 +11,8 @@ type VirtualJoystickProps = {
   onDash: (pressed: boolean) => void;
   // botao de agachar ligado ou desligado; sem ele, o botao nao aparece
   onCrouch?: (on: boolean) => void;
+  // botao de ataque (vale como a tecla F); sem ele, o botao nao aparece
+  onAttack?: () => void;
 };
 
 // Controle para telas de toque. A faixa de baixo da tela inteira e a area de
@@ -22,6 +24,7 @@ export function VirtualJoystick({
   onMove,
   onDash,
   onCrouch,
+  onAttack,
 }: VirtualJoystickProps) {
   const t = useTexts();
   // agachar e liga/desliga: um toque agacha, outro levanta
@@ -82,7 +85,13 @@ export function VirtualJoystick({
               ? 'border-white bg-[var(--game-highlight)]/80 text-[var(--game-ink)]'
               : 'border-white/35 bg-white/10 text-white/80',
           )}
-          style={{ bottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+          style={{
+            // com o botao de ataque no canto, o agachar fica a esquerda dele
+            right: onAttack ? '7rem' : undefined,
+            bottom: onAttack
+              ? 'calc(max(1.25rem, env(safe-area-inset-bottom)) + 0.5rem)'
+              : 'max(1.25rem, env(safe-area-inset-bottom))',
+          }}
           onPointerDown={(event) => {
             // o toque para aqui: nao comeca o joystick por baixo
             event.stopPropagation();
@@ -98,6 +107,29 @@ export function VirtualJoystick({
           />
         </button>
       )}
+      {/* ataque: o botao principal, maior que os outros, no canto do polegar.
+          Golpeia com a espada, quebra a caixa ao alcance e, com arma de
+          fogo, da a facada: o mesmo que a tecla F */}
+      {onAttack && (
+        <button
+          type='button'
+          aria-label={t.common.attack}
+          className='pointer-events-auto absolute right-5 flex size-20 items-center justify-center rounded-full border-4 border-white/60 bg-[var(--game-brandPink)]/45 text-white active:scale-90 active:bg-[var(--game-brandPink)]/75'
+          style={{ bottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+          onPointerDown={(event) => {
+            // o toque para aqui: nao comeca o joystick por baixo
+            event.stopPropagation();
+            onAttack();
+          }}
+          onPointerUp={(event) => event.stopPropagation()}
+        >
+          <Sword
+            aria-hidden
+            className='size-10'
+            strokeWidth={2.5}
+          />
+        </button>
+      )}
       {/* salto: no canto direito da area de toque, acima do agachar.
           O toque para aqui: nao comeca o joystick por baixo */}
       <button
@@ -105,10 +137,14 @@ export function VirtualJoystick({
         aria-label={t.common.dash}
         className='pointer-events-auto absolute right-5 flex size-16 items-center justify-center rounded-full border-4 border-white/35 bg-white/10 text-white/80 active:scale-90 active:bg-white/25'
         style={{
-          // com o agachar embaixo, o salto sobe uma posicao
-          bottom: onCrouch
-            ? 'calc(max(1.25rem, env(safe-area-inset-bottom)) + 5rem)'
-            : 'max(1.25rem, env(safe-area-inset-bottom))',
+          // com o ataque no canto, o salto fica em cima dele, centrado; sem
+          // ele, sobe uma posicao so quando ha o agachar embaixo
+          right: onAttack ? '1.75rem' : undefined,
+          bottom: onAttack
+            ? 'calc(max(1.25rem, env(safe-area-inset-bottom)) + 5.75rem)'
+            : onCrouch
+              ? 'calc(max(1.25rem, env(safe-area-inset-bottom)) + 5rem)'
+              : 'max(1.25rem, env(safe-area-inset-bottom))',
         }}
         onPointerDown={(event) => {
           event.stopPropagation();

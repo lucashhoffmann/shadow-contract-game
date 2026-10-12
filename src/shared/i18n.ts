@@ -16,6 +16,7 @@ const pt = {
     shield: 'Escudo',
     pause: 'Pausar',
     crouch: 'Agachar',
+    attack: 'Atacar',
     dash: 'Saltar',
     joystick: 'Joystick',
     close: 'Fechar',
@@ -288,7 +289,7 @@ const pt = {
           ],
           [
             'Critico',
-            'no corpo a corpo, aperte a interação que aparece sobre o inimigo a cada golpe: a chance de dano dobrado sobe de 10% para 60%',
+            'no corpo a corpo, aperte a interação que aparece sobre o inimigo a cada golpe: a chance de dano dobrado sobe de 10% para 60%. Agachado ou saltando o golpe nunca erra e o critico e certo; pelas costas, mata na hora. Salto em quem nao te viu e overkill',
           ],
           [
             'Com arma',
@@ -374,6 +375,7 @@ const en: typeof pt = {
     shield: 'Shield',
     pause: 'Pause',
     crouch: 'Crouch',
+    attack: 'Attack',
     dash: 'Dash',
     joystick: 'Joystick',
     close: 'Close',
@@ -628,7 +630,7 @@ const en: typeof pt = {
           ['Sword', 'kills from behind; alerted enemies take 30 to 45 damage'],
           [
             'Critical',
-            'in melee, press the action shown over the enemy on every swing: the chance of double damage goes from 10% to 60%',
+            'in melee, press the action shown over the enemy on every swing: the chance of double damage goes from 10% to 60%. Crouched or dashing, the swing never misses and the critical is guaranteed; from behind, it kills outright. Dashing into an unaware enemy is an overkill',
           ],
           [
             'With a gun',
