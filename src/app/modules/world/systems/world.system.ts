@@ -41,6 +41,7 @@ import {
   ROOM_W,
   setRoomSize,
   SLASH_TIME,
+  STREAK_NEVER,
 } from '@/app/modules/world/constants/world.constants';
 import type {
   AttackVariance,
@@ -74,6 +75,8 @@ export function createPlayer(
     reviving: false,
     kills: 0,
     deaths: 0,
+    streak: 0,
+    lastKillAt: STREAK_NEVER,
     pos: startPoint(),
     facing: Math.PI / 2,
     hp: PLAYER_MAX_HP,

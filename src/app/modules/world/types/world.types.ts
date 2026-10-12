@@ -213,6 +213,10 @@ export type Player = {
   // placar: inimigos que matou e vezes que morreu nesta partida
   kills: number;
   deaths: number;
+  // sequencia de mortes seguidas (cada uma a menos de STREAK_WINDOW da
+  // anterior), de 0 a STREAK_MAX, e quando foi a ultima (`run.seconds`)
+  streak: number;
+  lastKillAt: number;
   pos: Vec2;
   facing: number;
   hp: number;

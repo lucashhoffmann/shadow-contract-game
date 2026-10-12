@@ -539,6 +539,10 @@ player.arsenal: Weapon[]; // armas de fogo da run, na ordem de compra
   player nao tem e ignorada); `cycleWeapon` roda espada, cada arma, e volta
 - arma sem bala pode ser escolhida; o HUD mostra ela cinza e opaca
 
+`ItemId` tem tambem `'dash'` (`kind: 'dash'`): repoe `player.dashes` ate
+`DASH_MAX`; com os saltos cheios `canBuy` recusa. Preco, variacao e demanda
+como os outros itens.
+
 `WeaponId` e `'pistol' | 'silenced' | 'shotgun'`. `silenced` e a pistola com
 silenciador: mesmos numeros da pistola, mas o tiro nao faz barulho (ver
 audicao em `Enemy`).
@@ -668,6 +672,9 @@ function createGameEngine(canvas: HTMLCanvasElement): { dispose(): void };
   vista (`WorldRenderer.prompts()`) pulsa a acao dele: F da caixa ou da
   facada, `interact`; B do bau, `open`. O toque e consumido: nao chega ao
   joystick
+- o clique que nasce desse mesmo toque e engolido por `PROMPT_CLICK_GUARD` ms:
+  no celular ele cairia no dialogo que acabou de abrir embaixo do dedo (comprava
+  sozinho o primeiro cartao da loja)
 - nunca muta `World`
 - porta de correr na saida da sala inicial e de cada loja (entrada de cada
   nivel), nos tiles `isDoorTile` (`level/utils/grid.util.ts`)
@@ -860,6 +867,13 @@ link, seed?)`, `receiveInput(index, payload)`, `receiveState(snapshot)`.
   `tick` simula (solo ou host) ou so envia input (convidado). No multi nao ha
   legenda inicial nem pausa, e a sala nao conta para `best`. `backToMenu` e
   `startRun` chamam `link.leave()`
+- sequencia de mortes: `killEnemy` soma em `player.streak` quando a morte vem
+  a ate `STREAK_WINDOW` segundos da anterior (`player.lastKillAt`, em
+  `run.seconds`), ate `STREAK_MAX`; passou da janela, recomeca em 1. O store
+  publica `streak: { count, at }` do jogador local, e a tela mostra o aviso
+  (double, triple, quadra, penta kill) quando `count >= 2`; `at` muda a cada
+  morte e reinicia a animacao. `lastKillAt` de quem nunca matou e
+  `STREAK_NEVER`, finito, porque o mundo viaja em JSON
 - placar e menu: `Player` tem `kills` (quem estava em foco quando o inimigo
   morreu) e `deaths` (cada vez que `hp` cruza zero). O store publica
   `scores` (um por jogador, com `you` e `alive`), `scoreboard` (aberto pelo

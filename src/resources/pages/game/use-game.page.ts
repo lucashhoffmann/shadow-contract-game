@@ -29,6 +29,7 @@ export function useGamePage() {
   const menu = useGameStore((state) => state.menu);
   const endMatch = useGameStore((state) => state.endMatch);
   const scores = useGameStore((state) => state.scores);
+  const streak = useGameStore((state) => state.streak);
   const scoreboard = useGameStore((state) => state.scoreboard);
   const setScoreboard = useGameStore((state) => state.setScoreboard);
 
@@ -105,6 +106,7 @@ export function useGamePage() {
     reviveAllowance: Math.max(1, hud.revives),
     waitingNote: online && !host ? t.match.waitingHost : undefined,
     scores,
+    streak,
     scoreboard,
     // icone do placar: liga e desliga (no teclado e o Tab segurado)
     toggleScoreboard: () => setScoreboard(!scoreboard),

@@ -36,10 +36,42 @@
   --color-ring: var(--ring);
   --animate-damage: damage 0.7s ease-out;
   --animate-credit: credit-pulse 1.8s ease-in-out infinite;
+  --animate-streak: streak 1.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  --font-hit: 'Creepster', 'Lilita One', system-ui, sans-serif;
   --font-display: 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif;
 }
 
 /* dano: bate forte, pulsa uma vez e some */
+/* sequencia de mortes: despenca grande e torto, bate, treme e some subindo */
+@keyframes streak {
+  0% {
+    opacity: 0;
+    transform: scale(2.6) rotate(-9deg);
+  }
+  11% {
+    opacity: 1;
+    transform: scale(0.94) rotate(3deg);
+  }
+  17% {
+    transform: scale(1.1) rotate(-3deg);
+  }
+  23% {
+    transform: scale(1) rotate(2deg);
+  }
+  29% {
+    transform: scale(1.03) rotate(-2deg);
+  }
+  35%,
+  72% {
+    opacity: 1;
+    transform: scale(1) rotate(-2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9) translateY(-28px) rotate(-2deg);
+  }
+}
+
 /* credito do rodape: cresce e brilha de leve, sem parar */
 @keyframes credit-pulse {
   0%,

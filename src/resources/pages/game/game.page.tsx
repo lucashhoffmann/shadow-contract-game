@@ -11,6 +11,7 @@ import { Hud } from '@/resources/pages/game/components/hud.component';
 import { MatchMenu } from '@/resources/pages/game/components/match-menu.component';
 import { ReviveDialog } from '@/resources/pages/game/components/revive-dialog.component';
 import { Scoreboard } from '@/resources/pages/game/components/scoreboard.component';
+import { KillStreak } from '@/resources/pages/game/components/kill-streak.component';
 import { LegendDialog } from '@/resources/pages/game/components/legend-dialog.component';
 import { ShopDialog } from '@/resources/pages/game/components/shop-dialog.component';
 import { useGamePage } from '@/resources/pages/game/use-game.page';
@@ -42,6 +43,7 @@ export function GamePage() {
     reviveAllowance,
     waitingNote,
     scores,
+    streak,
     scoreboard,
     toggleScoreboard,
     backToMenu,
@@ -67,6 +69,10 @@ export function GamePage() {
         onScoreboard={
           online && screen === 'playing' ? toggleScoreboard : undefined
         }
+      />
+      <KillStreak
+        count={screen === 'playing' ? streak.count : 0}
+        at={streak.at}
       />
       <Scoreboard
         open={scoreboard && screen === 'playing'}

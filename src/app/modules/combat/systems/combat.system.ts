@@ -44,6 +44,8 @@ import {
   FLOATER_TIME,
   SHOT_TIME,
   SLASH_TIME,
+  STREAK_MAX,
+  STREAK_WINDOW,
   STEALTH_BACK_ANGLE,
   SWORD_DAMAGE,
 } from '@/app/modules/world/constants/world.constants';
@@ -126,6 +128,13 @@ export function killEnemy(world: World, enemy: Enemy): void {
   world.run.kills++;
   // quem esta em foco e quem matou (golpe proprio ou bala dele)
   world.player.kills++;
+  // morte em seguida da anterior soma na sequencia; senao, recomeca
+  const killer = world.player;
+  killer.streak =
+    world.run.seconds - killer.lastKillAt <= STREAK_WINDOW
+      ? Math.min(STREAK_MAX, killer.streak + 1)
+      : 1;
+  killer.lastKillAt = world.run.seconds;
   world.run.events.push({
     at: world.run.seconds,
     ...eventText((t) => t.events.enemyKilled(enemy.kind === 'ninja')),

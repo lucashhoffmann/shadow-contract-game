@@ -31,6 +31,7 @@ import {
   ROOM_H,
   ROOM_W,
   setRoomSize,
+  STREAK_NEVER,
   SHOP_EVERY,
 } from '@/app/modules/world/constants/world.constants';
 import {
@@ -234,6 +235,9 @@ type GameStore = {
   restartMatch: () => void;
   // em rede: o jogador local esta escolhendo quem reviver no bau
   reviving: boolean;
+  // sequencia de mortes do jogador local: quantas, e quando foi a ultima
+  // (`at` muda a cada morte: e o que reinicia o aviso na tela)
+  streak: { count: number; at: number };
   // escolhe quem reviver (`player.id`)
   revive: (id: number) => void;
   // ping de cada lugar da partida (session.store mede e avisa)
@@ -393,6 +397,7 @@ export const useGameStore = create<GameStore>()(
           world.run.idleWarnings !== prev.idleWarnings ||
           scoreKey !== sentScores ||
           world.player.reviving !== prev.reviving ||
+          world.player.lastKillAt !== prev.streak.at ||
           (Object.keys(hud) as (keyof Hud)[]).some(
             (key) => hud[key] !== prev.hud[key],
           );
@@ -429,6 +434,10 @@ export const useGameStore = create<GameStore>()(
           // fim de partida fecha o menu
           menu: screen === 'playing' && prev.menu,
           reviving: world.player.reviving,
+          streak:
+            world.player.lastKillAt === prev.streak.at
+              ? prev.streak
+              : { count: world.player.streak, at: world.player.lastKillAt },
           // recorde e do solo: sala de multiplayer nao conta
           best: multi ? prev.best : Math.max(prev.best, hud.room),
         });
@@ -477,6 +486,7 @@ export const useGameStore = create<GameStore>()(
           sync();
         },
         reviving: false,
+        streak: { count: 0, at: STREAK_NEVER },
         revive: (id) => {
           if (multi) multi.actions.revive = id;
         },
@@ -562,7 +572,12 @@ export const useGameStore = create<GameStore>()(
           multi?.leave();
           multi = null;
           sentScores = '';
-          set({ online: false, host: false, menu: false });
+          set({
+            online: false,
+            host: false,
+            menu: false,
+            streak: { count: 0, at: STREAK_NEVER },
+          });
           world = createWorld(seed, get().intelligence, get().attackVariance);
           world.status = 'intro';
           setJoystickInput(0, 0);
@@ -644,7 +659,13 @@ export const useGameStore = create<GameStore>()(
           multi = null;
           world = null;
           sentScores = '';
-          set({ online: false, host: false, menu: false, scoreboard: false });
+          set({
+            online: false,
+            host: false,
+            menu: false,
+            scoreboard: false,
+            streak: { count: 0, at: STREAK_NEVER },
+          });
           set({ screen: 'menu' });
         },
       };

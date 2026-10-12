@@ -64,6 +64,14 @@ export const DASH_MAX = 6;
 // freando ate parar; parede segura
 export const LAUNCH_TIME = 0.5;
 export const LAUNCH_DISTANCE = 2.2;
+// Sequencia: matar de novo a ate STREAK_WINDOW segundos da ultima morte
+// soma na sequencia (double, triple, quadra, penta kill). Passou disso, a
+// proxima morte comeca do um. Para em STREAK_MAX.
+export const STREAK_WINDOW = 4;
+export const STREAK_MAX = 5;
+// `lastKillAt` de quem ainda nao matou. Numero finito: o mundo viaja em JSON
+// no multiplayer, e -Infinity viraria null
+export const STREAK_NEVER = -1e6;
 // quem morre derruba o cenario em volta
 export const PROP_BREAK_RADIUS = 1.5;
 // distancia em que a porta de correr abre para quem pode passar
