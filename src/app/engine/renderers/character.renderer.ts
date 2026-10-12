@@ -210,7 +210,12 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     };
   }
 
-  const CLOTH = { player: mat.playerCloth, ninja: mat.purple, suit: mat.navy };
+  const CLOTH = {
+    player: mat.playerCloth,
+    ninja: mat.purple,
+    suit: mat.navy,
+    fat: mat.dark,
+  };
   // cabo na mao, guarda e lamina; a origem e o ponto de pegada
   const katanaInHand: Part[] = [
     [geo.grip, mat.dark, 0, 0.03, 0],
@@ -235,16 +240,30 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
         ...eyes,
       ],
     },
+    // gordo: terno preto, careca; a barriga vem da escala do tronco (make)
+    fat: {
+      body: [
+        [geo.torso, mat.dark, 0, 0.6, 0],
+        [geo.shirt, mat.white, 0.15, 0.64, 0],
+        [geo.tie, mat.gold, 0.165, 0.64, 0],
+      ],
+      head: [[geo.head, mat.skin, 0, 0, 0], ...eyes],
+    },
   };
   // angulo do braco direito: ninjas seguram espada, terno aponta a pistola
   const HOLD: Record<CharacterKind, number | null> = {
     player: 0.5,
     ninja: 0.5,
     suit: Math.PI / 2 - 0.1,
+    fat: Math.PI / 2 - 0.1,
   };
 
   function make(kind: CharacterKind): Character {
     const cloth = CLOTH[kind];
+    // quem leva arma de fogo no braco, sem espada
+    const gunner = kind === 'suit' || kind === 'fat';
+    // largura do tronco: os bracos acompanham
+    const girth = kind === 'fat' ? 1.5 : 1;
     // so o player e configuravel
     const scale =
       kind === 'player'
@@ -263,6 +282,7 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     trunk.position.y = TORSO_Y;
     addParts(trunk, PARTS[kind].body, mat.outline);
     for (const part of trunk.children) part.position.y -= TORSO_Y;
+    trunk.scale.set(girth, 1, girth);
     body.add(trunk);
     addParts(head, PARTS[kind].head, mat.outline);
     const shadow = new THREE.Mesh(geo.shadow, mat.shadow);
@@ -296,24 +316,29 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
       pivot.scale.setScalar(scale.legs);
       return pivot;
     });
-    const handMat = kind === 'suit' ? mat.skin : cloth;
+    const handMat = gunner ? mat.skin : cloth;
     const hold = HOLD[kind];
     const arms = SIDES.map((side) => {
       const parts: Part[] = [
         [geo.arm, cloth, 0, -0.13, 0],
         [geo.hand, handMat, 0, -0.3, 0, 0, scale.hands],
       ];
-      if (kind === 'suit' && side === 1) {
-        parts.push([geo.gun, mat.dark, 0, -0.42, 0]);
+      if (gunner && side === 1) {
+        // escopeta do gordo: a mesma peca, bem maior
+        parts.push(
+          kind === 'fat'
+            ? [geo.gun, mat.steel, 0, -0.52, 0, 0, 1.9]
+            : [geo.gun, mat.dark, 0, -0.42, 0],
+        );
       }
-      const pivot = limb(SHOULDER_Y, side * 0.26, parts);
+      const pivot = limb(SHOULDER_Y, side * 0.26 * girth, parts);
       pivot.rotation.x = -side * ARM_OPEN;
       if (side === 1 && hold !== null) pivot.rotation.z = hold;
       return pivot;
     });
 
     let sword: THREE.Group | null = null;
-    if (kind !== 'suit') {
+    if (!gunner) {
       // A espada acompanha o punho durante a preparacao e o corte.
       sword = new THREE.Group();
       sword.position.set(0, -0.3, 0);

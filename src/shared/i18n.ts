@@ -176,8 +176,8 @@ const pt = {
       `Ficha de revive usada: restam ${remaining}.`,
     contractEnded: (room: number) => `Contrato encerrado na sala ${room}.`,
     roomReached: (room: number) => `Sala ${room} alcancada.`,
-    enemyKilled: (ninja: boolean) =>
-      `${ninja ? 'Ninja' : 'Inimigo armado'} eliminado.`,
+    enemyKilled: (kind: 'ninja' | 'suit' | 'fat') =>
+      `${{ ninja: 'Ninja', suit: 'Inimigo armado', fat: 'Gordo da escopeta' }[kind]} eliminado.`,
     damageTaken: (lost: number, blocked: number) =>
       lost
         ? `Sofreu ${lost} de dano${blocked ? ` (${blocked} bloqueado pelo escudo)` : ''}.`
@@ -309,6 +309,10 @@ const pt = {
             'atira de longe, aguenta 2 tiros. Desvie das balas vermelhas',
           ],
           ['Ninja', 'corre e golpeia de perto, aguenta 2 golpes'],
+          [
+            'Gordo',
+            'raro, lento e sempre em dupla; escopeta de perto, aguenta o dobro. Guarda o bau da loja e o bau dourado',
+          ],
           [
             'Caixa',
             'cobre de bala e quebra com tiro ou briga; pode soltar vida ou escudo',
@@ -520,7 +524,8 @@ const en: typeof pt = {
     reviveUsed: (remaining) => `Revive token used: ${remaining} left.`,
     contractEnded: (room) => `Contract ended in room ${room}.`,
     roomReached: (room) => `Reached room ${room}.`,
-    enemyKilled: (ninja) => `${ninja ? 'Ninja' : 'Armed enemy'} eliminated.`,
+    enemyKilled: (kind) =>
+      `${{ ninja: 'Ninja', suit: 'Armed enemy', fat: 'Shotgun heavy' }[kind]} eliminated.`,
     damageTaken: (lost, blocked) =>
       lost
         ? `Took ${lost} damage${blocked ? ` (${blocked} blocked by shield)` : ''}.`
@@ -633,6 +638,10 @@ const en: typeof pt = {
         entries: [
           ['Suit', 'shoots from afar, survives 2 shots. Dodge red bullets'],
           ['Ninja', 'runs and strikes up close, survives 2 hits'],
+          [
+            'Heavy',
+            'rare, slow and always in pairs; close-range shotgun, twice as tough. Guards the shop chest and the golden chest',
+          ],
           ['Crate', 'blocks bullets and breaks; may drop health or shield'],
           [
             'Golden chest',

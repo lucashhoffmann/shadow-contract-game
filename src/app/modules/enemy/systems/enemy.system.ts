@@ -29,6 +29,11 @@ import {
   ENEMY_DASH_PER_ROOM,
   ENEMY_KINDS,
   ENEMY_RADIUS,
+  FAT_FIRE_INTERVAL,
+  FAT_FIRE_RANGE,
+  FAT_PELLET_DAMAGE,
+  FAT_PELLETS,
+  FAT_SPREAD,
   FIRE_DELAY,
   FIRE_INTERVAL,
   FIRE_RANGE,
@@ -152,7 +157,7 @@ export function createEnemy(
     dash: 0,
     dashCooldown: 0,
     dashEvery:
-      threat < ENEMY_DASH_FROM_ROOM
+      kind === 'fat' || threat < ENEMY_DASH_FROM_ROOM
         ? 0
         : Math.max(
             ENEMY_DASH_MIN_INTERVAL,
@@ -483,7 +488,9 @@ function alert(world: World, enemy: Enemy, dt: number): void {
     enemy.route = [];
     return;
   }
-  const reach = stats.ranged ? FIRE_RANGE : NINJA_REACH;
+  const fat = enemy.kind === 'fat';
+  const range = fat ? FAT_FIRE_RANGE : FIRE_RANGE;
+  const reach = stats.ranged ? range : NINJA_REACH;
   const gap = distance(enemy.pos, player.pos);
   if (enemy.dash > 0) {
     // bote do ninja acompanha o player que tenta sair da frente
@@ -611,25 +618,29 @@ function alert(world: World, enemy: Enemy, dt: number): void {
   enemy.facing = angleTo(enemy.pos, player.pos);
   enemy.fireCooldown -= dt;
   if (enemy.fireCooldown > 0) return;
-  enemy.fireCooldown = FIRE_INTERVAL;
+  enemy.fireCooldown = fat ? FAT_FIRE_INTERVAL : FIRE_INTERVAL;
   const strike = enemyStrike(
     world,
     enemy,
-    stats.ranged ? ENEMY_BULLET_DAMAGE : NINJA_DAMAGE,
+    fat ? FAT_PELLET_DAMAGE : stats.ranged ? ENEMY_BULLET_DAMAGE : NINJA_DAMAGE,
   );
   if (stats.ranged) {
-    const bullet = spawnProjectile(
-      world,
-      'enemy',
-      enemy.pos,
-      enemy.facing,
-      ENEMY_BULLET_SPEED,
-      strike.damage,
-      FIRE_RANGE,
-      'pistol',
-      enemy.id,
-    );
-    if (strike.critical) bullet.critical = true;
+    // escopeta do gordo: varias balas em leque; terno: uma so, reta
+    const pellets = fat ? FAT_PELLETS : 1;
+    for (let i = 0; i < pellets; i++) {
+      const bullet = spawnProjectile(
+        world,
+        'enemy',
+        enemy.pos,
+        enemy.facing + (fat ? (i / (pellets - 1) - 0.5) * FAT_SPREAD : 0),
+        ENEMY_BULLET_SPEED,
+        strike.damage,
+        range,
+        fat ? 'shotgun' : 'pistol',
+        enemy.id,
+      );
+      if (strike.critical) bullet.critical = true;
+    }
   } else {
     damagePlayer(world, strike.damage, enemy.pos, strike.critical);
   }

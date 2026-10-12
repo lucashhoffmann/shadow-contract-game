@@ -50,8 +50,12 @@ import {
   createEmptyWorld,
   createWorld,
 } from '@/app/modules/world/systems/world.system';
-import type { Enemy } from '@/app/modules/world/types/world.types';
+import type { Enemy, World } from '@/app/modules/world/types/world.types';
 import { createArenaWorld } from '@/test/world.fixture';
+
+// inimigos de ronda: fora os guardas de bau, que ficam parados num ponto so
+const onPatrol = (world: World) =>
+  world.enemies.filter((enemy) => enemy.patrol.length > 1);
 
 const ALL_TEMPLATES = [START_TEMPLATE, SHOP_TEMPLATE, ...COMBAT_TEMPLATES];
 const DOOR = '####...####';
@@ -156,9 +160,9 @@ describe('geracao de salas', () => {
     const plaza = COMBAT_TEMPLATES.find((t) => t.id === 'plaza')!;
     const world = createEmptyWorld(1);
     spawnRoom(world, 1, plaza);
-    const early = world.enemies.length;
+    const early = onPatrol(world).length;
     spawnRoom(world, 6, plaza);
-    expect(world.enemies.length - early).toBeGreaterThan(early);
+    expect(onPatrol(world).length - early).toBeGreaterThan(early);
   });
 
   // salas de combate de varias seeds: lider e parceiro de cada ronda
@@ -189,9 +193,9 @@ describe('geracao de salas', () => {
       for (const template of COMBAT_TEMPLATES) {
         const world = createEmptyWorld(seed);
         spawnRoom(world, 1, template);
-        if (world.enemies.length === 1) alone++;
+        if (onPatrol(world).length === 1) alone++;
         else paired++;
-        expect(world.enemies.length).toBeLessThanOrEqual(2);
+        expect(onPatrol(world).length).toBeLessThanOrEqual(2);
       }
     }
     expect(paired).toBeGreaterThan(0);
@@ -552,5 +556,50 @@ describe('bau dourado', () => {
       'invincibility',
       'shield',
     ]);
+  });
+});
+
+describe('gordo da escopeta', () => {
+  it('aparece menos que terno e ninja, e nunca sozinho na ronda', () => {
+    const count = { suit: 0, ninja: 0, fat: 0 };
+    for (let seed = 1; seed <= 80; seed++) {
+      for (const template of COMBAT_TEMPLATES) {
+        const world = createEmptyWorld(seed);
+        spawnRoom(world, 12, template);
+        const patrols = onPatrol(world);
+        for (const enemy of patrols) count[enemy.kind]++;
+        expect(patrols.filter((e) => e.kind === 'fat').length % 2).toBe(0);
+      }
+    }
+    expect(count.fat).toBeGreaterThan(0);
+    expect(count.fat).toBeLessThan(count.ninja);
+    expect(count.fat).toBeLessThan(count.suit);
+  });
+
+  it('dupla guarda o bau da loja e o bau dourado, colada nele', () => {
+    const shop = createEmptyWorld(1);
+    spawnRoom(shop, SHOP_EVERY, SHOP_TEMPLATE);
+    const chest = shop.rooms[0].chest!;
+    expect(shop.enemies.map((e) => e.kind)).toEqual(['fat', 'fat']);
+    for (const guard of shop.enemies) {
+      expect(Math.hypot(guard.pos.x - chest.x, guard.pos.y - chest.y)).toBe(1);
+    }
+
+    let golden = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const world = createEmptyWorld(seed);
+      spawnRoom(world, 1, COMBAT_TEMPLATES[0]);
+      const guards = world.enemies.filter((e) => e.patrol.length === 1);
+      const gold = world.props.find((prop) => prop.golden);
+      expect(guards.length).toBe(gold ? 2 : 0);
+      for (const guard of guards) {
+        expect(guard.kind).toBe('fat');
+        expect(
+          Math.hypot(guard.pos.x - gold!.pos.x, guard.pos.y - gold!.pos.y),
+        ).toBe(1);
+      }
+      if (gold) golden++;
+    }
+    expect(golden).toBeGreaterThan(0);
   });
 });

@@ -98,7 +98,26 @@ export const ENEMY_KINDS: Record<EnemyKind, EnemyStats> = {
     viewRange: 3.8,
     ranged: false,
   },
+  // lento, aguenta o dobro, escopeta de perto
+  fat: {
+    hp: 120,
+    patrolSpeed: 1.2,
+    chaseSpeed: 1.8,
+    viewRange: 4.5,
+    ranged: true,
+  },
 };
+// Gordo: mais raro que terno e ninja, e nunca sozinho (a ronda dele sempre
+// nasce com parceiro). Uma dupla tambem fica de guarda, parada, ao lado do bau
+// da loja e de cada bau dourado. Nao salta. A escopeta solta FAT_PELLETS
+// balas abertas em FAT_SPREAD rad, de curto alcance e recarga lenta.
+export const FAT_FROM_ROOM = 3;
+export const FAT_CHANCE = 0.12;
+export const FAT_FIRE_RANGE = 4;
+export const FAT_FIRE_INTERVAL = 1.4;
+export const FAT_PELLETS = 5;
+export const FAT_SPREAD = 0.5;
+export const FAT_PELLET_DAMAGE = 8;
 export const NINJA_FROM_ROOM = 2;
 export const NINJA_CHANCE = 0.4;
 export const NINJA_REACH = 0.9;

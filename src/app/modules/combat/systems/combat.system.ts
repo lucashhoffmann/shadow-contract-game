@@ -137,7 +137,7 @@ export function killEnemy(world: World, enemy: Enemy): void {
   killer.lastKillAt = world.run.seconds;
   world.run.events.push({
     at: world.run.seconds,
-    ...eventText((t) => t.events.enemyKilled(enemy.kind === 'ninja')),
+    ...eventText((t) => t.events.enemyKilled(enemy.kind)),
   });
   world.player.adrenaline = ADRENALINE_TIME;
   breakPropsNear(world, enemy.pos, PROP_BREAK_RADIUS);

@@ -155,16 +155,29 @@ Um contrato sao `SHOP_EVERY` salas; a ultima e sempre a loja.
 ## `Enemy`
 
 ```ts
-type EnemyKind = 'ninja' | 'suit';
+type EnemyKind = 'ninja' | 'suit' | 'fat';
 type EnemyState = 'patrol' | 'suspicious' | 'alert' | 'dead';
 ```
 
 Tipos (numeros em `ENEMY_KINDS`):
 
-| Tipo    | Vida | Em alerta                                          |
-| ------- | ---- | -------------------------------------------------- |
-| `suit`  | 60   | para dentro de `FIRE_RANGE` e dispara `Projectile` |
-| `ninja` | 60   | corre ate `NINJA_REACH` e golpeia, sem bala        |
+| Tipo    | Vida | Em alerta                                            |
+| ------- | ---- | ---------------------------------------------------- |
+| `suit`  | 60   | para dentro de `FIRE_RANGE` e dispara `Projectile`   |
+| `ninja` | 60   | corre ate `NINJA_REACH` e golpeia, sem bala          |
+| `fat`   | 120  | para dentro de `FAT_FIRE_RANGE` e dispara a escopeta |
+
+- `fat` (gordo): mais raro que os outros (`FAT_CHANCE`, a partir da sala
+  `FAT_FROM_ROOM`, sorteado antes do ninja) e nunca sozinho: a ronda dele
+  sempre nasce com parceiro, sem sortear `BUDDY_CHANCE`. Lento e nao salta
+  (`dashEvery` 0). A escopeta solta `FAT_PELLETS` balas (`Projectile.weapon`
+  `'shotgun'`) abertas em `FAT_SPREAD` rad, cada uma com `FAT_PELLET_DAMAGE`
+  de base, a cada `FAT_FIRE_INTERVAL`
+- guarda de bau (`spawnGuards`, em `spawnRoom`): o bau da loja (`room.chest`)
+  e cada bau dourado nascem com uma dupla de `fat` parada (`patrol` de um
+  ponto so) em tiles livres colados no bau, de costas para ele. Bau de
+  revive e caixa comum nao tem guarda. Por isso a sala de loja deixou de ser
+  vazia de inimigos
 
 `ninja` aparece normalmente a partir da sala `NINJA_FROM_ROOM`; a pressao por
 inatividade tambem pode chama-lo antes.

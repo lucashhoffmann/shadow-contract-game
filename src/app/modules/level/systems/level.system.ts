@@ -22,6 +22,8 @@ import {
   BUDDY_CHANCE,
   BUDDY_GAP,
   ENEMY_RADIUS,
+  FAT_CHANCE,
+  FAT_FROM_ROOM,
   GOLDEN_CHEST_MAX,
   GOLDEN_CHEST_MIN,
   GOLDEN_CHEST_PER_CONTRACT,
@@ -36,6 +38,7 @@ import {
   TILE_MONEY,
 } from '@/app/modules/world/constants/world.constants';
 import type {
+  EnemyKind,
   RoomTemplate,
   Vec2,
   World,
@@ -86,6 +89,24 @@ function buddyPatrol(world: World, patrol: Vec2[]): Vec2[] | null {
     }
   }
   return null;
+}
+
+// Dupla de gordos de guarda no bau em `spot`: cada um parado num tile livre
+// colado nele, de costas para o bau. Sem tile livre, sem guarda.
+function spawnGuards(world: World, index: number, spot: Vec2): void {
+  const posts = [
+    [0, -1],
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+  ]
+    .map(([dx, dy]) => ({ x: spot.x + dx, y: spot.y + dy }))
+    .filter((post) => !circleHitsWall(world, post.x, post.y, ENEMY_RADIUS));
+  for (const post of posts.slice(0, 2)) {
+    const guard = createEnemy(world, index, [post], 'fat');
+    guard.facing = Math.atan2(post.y - spot.y, post.x - spot.x);
+    world.enemies.push(guard);
+  }
 }
 
 // chance de a sala `index` ter bau dourado: cresce pela posicao da sala no
@@ -141,15 +162,18 @@ export function spawnRoom(
   let spawned = 0;
   for (let i = 0; i < enemyCount && spawned < ROOM_ENEMY_MAX; i++) {
     const patrol = route(i);
-    const kind =
-      threat >= NINJA_FROM_ROOM && nextRandom(world) < NINJA_CHANCE
-        ? 'ninja'
-        : 'suit';
+    const kind: EnemyKind =
+      threat >= FAT_FROM_ROOM && nextRandom(world) < FAT_CHANCE
+        ? 'fat'
+        : threat >= NINJA_FROM_ROOM && nextRandom(world) < NINJA_CHANCE
+          ? 'ninja'
+          : 'suit';
     const leader = createEnemy(world, index, patrol, kind);
     world.enemies.push(leader);
     spawned++;
     if (spawned >= ROOM_ENEMY_MAX) break;
-    if (nextRandom(world) >= BUDDY_CHANCE) continue;
+    // gordo nunca anda sozinho
+    if (kind !== 'fat' && nextRandom(world) >= BUDDY_CHANCE) continue;
     // Parceiro. Cada dupla se comporta de um jeito, por sorteio:
     const style = nextRandom(world);
     let path: Vec2[] | null = null;
@@ -196,12 +220,18 @@ export function spawnRoom(
     }
   });
 
-  // bau dourado: uma das caixas da sala de combate, as vezes
+  // bau da loja tem guarda
+  const chest = world.rooms[world.rooms.length - 1].chest;
+  if (chest) spawnGuards(world, index, chest);
+
+  // bau dourado: uma das caixas da sala de combate, as vezes; com guarda
   if (template.kind !== 'combat') return;
   if (nextRandom(world) >= goldenChestChance(index)) return;
   const crates = world.props.filter((prop) => prop.roomIndex === index);
   const crate = crates[Math.floor(nextRandom(world) * crates.length)];
-  if (crate) crate.golden = true;
+  if (!crate) return;
+  crate.golden = true;
+  spawnGuards(world, index, crate.pos);
 }
 
 // mantem vivas so as salas ao redor do player; o resto vira parede

@@ -10,6 +10,9 @@ import {
   DETECT_TIME,
   ENEMY_DASH_FROM_ROOM,
   ENEMY_DASH_MIN_INTERVAL,
+  FAT_PELLETS,
+  FAT_SPREAD,
+  FIRE_DELAY,
   FIXED_DT,
   HEARING_YELLOW,
   LAUNCH_DISTANCE,
@@ -60,6 +63,18 @@ describe('canSee', () => {
 });
 
 describe('updateEnemies', () => {
+  it('gordo em alerta dispara a escopeta: FAT_PELLETS balas em leque', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 5.5, -Math.PI / 2, 'fat');
+    enemy.detection = 1;
+    run(world, FIRE_DELAY + 0.1);
+    expect(world.projectiles).toHaveLength(FAT_PELLETS);
+    expect(world.projectiles.every((p) => p.weapon === 'shotgun')).toBe(true);
+    const angles = world.projectiles.map((p) => Math.atan2(p.vel.y, p.vel.x));
+    expect(Math.max(...angles) - Math.min(...angles)).toBeCloseTo(FAT_SPREAD);
+    expect(enemy.dashEvery).toBe(0);
+  });
+
   it('nao ve nem ouve player invisivel, e em alerta perde o rastro', () => {
     const world = createArenaWorld();
     const enemy = addEnemy(world, 5.5, 5.5, -Math.PI / 2);

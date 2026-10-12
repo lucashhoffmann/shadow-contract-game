@@ -47,7 +47,8 @@ export type Room = {
   reviveFree: boolean;
 };
 
-export type EnemyKind = 'ninja' | 'suit';
+// 'fat': gordo de escopeta, raro, sempre em dupla; tambem guarda bau
+export type EnemyKind = 'ninja' | 'suit' | 'fat';
 
 export type EnemyStats = {
   hp: number;
