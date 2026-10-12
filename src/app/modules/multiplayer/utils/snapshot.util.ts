@@ -1,5 +1,7 @@
+import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import type {
   InputState,
+  ItemId,
   Room,
   Run,
   World,
@@ -23,7 +25,10 @@ export type Snapshot = Omit<
 // muda quando alguma sala entra, sai ou tem tile alterado
 export function roomsKey(world: World): string {
   return world.rooms
-    .map((room) => `${room.index}:${room.shopVisited}:${room.tiles.join('')}`)
+    .map(
+      (room) =>
+        `${room.index}:${room.shopVisited}:${room.reviveFree}:${room.tiles.join('')}`,
+    )
     .join('|');
 }
 
@@ -75,6 +80,10 @@ export function mergeInput(
     ...incoming,
     interact: incoming.interact || pending?.interact,
     open: incoming.open || pending?.open,
+    buy: incoming.buy ?? pending?.buy,
+    leaveShop: incoming.leaveShop || pending?.leaveShop,
+    revive: incoming.revive ?? pending?.revive,
+    select: incoming.select ?? pending?.select,
   };
 }
 
@@ -83,6 +92,10 @@ export function clearPulses(input: InputState | undefined): void {
   if (!input) return;
   input.interact = false;
   input.open = false;
+  input.buy = undefined;
+  input.leaveShop = false;
+  input.revive = undefined;
+  input.select = undefined;
 }
 
 // so o que o host aceita de um convidado: numeros limitados e booleanos
@@ -100,5 +113,15 @@ export function cleanInput(payload: unknown): InputState | null {
     crouch: raw.crouch === true,
     interact: raw.interact === true,
     open: raw.open === true,
+    ...(typeof raw.buy === 'string' &&
+      raw.buy in ITEMS && { buy: raw.buy as ItemId }),
+    ...(raw.leaveShop === true && { leaveShop: true }),
+    ...(Number.isInteger(raw.revive) && { revive: raw.revive as number }),
+    ...(typeof raw.select === 'string' &&
+      (raw.select === 'sword' ||
+        raw.select === 'next' ||
+        (raw.select in ITEMS && raw.select !== 'armor')) && {
+        select: raw.select as InputState['select'],
+      }),
   };
 }

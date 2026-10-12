@@ -52,11 +52,16 @@ export function useGamePage() {
     });
   }
 
-  const restart = () => {
-    if (!online) return startRun();
+  const restartMatch = useGameStore((state) => state.restartMatch);
+  const reviving = useGameStore((state) => state.reviving);
+  const revive = useGameStore((state) => state.revive);
+  // sair da partida em rede: volta para as sessoes
+  const leaveMatch = () => {
     backToMenu();
     openLobby();
   };
+  // em rede so o host recomeca, e para todos, sem derrubar a sessao
+  const restart = online ? (host ? restartMatch : undefined) : () => startRun();
   const legend =
     screen === 'paused'
       ? {
@@ -93,8 +98,12 @@ export function useGamePage() {
     host,
     menu,
     endMatch,
-    // sair da partida em rede: volta para as sessoes
-    leaveMatch: restart,
+    leaveMatch,
+    reviving,
+    revive,
+    // quantos o bau de revive ainda levanta: fichas, ou o gratis
+    reviveAllowance: Math.max(1, hud.revives),
+    waitingNote: online && !host ? t.match.waitingHost : undefined,
     scores,
     scoreboard,
     // icone do placar: liga e desliga (no teclado e o Tab segurado)

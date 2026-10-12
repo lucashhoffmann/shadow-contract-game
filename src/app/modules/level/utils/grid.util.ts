@@ -50,7 +50,8 @@ export function tileAt(world: World, tx: number, ty: number): string {
 // parede ('#') bloqueia tudo. Caixa ('o') bloqueia passagem e bala, mas e
 // baixa: nao bloqueia visao. Bau ('C') bloqueia igual a caixa e nao quebra.
 export function isSolidTile(tile: string): boolean {
-  return tile === '#' || tile === 'o' || tile === 'C';
+  // bau de revive ('R') e igual ao da loja
+  return tile === '#' || tile === 'o' || tile === 'C' || tile === 'R';
 }
 
 // parede, ou porta fechada: os dois seguram bala e visao

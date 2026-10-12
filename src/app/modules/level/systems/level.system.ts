@@ -57,6 +57,7 @@ export function spawnRoom(
   template: RoomTemplate = pickTemplate(world, index),
 ): void {
   const chestRow = template.tiles.findIndex((line) => line.includes('C'));
+  const reviveRow = template.tiles.findIndex((line) => line.includes('R'));
   world.rooms.push({
     index,
     templateId: template.id,
@@ -68,6 +69,11 @@ export function spawnRoom(
         ? null
         : tileCenter(index, template.tiles[chestRow].indexOf('C'), chestRow),
     shopVisited: false,
+    reviveChest:
+      reviveRow < 0
+        ? null
+        : tileCenter(index, template.tiles[reviveRow].indexOf('R'), reviveRow),
+    reviveFree: true,
   });
 
   // multiplayer: mais inimigos por sala e dificuldade adiantada

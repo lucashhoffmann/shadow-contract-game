@@ -70,6 +70,8 @@ export function createPlayer(
     name,
     color,
     money: 0,
+    shopping: false,
+    reviving: false,
     kills: 0,
     deaths: 0,
     pos: startPoint(),

@@ -59,7 +59,9 @@ conhecida. Usar `createWorld(seed)` para testar geracao e integracao.
   mais perto, bala fere so quem acerta, morte conta para quem atirou, carteira
   individual, morto nao age, partida acaba quando todos morrem, quem fica para
   tras e puxado; todo template 17x19 e valido; mais jogadores, mais inimigos
-  e inimigos mais espertos que no solo
+  e inimigos mais espertos que no solo; loja individual e sem pausa, bau de
+  revive (fichas do grupo, um gratis por bau, escolha quando faltam revives),
+  troca de arma e recomeco sem derrubar a sessao
 - `level`: template valido, caminho entre entrada e saida, geracao
   deterministica, loja a cada `SHOP_EVERY` salas, no maximo 3 salas vivas
 - `player`: anda, nao atravessa parede, desliza na parede, diagonal nao e mais

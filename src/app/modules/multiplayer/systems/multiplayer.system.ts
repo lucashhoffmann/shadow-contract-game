@@ -9,8 +9,21 @@ import {
   updateRooms,
 } from '@/app/modules/level/systems/level.system';
 import { roomIndexAt } from '@/app/modules/level/utils/grid.util';
-import { movePlayer } from '@/app/modules/player/systems/player.system';
-import { ROOMS_BEHIND } from '@/app/modules/world/constants/world.constants';
+import {
+  cycleWeapon,
+  movePlayer,
+  selectWeapon,
+} from '@/app/modules/player/systems/player.system';
+import {
+  buyItem,
+  nearbyChest,
+  visitShop,
+} from '@/app/modules/shop/systems/shop.system';
+import {
+  CHEST_RANGE,
+  REVIVE_HP,
+  ROOMS_BEHIND,
+} from '@/app/modules/world/constants/world.constants';
 import {
   createEmptyWorld,
   createPlayer,
@@ -19,9 +32,11 @@ import {
 import type {
   InputState,
   Player,
+  Room,
   World,
 } from '@/app/modules/world/types/world.types';
 import { alivePlayers, asPlayer } from '@/app/modules/world/utils/players.util';
+import { distance } from '@/shared/utils/math.util';
 import { eventText } from '@/shared/i18n';
 
 // Regras que so valem com varios jogadores. O nucleo (movimento, inimigo,
@@ -68,6 +83,90 @@ function advanceRooms(world: World): void {
   }
 }
 
+// sala cujo bau de revive esta ao alcance do jogador em foco
+export function nearbyReviveChest(world: World): Room | undefined {
+  return world.rooms.find(
+    (room) =>
+      room.reviveChest &&
+      distance(world.player.pos, room.reviveChest) <= CHEST_RANGE,
+  );
+}
+
+// Quantos o bau ainda levanta: um por ficha do grupo. Sem ficha, um de graca
+// por bau, para o grupo nao ficar preso com gente morta.
+export function reviveAllowance(world: World, room: Room): number {
+  return world.run.revives > 0 ? world.run.revives : room.reviveFree ? 1 : 0;
+}
+
+// levanta `dead` ao lado do bau, gastando uma ficha (ou o revive gratis)
+function reviveAt(world: World, room: Room, dead: Player): void {
+  if (!room.reviveChest || dead.hp > 0) return;
+  if (reviveAllowance(world, room) === 0) return;
+  if (world.run.revives > 0) world.run.revives--;
+  else room.reviveFree = false;
+  dead.hp = Math.round(dead.maxHp * REVIVE_HP);
+  // em volta do bau, um lugar por jogador
+  dead.pos = {
+    x: room.reviveChest.x + (SPAWN_OFFSETS[dead.id] ?? 0) * 0.6,
+    y: room.reviveChest.y - 1.2,
+  };
+  dead.dash = 0;
+}
+
+// B no bau de revive. Da para levantar todos os mortos: levanta. Ha mais
+// mortos que revives: quem abriu escolhe (`player.reviving`).
+function openReviveChest(world: World, room: Room): void {
+  const dead = world.players.filter((player) => player.hp <= 0);
+  const allowance = reviveAllowance(world, room);
+  if (dead.length === 0 || allowance === 0) return;
+  if (dead.length > allowance) {
+    world.player.reviving = true;
+    return;
+  }
+  for (const player of dead) reviveAt(world, room, player);
+}
+
+// Loja, bau de revive e troca de arma do jogador em foco. Devolve true se
+// ele esta ocupado (loja aberta ou escolhendo quem reviver): fica parado e
+// nao ataca, enquanto o jogo dos outros segue.
+function desk(world: World, input: InputState): boolean {
+  const player = world.player;
+  if (input.select) {
+    if (input.select === 'next') cycleWeapon(world);
+    else selectWeapon(world, input.select === 'sword' ? null : input.select);
+  }
+  if (player.shopping) {
+    if (input.buy) buyItem(world, input.buy);
+    if (input.leaveShop || !nearbyChest(world)) player.shopping = false;
+    return player.shopping;
+  }
+  if (player.reviving) {
+    const room = nearbyReviveChest(world);
+    const chosen = world.players[input.revive ?? -1];
+    if (room && chosen) reviveAt(world, room, chosen);
+    // acabou o que escolher, ou ele fechou
+    if (
+      input.leaveShop ||
+      !room ||
+      reviveAllowance(world, room) === 0 ||
+      world.players.every((other) => other.hp > 0)
+    ) {
+      player.reviving = false;
+    }
+    return player.reviving;
+  }
+  if (!input.open) return false;
+  const shop = nearbyChest(world);
+  if (shop) {
+    visitShop(world, shop);
+    player.shopping = true;
+    return true;
+  }
+  const revive = nearbyReviveChest(world);
+  if (revive) openReviveChest(world, revive);
+  return player.reviving;
+}
+
 // `inputs[i]` e o input de `players[i]`; sem input, o jogador fica parado.
 // Morto (`hp <= 0`) nao age nem e alvo; a partida acaba quando todos morrem.
 export function stepMultiWorld(
@@ -82,10 +181,17 @@ export function stepMultiWorld(
       asPlayer(world, player, () => act(inputs[player.id] ?? IDLE));
     }
   };
-  each((input) => movePlayer(world, input, dt));
+  // ocupado na loja ou no bau de revive: nao anda nem ataca neste passo
+  const busy = new Set<Player>();
+  each((input) => {
+    if (desk(world, input)) busy.add(world.player);
+    else movePlayer(world, input, dt);
+  });
   advanceRooms(world);
   updateEnemies(world, dt);
-  each((input) => fight(world, input, dt));
+  each((input) => {
+    if (!busy.has(world.player)) fight(world, input, dt);
+  });
   updateProjectiles(world, dt);
   updateFloaters(world, dt);
   each(() => collectPickups(world));

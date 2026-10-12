@@ -80,7 +80,9 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     if (event.code === 'KeyQ') useGameStore.getState().cycleWeapon();
     // B abre o bau ao alcance e fecha a loja aberta
     if (event.code === 'KeyB') {
-      if (getWorld()?.status === 'shop') useGameStore.getState().closeShop();
+      // pela tela, nao pelo mundo: em rede a loja e de cada jogador
+      if (useGameStore.getState().screen === 'shop')
+        useGameStore.getState().closeShop();
       else if (getWorld()?.status === 'playing') input.open = true;
     }
   };

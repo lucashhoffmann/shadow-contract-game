@@ -26,6 +26,7 @@ import {
   HAND_Y,
 } from '@/app/engine/renderers/weapon.renderer';
 import { meleeTarget } from '@/app/modules/combat/systems/combat.system';
+import { nearbyReviveChest } from '@/app/modules/multiplayer/systems/multiplayer.system';
 import { nearbyChest } from '@/app/modules/shop/systems/shop.system';
 import {
   DASH_TIME,
@@ -1176,6 +1177,17 @@ export function createWorldRenderer(
       group.add(chest.group);
       chestLids.set(room.index, chest.lid);
     }
+    // bau de revive (multiplayer): o mesmo bau, com a cruz da ficha em cima
+    if (room.reviveChest) {
+      const chest = buildChest();
+      chest.group.name = 'reviveChest';
+      chest.group.position.set(room.reviveChest.x, 0, -room.reviveChest.y);
+      const cross = new THREE.Mesh(geo.revive, mat.revive);
+      cross.position.y = 1.15;
+      cross.scale.setScalar(1.3);
+      chest.group.add(cross);
+      group.add(chest.group);
+    }
 
     const instanced = new THREE.InstancedMesh(
       geo.wall,
@@ -1904,12 +1916,28 @@ export function createWorldRenderer(
         world.status === 'playing' || world.status === 'shop'
           ? nearbyChest(world)
           : undefined;
-      chestPrompt.visible = world.status === 'playing' && !!chestRoom?.chest;
-      if (chestRoom?.chest) {
-        chestPrompt.position.set(chestRoom.chest.x, 0, -chestRoom.chest.y);
-        animatePrompt(chestPrompt, 1.3, time);
+      // bau de revive: o mesmo B, quando ha algum colega morto para levantar
+      const reviveAt =
+        world.status === 'playing' &&
+        !chestRoom &&
+        world.player.hp > 0 &&
+        world.players.some((other) => other.hp <= 0)
+          ? nearbyReviveChest(world)?.reviveChest
+          : undefined;
+      const promptAt =
+        world.status === 'playing' && !world.player.shopping
+          ? (chestRoom?.chest ?? reviveAt)
+          : undefined;
+      chestPrompt.visible = !!promptAt;
+      if (promptAt) {
+        chestPrompt.position.set(promptAt.x, 0, -promptAt.y);
+        animatePrompt(chestPrompt, reviveAt ? 1.9 : 1.3, time);
       }
-      const opened = world.status === 'shop' ? chestRoom?.index : undefined;
+      // em rede a loja nao muda o status: vale quem esta com ela aberta
+      const opened =
+        world.status === 'shop' || world.player.shopping
+          ? chestRoom?.index
+          : undefined;
       for (const [index, lid] of chestLids) {
         const target = index === opened ? CHEST_OPEN : 0;
         lid.rotation.x += (target - lid.rotation.x) * Math.min(1, dt * 9);

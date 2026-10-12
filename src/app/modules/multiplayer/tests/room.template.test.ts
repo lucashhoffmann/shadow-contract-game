@@ -42,7 +42,7 @@ describe.each(ALL)('template $id', (template) => {
   it('tem 19 linhas de 17 tiles validos, com portas no centro', () => {
     expect(template.tiles).toHaveLength(H);
     for (const line of template.tiles) {
-      expect(line).toMatch(new RegExp(`^[#.$Co]{${W}}$`));
+      expect(line).toMatch(new RegExp(`^[#.$CoR]{${W}}$`));
       expect(line[0]).toBe('#');
       expect(line[W - 1]).toBe('#');
     }

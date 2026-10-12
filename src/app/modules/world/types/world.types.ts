@@ -11,6 +11,16 @@ export type InputState = {
   interact?: boolean;
   // pulso da tecla B: abre o bau ao alcance
   open?: boolean;
+  // Pulsos so do multiplayer: o que no solo e acao direta do store viaja
+  // aqui, junto do input, para o host aplicar no jogador certo.
+  // comprar na loja aberta
+  buy?: ItemId;
+  // fechar a loja ou a escolha do bau de revive
+  leaveShop?: boolean;
+  // `player.id` de quem reviver no bau de revive
+  revive?: number;
+  // trocar de arma: uma do arsenal, 'sword', ou 'next' para a proxima
+  select?: WeaponId | 'sword' | 'next';
 };
 
 export type RoomKind = 'start' | 'combat' | 'shop';
@@ -31,6 +41,10 @@ export type Room = {
   chest: Vec2 | null;
   // ja abriu o bau: os precos desta sala ja foram sorteados
   shopVisited: boolean;
+  // multiplayer: centro do bau de revive (tile 'R'); null = sala sem ele
+  reviveChest: Vec2 | null;
+  // o bau ainda tem o revive gratis (para o grupo sem ficha nao travar)
+  reviveFree: boolean;
 };
 
 export type EnemyKind = 'ninja' | 'suit';
@@ -177,6 +191,10 @@ export type Player = {
   color: string | null;
   // carteira: cada jogador pega e gasta o proprio dinheiro
   money: number;
+  // multiplayer: esta com a loja aberta, ou escolhendo quem reviver no bau.
+  // Parado enquanto isso; o jogo dos outros continua
+  shopping: boolean;
+  reviving: boolean;
   // placar: inimigos que matou e vezes que morreu nesta partida
   kills: number;
   deaths: number;

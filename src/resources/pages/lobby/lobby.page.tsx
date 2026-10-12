@@ -35,7 +35,7 @@ export function LobbyPage() {
   } = useLobbyPage();
 
   return (
-    <main className='game-menu-background font-display relative flex min-h-full flex-col items-center gap-5 overflow-y-auto p-6 pt-16 text-center'>
+    <main className='game-menu-background font-display relative flex h-full touch-pan-y flex-col items-center gap-5 overflow-y-auto p-6 pt-16 text-center'>
       <button
         type='button'
         className={`${CHUNKY} absolute top-3 left-3 bg-[var(--game-secondary)] text-base`}

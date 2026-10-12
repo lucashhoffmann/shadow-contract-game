@@ -30,8 +30,12 @@ export function HomePage() {
   const bloodColor = useGameStore((state) => state.bloodColor);
   const setBloodColor = useGameStore((state) => state.setBloodColor);
 
+  // Rola quando o conteudo nao cabe (celular deitado, muitos botoes). O centro
+  // vem das margens automaticas do titulo e do rodape: sobrando espaco,
+  // centralizam; faltando, encostam no topo sem cortar nada. touch-pan-y: o
+  // body bloqueia gestos de toque por causa do jogo.
   return (
-    <main className='game-menu-background font-display relative flex min-h-full flex-col items-center justify-center gap-7 overflow-hidden p-6 text-center'>
+    <main className='game-menu-background font-display relative flex h-full touch-pan-y flex-col items-center gap-7 overflow-x-hidden overflow-y-auto p-6 text-center'>
       {/* Spot no teto iluminando o titulo: refletor, facho que abre para
           baixo e a poca de luz onde ele bate. O facho balanca bem e a lampada
           falha de vez em quando (spotlight-light, em index.css). */}
@@ -49,7 +53,7 @@ export function HomePage() {
         aria-hidden
         className='spotlight-light pointer-events-none absolute top-[22%] left-1/2 h-[46vh] w-[min(130vw,48rem)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgb(255_255_255/0.2)_0%,rgb(255_255_255/0.06)_45%,transparent_70%)]'
       />
-      <h1 className='text-outline relative flex -rotate-3 flex-col text-6xl leading-none tracking-wide uppercase sm:text-7xl'>
+      <h1 className='text-outline relative mt-auto flex -rotate-3 flex-col text-6xl leading-none tracking-wide uppercase sm:text-7xl'>
         <span className='text-white'>Shadow</span>{' '}
         <span className='text-[1.15em] text-[var(--game-brandPink)]'>
           Contract
@@ -137,7 +141,7 @@ export function HomePage() {
         </Dialog>
         <button
           type='button'
-          className={SECONDARY}
+          className={`${SECONDARY} font-display`}
           aria-label={t.home.changeLanguage}
           onClick={() => setLanguage(language === 'pt-BR' ? 'en' : 'pt-BR')}
         >
@@ -154,7 +158,7 @@ export function HomePage() {
       <p className='relative max-w-xs font-sans text-sm text-white/70'>
         {t.home.instructions}
       </p>
-      <footer className='text-outline animate-credit absolute inset-x-0 bottom-3 text-base tracking-wide text-white motion-reduce:animate-none'>
+      <footer className='text-outline animate-credit relative mt-auto text-base tracking-wide text-white motion-reduce:animate-none'>
         {t.home.credit}{' '}
         <a
           href='https://github.com/lucashhoffmann/'

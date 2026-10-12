@@ -20,7 +20,10 @@ type GameOverDialogProps = {
   kills: number;
   best: number;
   run: Run | null;
-  onRestart: () => void;
+  // sem ele o botao some (convidado em rede: quem recomeca e o host)
+  onRestart?: () => void;
+  // aviso no lugar do botao de recomecar
+  note?: string;
   onMenu: () => void;
 };
 
@@ -31,6 +34,7 @@ export function GameOverDialog({
   best,
   run,
   onRestart,
+  note,
   onMenu,
 }: GameOverDialogProps) {
   const t = useTexts();
@@ -71,21 +75,24 @@ export function GameOverDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className='flex-col items-center gap-3 sm:flex-col sm:justify-center'>
-          <button
-            type='button'
-            className='text-outline flex items-center gap-2 rounded-2xl border-4 border-white bg-[var(--game-success)] px-6 py-3 text-2xl text-white uppercase shadow-[0_5px_0_var(--game-ink)] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none'
-            onClick={() => {
-              setAnalysisOpen(false);
-              onRestart();
-            }}
-          >
-            <RotateCcw
-              aria-hidden
-              className='size-6'
-              strokeWidth={3.5}
-            />
-            {t.game.restart}
-          </button>
+          {onRestart && (
+            <button
+              type='button'
+              className='text-outline flex items-center gap-2 rounded-2xl border-4 border-white bg-[var(--game-success)] px-6 py-3 text-2xl text-white uppercase shadow-[0_5px_0_var(--game-ink)] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none'
+              onClick={() => {
+                setAnalysisOpen(false);
+                onRestart();
+              }}
+            >
+              <RotateCcw
+                aria-hidden
+                className='size-6'
+                strokeWidth={3.5}
+              />
+              {t.game.restart}
+            </button>
+          )}
+          {note && <p className='text-outline text-lg text-white'>{note}</p>}
           <ShareRecord
             best={best}
             room={room}

@@ -9,6 +9,7 @@ import { DamageVignette } from '@/resources/pages/game/components/damage-vignett
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
 import { Hud } from '@/resources/pages/game/components/hud.component';
 import { MatchMenu } from '@/resources/pages/game/components/match-menu.component';
+import { ReviveDialog } from '@/resources/pages/game/components/revive-dialog.component';
 import { Scoreboard } from '@/resources/pages/game/components/scoreboard.component';
 import { LegendDialog } from '@/resources/pages/game/components/legend-dialog.component';
 import { ShopDialog } from '@/resources/pages/game/components/shop-dialog.component';
@@ -36,6 +37,10 @@ export function GamePage() {
     menu,
     endMatch,
     leaveMatch,
+    reviving,
+    revive,
+    reviveAllowance,
+    waitingNote,
     scores,
     scoreboard,
     toggleScoreboard,
@@ -66,6 +71,13 @@ export function GamePage() {
       <Scoreboard
         open={scoreboard && screen === 'playing'}
         scores={scores}
+      />
+      <ReviveDialog
+        open={reviving && screen === 'playing'}
+        scores={scores}
+        allowance={reviveAllowance}
+        onRevive={revive}
+        onClose={closeShop}
       />
       <MatchMenu
         open={menu}
@@ -101,7 +113,8 @@ export function GamePage() {
         best={best}
         run={getWorld()?.run ?? null}
         onRestart={restart}
-        onMenu={backToMenu}
+        note={waitingNote}
+        onMenu={online ? leaveMatch : backToMenu}
       />
     </div>
   );

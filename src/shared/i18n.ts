@@ -210,29 +210,45 @@ const pt = {
     home: 'Inicio',
     fullscreen: 'Tela cheia',
     restart: 'Reiniciar',
-    sections: [
-      {
-        title: 'Controles',
-        entries: [
-          ['WASD / setas / joystick', 'mover'],
-          [
-            'Espaco',
-            'salto de esquiva. Livre na sala inicial; depois gasta 1 dos 6',
-          ],
-          ['C / Ctrl', 'agachar: mais lento, inimigos ouvem menos'],
-          [
-            'F',
-            'quebrar a caixa ao alcance; com arma, facada no inimigo ao lado',
-          ],
-          ['B', 'abrir e fechar o bau da loja, no fim do contrato'],
-          ['Q', 'trocar entre espada e armas (ou clique na arma, no topo)'],
-          [
-            'Toque',
-            'no celular: icone de mao sobre o alvo; botao de setas para saltar',
-          ],
-          ['P', 'pausar e ver esta legenda'],
+    keyboardControls: {
+      title: 'Controles',
+      entries: [
+        ['WASD / setas', 'mover'],
+        [
+          'Espaco',
+          'salto de esquiva. Livre na sala inicial; depois gasta 1 dos 6',
         ],
-      },
+        ['C / Ctrl', 'agachar: mais lento, inimigos ouvem menos'],
+        [
+          'F',
+          'quebrar a caixa ao alcance; com arma, facada no inimigo ao lado',
+        ],
+        ['B', 'abrir e fechar o bau da loja, no fim do contrato'],
+        ['Q', 'trocar entre espada e armas (ou clique na arma, no topo)'],
+        ['P', 'pausar e ver esta legenda'],
+      ],
+    },
+    touchControls: {
+      title: 'Controles',
+      entries: [
+        ['Joystick', 'arraste na parte inferior da tela para andar'],
+        [
+          'Setas',
+          'toque no botão à direita para saltar; depois da sala inicial gasta 1 dos 6 saltos',
+        ],
+        [
+          'Agachar',
+          'toque no botão à direita para andar devagar e fazer menos barulho; toque de novo para levantar',
+        ],
+        [
+          'Mão',
+          'toque no ícone sobre caixas, baús ou inimigos próximos para interagir',
+        ],
+        ['Armas', 'toque na arma no topo da tela para trocar'],
+        ['Pausa', 'toque no botão no topo para ver esta legenda'],
+      ],
+    },
+    sections: [
       {
         title: 'Furtividade',
         entries: [
@@ -260,7 +276,7 @@ const pt = {
           ],
           [
             'Com arma',
-            'atira sozinho de longe; colado no inimigo, so ataca no F (faca)',
+            'atira sozinho de longe; colado no inimigo, use a interação para esfaquear',
           ],
           ['Tiro', 'perde forca com a distancia; escopeta so resolve de perto'],
           [
@@ -309,6 +325,12 @@ const pt = {
     you: '(voce)',
     dead: 'morto',
     ended: 'O host encerrou a partida.',
+    waitingHost: 'Esperando o host comecar outra partida.',
+    reviveTitle: 'Quem volta?',
+    reviveNote: (count: number) =>
+      count === 1
+        ? 'O bau levanta 1 jogador. Escolha quem.'
+        : `O bau levanta ${count} jogadores. Escolha quem.`,
   },
 };
 
@@ -512,23 +534,39 @@ const en: typeof pt = {
     home: 'Home',
     fullscreen: 'Fullscreen',
     restart: 'Restart',
-    sections: [
-      {
-        title: 'Controls',
-        entries: [
-          ['WASD / arrows / joystick', 'move'],
-          ['Space', 'dodge dash. Free in the starting room; then uses 1 of 6'],
-          ['C / Ctrl', 'crouch: slower and quieter'],
-          ['F', 'break a nearby crate; with a gun, stab an adjacent enemy'],
-          ['B', 'open or close the shop chest at the end of a contract'],
-          ['Q', 'switch between sword and guns (or click a weapon above)'],
-          [
-            'Touch',
-            'on mobile: tap the hand icon over a target; tap arrows to dash',
-          ],
-          ['P', 'pause and view this guide'],
+    keyboardControls: {
+      title: 'Controls',
+      entries: [
+        ['WASD / arrows', 'move'],
+        ['Space', 'dodge dash. Free in the starting room; then uses 1 of 6'],
+        ['C / Ctrl', 'crouch: slower and quieter'],
+        ['F', 'break a nearby crate; with a gun, stab an adjacent enemy'],
+        ['B', 'open or close the shop chest at the end of a contract'],
+        ['Q', 'switch between sword and guns (or click a weapon above)'],
+        ['P', 'pause and view this guide'],
+      ],
+    },
+    touchControls: {
+      title: 'Controls',
+      entries: [
+        ['Joystick', 'drag at the bottom of the screen to move'],
+        [
+          'Arrows',
+          'tap the button on the right to dash; after the starting room it uses 1 of 6 dashes',
         ],
-      },
+        [
+          'Crouch',
+          'tap the button on the right to move slowly and quietly; tap again to stand',
+        ],
+        [
+          'Hand',
+          'tap the icon over crates, chests or nearby enemies to interact',
+        ],
+        ['Weapons', 'tap a weapon at the top of the screen to switch'],
+        ['Pause', 'tap the button at the top to view this guide'],
+      ],
+    },
+    sections: [
       {
         title: 'Stealth',
         entries: [
@@ -553,7 +591,7 @@ const en: typeof pt = {
           ['Sword', 'kills from behind; alerted enemies take 30 to 45 damage'],
           [
             'With a gun',
-            'shoots automatically at range; press F to stab up close',
+            'shoots automatically at range; use the attack action to stab up close',
           ],
           ['Shot', 'weakens with distance; shotgun works best up close'],
           [
@@ -590,6 +628,12 @@ const en: typeof pt = {
     you: '(you)',
     dead: 'dead',
     ended: 'The host ended the match.',
+    waitingHost: 'Waiting for the host to start another match.',
+    reviveTitle: 'Who comes back?',
+    reviveNote: (count) =>
+      count === 1
+        ? 'The chest revives 1 player. Choose who.'
+        : `The chest revives ${count} players. Choose who.`,
   },
 };
 

@@ -125,6 +125,12 @@ export function nearbyChest(world: World): Room | undefined {
 export function openChest(world: World): void {
   const room = nearbyChest(world);
   if (!room) return;
+  visitShop(world, room);
+  world.status = 'shop';
+}
+
+// primeira abertura do bau da sala: sorteia os precos
+export function visitShop(world: World, room: Room): void {
   if (!room.shopVisited) {
     room.shopVisited = true;
     rollMarket(world);
@@ -134,7 +140,6 @@ export function openChest(world: World): void {
       ...eventText((t) => t.events.shopVisited(world.run.shops)),
     });
   }
-  world.status = 'shop';
 }
 
 export function closeShop(world: World): void {

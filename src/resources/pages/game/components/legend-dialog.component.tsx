@@ -36,6 +36,8 @@ export function LegendDialog({
   onRestart,
 }: LegendDialogProps) {
   const t = useTexts();
+  const touch =
+    typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   return (
     <Dialog
       open={open}
@@ -56,7 +58,10 @@ export function LegendDialog({
               {t.legend.subtitle}
             </DialogDescription>
           </DialogHeader>
-          {t.legend.sections.map(({ title: section, entries }) => (
+          {[
+            touch ? t.legend.touchControls : t.legend.keyboardControls,
+            ...t.legend.sections,
+          ].map(({ title: section, entries }) => (
             <section
               key={section}
               className='rounded-2xl bg-black/25 p-3'

@@ -704,7 +704,33 @@ function stepMultiWorld(
   ficou alem de `ROOMS_BEHIND` e puxado para `run.checkpoint`
 - dinheiro e individual: a moeda e de quem pegou
 - a partida acaba (`status: 'dead'`) quando todos os jogadores morrem
-- ainda nao valem no multi: inatividade, loja e revive
+- ainda nao vale no multi: inatividade
+
+### Loja, bau de revive e troca de arma em rede
+
+No solo sao acoes diretas do store. Em rede viajam como pulsos no
+`InputState` (`buy`, `leaveShop`, `revive`, `select`) e quem aplica e o host,
+no passo, com o jogador certo em foco (`desk`, em `multiplayer.system.ts`).
+
+- loja nao pausa e e de cada um: `open` perto do bau liga `player.shopping`
+  (e sorteia os precos na primeira vez, `visitShop`). Quem esta com a loja
+  aberta nao anda nem ataca; os outros seguem. `buy` so vale com a loja
+  aberta e sai da carteira de quem comprou; `leaveShop`, ou se afastar, fecha.
+  `world.status` continua `playing`; o store mostra a tela `shop` so para
+  quem tem `shopping`
+- bau de revive: tile `R` na sala da loja do multi (`Room.reviveChest`), um
+  por contrato. `reviveAllowance` diz quantos ele levanta: um por ficha do
+  grupo (`run.revives`); sem ficha, um de graca por bau (`Room.reviveFree`).
+  `open` perto dele, com alguem morto: se da para levantar todos, levanta;
+  se ha mais mortos que revives, liga `player.reviving` e quem abriu escolhe
+  com `revive: player.id` ate acabar. Quem volta nasce ao lado do bau com
+  `REVIVE_HP` da vida
+- no multi a ficha nao e gasta sozinha ao morrer (isso e do solo): o morto
+  assiste ate o grupo chegar ao bau
+- `select`: `'next'`, `'sword'` ou o id de uma arma do arsenal
+- recomeco: com `status: 'dead'`, `restartMatch()` (so host) cria outro mundo
+  com os mesmos lugares e manda o estado; os convidados voltam a `playing`
+  sozinhos ao receber. A sessao e a conexao continuam as mesmas
 
 ### Rede
 
@@ -741,6 +767,8 @@ link, seed?)`, `receiveInput(index, payload)`, `receiveState(snapshot)`.
   `scores` (um por jogador, com `you` e `alive`), `scoreboard` (aberto pelo
   Tab segurado ou pelo icone do HUD) e, em rede, `online`, `host` e `menu`.
   `togglePause` em rede nao pausa: abre e fecha `menu` por cima do jogo.
+  O store tambem publica `reviving` (escolha do bau aberta) e tem
+  `revive(id)` e `restartMatch()`.
   `endMatch()` so vale para o host: poe `status: 'dead'` e manda o estado na
   hora, levando todos para a tela de resultado
 - `session.store`: `status` (`idle`, `connecting`, `lobby`, `room`,

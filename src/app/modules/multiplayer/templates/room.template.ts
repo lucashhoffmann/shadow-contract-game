@@ -1,7 +1,7 @@
 import type { RoomTemplate } from '@/app/modules/world/types/world.types';
 
 // Salas do multiplayer: 17x19, quase o dobro da area do solo, com ate 8
-// rondas por sala. Mesma legenda e regras de level/templates/room.template.ts;
+// rondas por sala. 'R' e o bau de revive, ao lado do bau da loja. Mesma legenda e regras de level/templates/room.template.ts;
 // multiplayer/tests/room.template.test.ts valida todas.
 
 export const MULTI_START_TEMPLATE: RoomTemplate = {
@@ -44,7 +44,7 @@ export const MULTI_SHOP_TEMPLATE: RoomTemplate = {
     '#...............#',
     '#...............#',
     '#...............#',
-    '#.......C.......#',
+    '#...R...C.......#',
     '#...............#',
     '#...............#',
     '#...............#',

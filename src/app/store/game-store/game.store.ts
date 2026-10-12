@@ -212,6 +212,12 @@ type GameStore = {
   setScoreboard: (open: boolean) => void;
   // host: acaba a partida para todos e mostra o resultado
   endMatch: () => void;
+  // host: depois da derrota, comeca outra partida com os mesmos jogadores
+  restartMatch: () => void;
+  // em rede: o jogador local esta escolhendo quem reviver no bau
+  reviving: boolean;
+  // escolhe quem reviver (`player.id`)
+  revive: (id: number) => void;
   intelligence: Record<number, EnemyIntelligence>;
   attackVariance: AttackVariance | null;
   setLook: (patch: Partial<PlayerLook>) => void;
@@ -271,6 +277,10 @@ let multi:
       sentRooms: string;
       // convidado: ultimo input enviado, para nao repetir
       sentInput: string;
+      // lugares da partida, para o host recomecar com os mesmos
+      seats: Seat[];
+      // acoes do jogador local a mandar no proximo passo (loja, revive, arma)
+      actions: Partial<InputState>;
     })
   | null = null;
 // o host manda o estado a cada tantos passos: 60 / 3 = 20 vezes por segundo
@@ -327,7 +337,11 @@ export const useGameStore = create<GameStore>()(
         const key = world.player.arsenal
           .map((weapon) => `${weapon.id}:${weapon.ammo}`)
           .join();
-        const screen = SCREEN_BY_STATUS[world.status];
+        // em rede a loja e de cada um: abre so para quem esta nela
+        const screen =
+          world.status === 'playing' && world.player.shopping
+            ? 'shop'
+            : SCREEN_BY_STATUS[world.status];
         const scoreKey = world.players
           .map((p) => `${p.kills}/${p.deaths}/${p.hp > 0}`)
           .join();
@@ -340,6 +354,7 @@ export const useGameStore = create<GameStore>()(
           world.run.attackVariance !== prev.attackVariance ||
           world.run.idleWarnings !== prev.idleWarnings ||
           scoreKey !== sentScores ||
+          world.player.reviving !== prev.reviving ||
           (Object.keys(hud) as (keyof Hud)[]).some(
             (key) => hud[key] !== prev.hud[key],
           );
@@ -374,6 +389,7 @@ export const useGameStore = create<GameStore>()(
           idleWarnings: world.run.idleWarnings,
           // fim de partida fecha o menu
           menu: screen === 'playing' && prev.menu,
+          reviving: world.player.reviving,
           // recorde e do solo: sala de multiplayer nao conta
           best: multi ? prev.best : Math.max(prev.best, hud.room),
         });
@@ -401,6 +417,19 @@ export const useGameStore = create<GameStore>()(
         menu: false,
         setScoreboard: (open) => {
           if (open !== get().scoreboard) set({ scoreboard: open });
+        },
+        reviving: false,
+        revive: (id) => {
+          if (multi) multi.actions.revive = id;
+        },
+        restartMatch: () => {
+          if (!multi?.host || world?.status !== 'dead') return;
+          world = createMultiWorld(Date.now(), multi.seats);
+          multi.inputs = [];
+          multi.sentRooms = '';
+          sentScores = '';
+          publish();
+          sync();
         },
         endMatch: () => {
           if (!world || !multi?.host || world.status !== 'playing') return;
@@ -436,6 +465,8 @@ export const useGameStore = create<GameStore>()(
             ticks: 0,
             sentRooms: '',
             sentInput: '',
+            seats,
+            actions: {},
           };
           sentScores = '';
           set({ online: true, host: link.host, menu: false, scores: [] });
@@ -487,13 +518,16 @@ export const useGameStore = create<GameStore>()(
           toggleWorldPause(world);
           sync();
         },
-        tick: (input, dt) => {
+        tick: (raw, dt) => {
+          // em rede, as acoes de loja, revive e arma viajam junto do input
+          const input = multi ? { ...raw, ...multi.actions } : raw;
+          if (multi) multi.actions = {};
           if (multi && !multi.host) {
             // convidado nao simula: manda o input quando muda
             const next = JSON.stringify(input);
             if (next !== multi.sentInput) {
               multi.sentInput = next;
-              multi.sendInput({ ...input });
+              multi.sendInput(input);
             }
             return;
           }
@@ -513,21 +547,28 @@ export const useGameStore = create<GameStore>()(
           if (++multi.ticks % SNAPSHOT_EVERY === 0 || over) publish();
           sync();
         },
+        // Em rede quem aplica e o host, no passo: aqui so fica anotado
+        // (`multi.actions`) para ir no proximo input.
         buy: (id) => {
-          if (world && buyItem(world, id)) sync();
+          if (multi) multi.actions.buy = id;
+          else if (world && buyItem(world, id)) sync();
         },
         selectWeapon: (id) => {
-          if (!world) return;
+          if (multi) multi.actions.select = id ?? 'sword';
+          if (multi || !world) return;
           selectWorldWeapon(world, id);
           sync();
         },
         cycleWeapon: () => {
-          if (!world || world.status !== 'playing') return;
+          if (multi) multi.actions.select = 'next';
+          if (multi || !world || world.status !== 'playing') return;
           cycleWorldWeapon(world);
           sync();
         },
+        // fecha a loja; em rede, tambem a escolha do bau de revive
         closeShop: () => {
-          if (!world) return;
+          if (multi) multi.actions.leaveShop = true;
+          if (multi || !world) return;
           closeWorldShop(world);
           sync();
         },

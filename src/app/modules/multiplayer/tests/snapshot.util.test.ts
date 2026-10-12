@@ -84,5 +84,18 @@ describe('input do convidado', () => {
       interact: true,
       open: false,
     });
+    // acoes de loja e revive: so valores conhecidos passam
+    expect(
+      cleanInput({ buy: 'pistol', revive: 2, select: 'next', leaveShop: true }),
+    ).toMatchObject({
+      buy: 'pistol',
+      revive: 2,
+      select: 'next',
+      leaveShop: true,
+    });
+    const junk = cleanInput({ buy: 'tank', revive: 1.5, select: 'armor' })!;
+    expect(junk.buy).toBeUndefined();
+    expect(junk.revive).toBeUndefined();
+    expect(junk.select).toBeUndefined();
   });
 });

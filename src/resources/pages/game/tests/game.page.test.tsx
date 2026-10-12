@@ -16,6 +16,7 @@ import { MatchMenu } from '@/resources/pages/game/components/match-menu.componen
 import { Scoreboard } from '@/resources/pages/game/components/scoreboard.component';
 import { ShopDialog } from '@/resources/pages/game/components/shop-dialog.component';
 import { GamePage } from '@/resources/pages/game/game.page';
+import { useLanguage } from '@/shared/i18n';
 
 // jsdom nao tem WebGL
 const { dispose } = vi.hoisted(() => ({ dispose: vi.fn() }));
@@ -371,6 +372,11 @@ describe('ShopDialog', () => {
 });
 
 describe('LegendDialog', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    useLanguage.getState().setLanguage('pt-BR');
+  });
+
   it('mostra a legenda e dispara a acao', async () => {
     const onAction = vi.fn();
     render(
@@ -390,6 +396,31 @@ describe('LegendDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Comecar' }));
 
     expect(onAction).toHaveBeenCalled();
+  });
+
+  it('mostra os controles de toque no mobile em portugues e ingles', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(pointer: coarse)',
+    }));
+    render(
+      <LegendDialog
+        open
+        title='Como jogar'
+        actionLabel='Comecar'
+        onMenu={vi.fn()}
+        onAction={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Joystick')).toBeInTheDocument();
+    expect(screen.getByText('Mão')).toBeInTheDocument();
+    expect(screen.queryByText('Espaco')).toBeNull();
+    expect(screen.queryByText('F')).toBeNull();
+
+    act(() => useLanguage.getState().setLanguage('en'));
+    expect(screen.getByText('Hand')).toBeInTheDocument();
+    expect(screen.getByText('Arrows')).toBeInTheDocument();
+    expect(screen.queryByText('Space')).toBeNull();
   });
 });
 
