@@ -100,7 +100,8 @@ type InputState = {
 simulacao normaliza se o vetor passar de 1.
 Em tela de toque ou janela estreita, o joystick aparece no centro inferior durante o
 jogo; tocar e arrastar no disco move o personagem, soltar zera o movimento.
-`interact` e um pulso da tecla F: quebra a caixa intacta mais proxima dentro de
+`interact` e um pulso da tecla F. Sem inimigo nem caixa ao alcance, o player
+golpeia de espada no ar (`player.slash`, so animacao, sem recarga). Senao: quebra a caixa intacta mais proxima dentro de
 `MELEE_RANGE`, vira o player para ela e anima o golpe de espada. Fora de
 `playing`, o pulso e ignorado. O F modelado aparece sobre a caixa ao alcance.
 Com arma de fogo na mao e inimigo em `MELEE_RANGE`, o mesmo pulso vira facada
@@ -250,7 +251,8 @@ Estados:
   `NINJA_DODGE_HOP` tiles de lado (`evading`), sem corrigir o rumo nem golpear
   ao pousar. Chance por bala `NINJA_DODGE_CHANCE` vezes o quadrado da
   inteligencia de salto, ate `NINJA_DODGE_MAX`; fixa por par bala/ninja
-- shuriken: `ninja` de nivel (contrato) `SHURIKEN_FROM_LEVEL` em diante, em
+- shuriken: `ninja` a partir da sala `SHURIKEN_FROM_ROOM` do contrato
+  `SHURIKEN_FROM_LEVEL` (sala 12 com os valores atuais) em diante, em
   `alert` com linha de visao e entre `SHURIKEN_MIN_GAP` e `SHURIKEN_RANGE` do
   player, arremessa um `Projectile` com `shuriken: true` a cada
   `SHURIKEN_INTERVAL` (`throwCooldown`; a primeira sai `SHURIKEN_FIRST` apos
@@ -436,7 +438,9 @@ type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
 
 O player comeca com a espada e nunca a perde.
 
-- sem arma de fogo, encostado (`MELEE_RANGE`) em alguem: golpe de espada
+- sem arma de fogo, com alguem a ate `SWORD_RANGE` (o alcance do braco mais
+  a lamina; maior que `MELEE_RANGE`, que segue valendo para a facada de quem
+  esta com arma de fogo e para a caixa): golpe de espada
   automatico. Com arma de fogo, a espada so sai no pulso `interact` (F) com
   alguem ao alcance (`meleeTarget`), sem gastar municao; sem o F, nada
   acontece: nao atira em quem esta ao alcance da espada
@@ -451,6 +455,19 @@ O player comeca com a espada e nunca a perde.
     inclusive headshot, que nesse caso mostra overkill. Nao muda dano nem
     recompensa
   - inimigo `alert`: leva `SWORD_DAMAGE` com variacao de ataque
+  - critico: esse golpe em inimigo `alert` tem chance `SWORD_CRIT_CHANCE` de
+    valer `SWORD_CRIT_MULT` vezes (`Floater.critical`, "CRITICO" sobre o
+    numero). F (`interact`) com inimigo ao alcance da espada poe
+    `player.focus` em `CRIT_FOCUS_TIME` (`fight`): com a espada so vale
+    contra quem esta `alert`, com arma na mao e a propria facada. O proximo
+    golpe com foco usa `SWORD_CRIT_FOCUS` e gasta o foco. Enquanto o F vale
+    para o combate, nao quebra caixa. A engine mostra o F sobre o inimigo.
+    O mesmo F poe `player.clash` em `CRIT_FOCUS_TIME` (so visual, o golpe
+    nao gasta): enquanto dura, a engine da um zoom curto e blur leve
+    (`CLASH_ZOOM`, `CLASH_BLUR`)
+  - raiva: enquanto `player.adrenaline` dura depois de uma morte, a engine
+    pinta o contorno do player de vermelho e pulsa a marca de raiva sobre a
+    cabeca dele (a mesma do inimigo em furia)
 - senao, com arma de fogo: mira no inimigo vivo mais proximo dentro de `range`
   e com linha de visao, dispara `pellets` balas abertas em `spread` radianos,
   gasta 1 de municao; municao zerada nao remove a arma: ela fica na mao e

@@ -31,10 +31,23 @@ export const IDLE_WARNING_DELAY = 10;
 export const IDLE_WARNING_INTERVAL = 5;
 export const IDLE_MAX_ENEMIES = 5;
 export const MELEE_RANGE = 1.1;
+// Alcance do golpe de espada, de centro a centro: o braco e a lamina (a
+// ponta fica a ~1.2 do centro do player) mais o raio do inimigo. Com arma de
+// fogo na mao vale MELEE_RANGE: e facada, e a arma atira sozinha em quem esta
+// alem dela.
+export const SWORD_RANGE = 1.6;
 export const ATTACK_COOLDOWN = 0.5;
 export const PICKUP_RADIUS = 0.7;
 // espada: executa desavisado; em alerta tira SWORD_DAMAGE por golpe
 export const SWORD_DAMAGE = 30;
+// Critico da espada contra inimigo em alerta: vale SWORD_CRIT_MULT vezes.
+// A chance e SWORD_CRIT_CHANCE; apertar F com o inimigo ao alcance da o foco,
+// e o proximo golpe dentro de CRIT_FOCUS_TIME usa SWORD_CRIT_FOCUS. O tempo
+// cobre uma recarga do golpe: F no ritmo da espada mantem o foco.
+export const SWORD_CRIT_CHANCE = 0.1;
+export const SWORD_CRIT_FOCUS = 0.6;
+export const SWORD_CRIT_MULT = 2;
+export const CRIT_FOCUS_TIME = 0.6;
 // overkill: execucao agachado e pelas costas. "Costas" e fora deste angulo
 // para cada lado da direcao em que o inimigo olha
 export const STEALTH_BACK_ANGLE = Math.PI / 2;
@@ -184,7 +197,9 @@ export const NINJA_DASH_TURN = 2.5;
 export const NINJA_LUNGE_STRIKE = 0.15;
 // shuriken: a partir desse nivel (contrato) o ninja em alerta arremessa de
 // longe enquanto se aproxima
-export const SHURIKEN_FROM_LEVEL = 10;
+export const SHURIKEN_FROM_LEVEL = 3;
+// sala desse contrato (1 = a primeira) em que comeca
+export const SHURIKEN_FROM_ROOM = 2;
 export const SHURIKEN_INTERVAL = 2.2;
 // a primeira sai logo ao entrar em alerta: correndo, ele chega perto antes
 // de uma recarga inteira

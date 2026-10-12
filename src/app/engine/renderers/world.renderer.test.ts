@@ -206,3 +206,55 @@ it('inimigo em furia: marca de raiva sobre a cabeca e contorno do corpo trocado'
   expect([...outlines()][0]).toBe(calm[0]);
   renderer.dispose();
 });
+
+it('cada objeto quebrado deixa destrocos de um jeito so dele', () => {
+  // tres caixas na mesma linha; ids diferentes
+  const world = createArenaWorld({ 9: '#.o.o.o...#' });
+  for (const prop of world.props) prop.broken = true;
+  const scene = new THREE.Scene();
+  const renderer = createWorldRenderer(
+    scene,
+    DEFAULT_LOOK,
+    DEFAULT_BLOOD_COLOR,
+  );
+  renderer.sync(world, 1);
+
+  // um grupo por objeto, na posicao dele; so pedacos dentro
+  const piles = world.props.map((prop) =>
+    scene.children.find(
+      (child) =>
+        child.position.x === prop.pos.x && child.position.z === -prop.pos.y,
+    )!,
+  );
+  const shape = (pile: THREE.Object3D) =>
+    pile.children
+      .map((piece) =>
+        [...piece.position.toArray(), ...piece.scale.toArray()]
+          .map((value) => value.toFixed(2))
+          .join(),
+      )
+      .join('|');
+  for (const pile of piles) {
+    expect(pile.children.length).toBeGreaterThanOrEqual(8);
+    // espalhados em volta, nao empilhados num ponto
+    const reach = pile.children.map((piece) =>
+      Math.hypot(piece.position.x, piece.position.z),
+    );
+    expect(Math.max(...reach)).toBeGreaterThan(0.25);
+    expect(Math.max(...reach)).toBeLessThan(1);
+  }
+  expect(new Set(piles.map(shape)).size).toBe(3);
+
+  // o mesmo objeto quebra sempre igual: outro desenho da o mesmo monte
+  const other = new THREE.Scene();
+  const again = createWorldRenderer(other, DEFAULT_LOOK, DEFAULT_BLOOD_COLOR);
+  again.sync(world, 1);
+  const first = other.children.find(
+    (child) =>
+      child.position.x === world.props[0].pos.x &&
+      child.position.z === -world.props[0].pos.y,
+  )!;
+  expect(shape(first)).toBe(shape(piles[0]));
+  renderer.dispose();
+  again.dispose();
+});

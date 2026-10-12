@@ -1,6 +1,7 @@
 import {
   collectPickups,
   damagePlayer,
+  meleeTarget,
   killEnemy,
   spawnProjectile,
   updateCombat,
@@ -32,10 +33,18 @@ import {
   PLAYER_MAX_HP,
   SHIELD_MAX,
   SHOT_TIME,
+  SLASH_TIME,
+  SWORD_CRIT_CHANCE,
+  SWORD_CRIT_FOCUS,
   SWORD_DAMAGE,
+  SWORD_RANGE,
+  MELEE_RANGE,
   SHOP_EVERY,
 } from '@/app/modules/world/constants/world.constants';
-import { createEmptyWorld } from '@/app/modules/world/systems/world.system';
+import {
+  createEmptyWorld,
+  fight,
+} from '@/app/modules/world/systems/world.system';
 import type { World } from '@/app/modules/world/types/world.types';
 import { distance } from '@/shared/utils/math.util';
 import { addEnemy, createArenaWorld } from '@/test/world.fixture';
@@ -1079,5 +1088,58 @@ describe('saque do inimigo morto', () => {
       const item = world.pickups[1];
       if (item) expect(Math.floor(item.pos.x)).toBe(5);
     }
+  });
+});
+
+describe('critico da espada', () => {
+  // golpes em inimigo em alerta colado no player, com ou sem F a cada golpe
+  function crits(press: boolean) {
+    let critical = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const world = createArenaWorld();
+      world.rngState = seed;
+      world.run.meleeMissChance = 0;
+      world.run.nextMeleeChanceAt = Infinity;
+      const enemy = addEnemy(world, 5.5, 3.3, -Math.PI / 2);
+      enemy.state = 'alert';
+      fight(world, { moveX: 0, moveY: 0, dash: false, interact: press }, 0);
+      const hit = world.floaters[0];
+      if (hit.critical) critical++;
+      // critico dobra: mata de uma vez quem tem a vida cheia
+      expect(enemy.hp <= 0).toBe(!!hit.critical);
+      expect(world.player.focus).toBe(0);
+    }
+    return critical / 300;
+  }
+
+  it('F no corpo a corpo sobe a chance de SWORD_CRIT_CHANCE para SWORD_CRIT_FOCUS', () => {
+    expect(crits(false)).toBeCloseTo(SWORD_CRIT_CHANCE, 1);
+    expect(crits(true)).toBeCloseTo(SWORD_CRIT_FOCUS, 1);
+  });
+});
+
+describe('F no vazio', () => {
+  it('golpeia de espada no ar, sem atrasar o proximo golpe', () => {
+    const world = createArenaWorld();
+    fight(world, { moveX: 0, moveY: 0, dash: false, interact: true }, 0);
+    expect(world.player.slash).toBe(SLASH_TIME);
+    expect(world.player.attackCooldown).toBe(0);
+    expect(world.floaters).toHaveLength(0);
+  });
+});
+
+describe('alcance da espada', () => {
+  it('espada pega ate SWORD_RANGE; facada com arma na mao, so ate MELEE_RANGE', () => {
+    const gap = (MELEE_RANGE + SWORD_RANGE) / 2;
+    const sword = createArenaWorld();
+    addEnemy(sword, 5.5, 2.5 + gap, -Math.PI / 2);
+    expect(meleeTarget(sword)).toBeDefined();
+    addEnemy(sword, 5.5, 2.5 + SWORD_RANGE + 0.1, -Math.PI / 2);
+    expect(meleeTarget(sword)).toBe(sword.enemies[0]);
+
+    const armed = createArenaWorld();
+    armed.player.weapon = { id: 'pistol', ammo: 5 };
+    addEnemy(armed, 5.5, 2.5 + gap, -Math.PI / 2);
+    expect(meleeTarget(armed)).toBeUndefined();
   });
 });

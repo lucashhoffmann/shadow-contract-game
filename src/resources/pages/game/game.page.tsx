@@ -16,6 +16,9 @@ import { LegendDialog } from '@/resources/pages/game/components/legend-dialog.co
 import { ShopDialog } from '@/resources/pages/game/components/shop-dialog.component';
 import { useGamePage } from '@/resources/pages/game/use-game.page';
 
+// abaixo disso (pontos de vida) a tela pulsa em vermelho
+const LOW_HP = 20;
+
 export function GamePage() {
   const {
     canvasRef,
@@ -56,6 +59,11 @@ export function GamePage() {
         className='block h-full w-full'
       />
       <DamageVignette hits={hits} />
+      {/* vida baixa: a mesma borda vermelha, pulsando ate recuperar ou morrer */}
+      <DamageVignette
+        hits={hud.hp > 0 && hud.hp < LOW_HP ? 1 : 0}
+        loop
+      />
       <DamageVignette
         hits={idleWarnings}
         color='blue'

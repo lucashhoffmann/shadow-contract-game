@@ -23,6 +23,7 @@ import {
   SENSE_RANGE,
   SHURIKEN_DAMAGE,
   SHURIKEN_FROM_LEVEL,
+  SHURIKEN_FROM_ROOM,
   SHURIKEN_INTERVAL,
   SHOP_EVERY,
   PLAYER_MAX_HP,
@@ -376,13 +377,15 @@ describe('updateEnemies', () => {
       run(world, SHURIKEN_INTERVAL);
       return world.projectiles.filter((p) => p.shuriken);
     };
-    const stars = thrown(SHOP_EVERY * SHURIKEN_FROM_LEVEL);
+    // primeira sala com shuriken: contrato e sala dentro dele
+    const first = SHOP_EVERY * (SHURIKEN_FROM_LEVEL - 1) + SHURIKEN_FROM_ROOM;
+    const stars = thrown(first);
     expect(stars.length).toBeGreaterThan(0);
     expect(stars[0].owner).toBe('enemy');
-    // no nivel 10 o dano ja cresceu acima do base
+    // nesse nivel o dano ja cresceu acima do base
     expect(stars[0].damage).toBeGreaterThan(SHURIKEN_DAMAGE);
     expect(stars[0].vel.y).toBeGreaterThan(0);
-    expect(thrown(SHOP_EVERY * (SHURIKEN_FROM_LEVEL - 1))).toHaveLength(0);
+    expect(thrown(first - 1)).toHaveLength(0);
   });
 
   it('ninja nao salta com caixa ou bau no trajeto, e nunca entra no tile', () => {

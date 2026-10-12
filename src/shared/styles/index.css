@@ -35,7 +35,10 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --animate-damage: damage 0.7s ease-out;
+  --animate-low-health: damage 1.1s ease-out infinite;
   --animate-credit: credit-pulse 1.8s ease-in-out infinite;
+  --animate-hud-pop: hud-pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+  --animate-hud-in: hud-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
   --animate-streak: streak 1.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
   --font-hit: 'Creepster', 'Lilita One', system-ui, sans-serif;
   --font-display: 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif;
@@ -69,6 +72,28 @@
   100% {
     opacity: 0;
     transform: scale(0.9) translateY(-28px) rotate(-2deg);
+  }
+}
+
+/* HUD: valor que mudou estoura e assenta */
+@keyframes hud-pop {
+  0% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* HUD: entra descendo do topo da tela */
+@keyframes hud-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-60%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

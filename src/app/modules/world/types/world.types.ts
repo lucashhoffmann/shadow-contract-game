@@ -227,6 +227,12 @@ export type Player = {
   attackCooldown: number;
   // segundos restantes do golpe de espada (so para animacao)
   slash: number;
+  // segundos restantes do foco (F no corpo a corpo): o proximo golpe de
+  // espada nesse tempo tem chance maior de critico
+  focus: number;
+  // segundos restantes do efeito do F no corpo a corpo (so para a camera:
+  // zoom e blur). O golpe gasta `focus`, mas nao este
+  clash: number;
   // segundos restantes do recuo do ultimo tiro (so para animacao)
   shot: number;
   // segundos restantes do bonus de velocidade apos uma morte
@@ -308,7 +314,7 @@ export type Floater = {
   headshot?: boolean;
   // execucao furtiva: agachado e pelas costas
   overkill?: boolean;
-  // golpe critico do inimigo contra o player
+  // golpe critico: do inimigo contra o player, ou da espada do player
   critical?: boolean;
   // golpe que bateu em player invencivel: `amount` 0, texto proprio
   blocked?: boolean;

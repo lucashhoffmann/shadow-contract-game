@@ -3,6 +3,7 @@ import * as THREE from 'three';
 
 import { createWorldRenderer } from '@/app/engine/renderers/world.renderer';
 import {
+  CRIT_FOCUS_TIME,
   DASH_TIME,
   FIXED_DT,
 } from '@/app/modules/world/constants/world.constants';
@@ -25,6 +26,10 @@ const PROMPT_CLICK_GUARD = 600;
 const PUNCH_TIME = 0.35;
 const PUNCH_ZOOM = 3.5;
 const PUNCH_BLUR = 3;
+// F no corpo a corpo (`player.clash`): zoom e blur menores que os do soco,
+// que duram enquanto o jogador segue apertando
+const CLASH_ZOOM = 2;
+const CLASH_BLUR = 1.2;
 // raio, em px na tela, em que o toque conta como em cima do icone de
 // interacao; folgado, para caber um dedo
 const PROMPT_TAP_RADIUS = 44;
@@ -202,13 +207,14 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     kills = world.run.kills;
     hp = health;
     punch = Math.max(0, punch - frameTime / PUNCH_TIME);
-    camera.fov = CAMERA_FOV - PUNCH_ZOOM * punch;
-    camera.updateProjectionMatrix();
     const { dash } = world.player;
+    const clash = world.player.clash / CRIT_FOCUS_TIME;
+    camera.fov = CAMERA_FOV - PUNCH_ZOOM * punch - CLASH_ZOOM * clash;
+    camera.updateProjectionMatrix();
     const rush =
       dash > 0 ? Math.sin(Math.PI * (1 - dash / DASH_TIME)) * DASH_BLUR : 0;
-    // o mais forte dos dois vale; nao somam
-    const blur = Math.max(punch * PUNCH_BLUR, rush);
+    // o mais forte vale; nao somam
+    const blur = Math.max(punch * PUNCH_BLUR, rush, clash * CLASH_BLUR);
     canvas.style.filter = blur > 0.05 ? `blur(${blur.toFixed(1)}px)` : '';
 
     // camera segue suavizada, como o personagem (ver world.renderer animate)

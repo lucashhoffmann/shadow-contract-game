@@ -30,6 +30,7 @@ import {
 } from '@/app/modules/shop/systems/shop.system';
 import {
   ATTACK_COOLDOWN,
+  CRIT_FOCUS_TIME,
   DASH_MAX,
   HEADSHOT_BASE,
   IDLE_MAX_ENEMIES,
@@ -84,6 +85,8 @@ export function createPlayer(
     shield: 0,
     attackCooldown: 0,
     slash: 0,
+    focus: 0,
+    clash: 0,
     shot: 0,
     adrenaline: 0,
     invisible: 0,
@@ -277,15 +280,23 @@ function revive(world: World): void {
 
 // F e ataque do jogador em foco: facada, caixa ou tiro
 export function fight(world: World, input: InputState, dt: number): void {
-  // F com arma na mao e inimigo ao alcance e facada, nao caixa
-  const knife =
-    !!input.interact && !!world.player.weapon && !!meleeTarget(world);
-  const prop = input.interact && !knife && nearbyProp(world);
+  // F com inimigo ao alcance da espada e do combate, nao da caixa. Com arma
+  // na mao e a facada; com a espada, contra quem ja esta em alerta, e so o
+  // foco. Os dois deixam o proximo golpe com mais chance de critico
+  const foe = input.interact ? meleeTarget(world) : undefined;
+  const knife = !!foe && !!world.player.weapon;
+  const focused = knife || foe?.state === 'alert';
+  if (focused) world.player.focus = world.player.clash = CRIT_FOCUS_TIME;
+  const prop = input.interact && !focused && nearbyProp(world);
   if (prop) {
     world.player.facing = angleTo(world.player.pos, prop.pos);
     world.player.slash = SLASH_TIME;
     world.player.attackCooldown = ATTACK_COOLDOWN;
     breakProp(world, prop);
+  } else if (input.interact && !focused && world.player.slash <= 0) {
+    // F no vazio: golpe de espada no ar. So animacao: nao acerta ninguem nem
+    // atrasa o proximo golpe
+    world.player.slash = SLASH_TIME;
   }
   updateCombat(world, dt, knife);
 }

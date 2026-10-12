@@ -103,7 +103,9 @@ describe('Hud', () => {
         hud={{ ...HUD, weaponId: null, ammo: 0 }}
       />,
     );
-    expect(screen.getByText('Espada')).toBeInTheDocument();
+    // espada: so a imagem, sem o nome escrito
+    expect(screen.getByAltText('Espada')).toBeInTheDocument();
+    expect(screen.queryByText('Espada')).toBeNull();
     expect(container.querySelector('img')).toHaveAttribute('src', 'data:sword');
     expect(screen.queryByLabelText(/Balas/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Headshot/)).not.toBeInTheDocument();
@@ -613,6 +615,24 @@ it('borda vermelha aparece so quando a vida cai', () => {
   expect(screen.queryByTestId('damage-vignette')).toBeNull();
   setHp(80);
   expect(screen.getByTestId('damage-vignette')).toBeInTheDocument();
+});
+
+it('borda vermelha pulsa sem parar com menos de 20 de vida, e some ao curar ou morrer', () => {
+  const setHp = (hp: number) =>
+    act(() =>
+      useGameStore.setState((state) => ({ hud: { ...state.hud, hp } })),
+    );
+  setHp(20);
+  render(<GamePage />);
+  expect(screen.queryByTestId('low-health-vignette')).toBeNull();
+  setHp(19);
+  expect(screen.getByTestId('low-health-vignette')).toHaveClass(
+    'animate-low-health',
+  );
+  setHp(60);
+  expect(screen.queryByTestId('low-health-vignette')).toBeNull();
+  setHp(0);
+  expect(screen.queryByTestId('low-health-vignette')).toBeNull();
 });
 
 it('borda azul usa o mesmo pulso quando ha aviso de inatividade', () => {

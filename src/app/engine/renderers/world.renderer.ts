@@ -53,6 +53,7 @@ import type {
   World,
 } from '@/app/modules/world/types/world.types';
 import type { PlayerLook } from '@/app/store/game-store/game.store';
+import { nextRandom } from '@/shared/utils/rng.util';
 
 // Desenha o World. Nunca muta o World.
 // Simulacao (x, y) vira three (x, altura, -y).
@@ -187,13 +188,13 @@ const BURST = {
 };
 // aparencias do objeto destrutivel; so visual (ver buildProp)
 const PROP_VARIANTS = ['crate', 'sideboard', 'barrel', 'plant'] as const;
-const DEBRIS = [
-  [-0.25, -0.2, 0.4],
-  [0.28, -0.1, 1.9],
-  [-0.05, 0.3, 2.7],
-  [0.3, 0.32, 0.9],
-  [-0.32, 0.12, 1.3],
-];
+// Destrocos do que quebrou: quantos pedacos, e ate onde se espalham. Cada
+// objeto quebra de um jeito so dele (sorteio fixo pelo id), como a poca de
+// sangue: nunca dois montes iguais.
+const DEBRIS_PIECES = [5, 9];
+const DEBRIS_SPREAD = 0.55;
+// lascas pequenas, mais longe que os pedacos
+const DEBRIS_CHIPS = [3, 6];
 // visual do dinheiro no chao. amount/height 0 desliga a animacao
 const MONEY = {
   color: COLORS.model.ccfae52,
@@ -1386,13 +1387,80 @@ export function createWorldRenderer(
           plant: [mat.pot, mat.leaf],
         }[variant];
     if (prop.broken) {
-      // destrocos na cor do que quebrou
-      DEBRIS.forEach(([x, z, turn], i) => {
-        const plank = new THREE.Mesh(geo.plank, i % 2 ? main : trim);
-        plank.position.set(x, 0.04 + i * 0.012, z);
-        plank.rotation.y = turn + prop.id;
-        group.add(plank);
-      });
+      // destrocos na cor do que quebrou, espalhados sem regra: tamanhos,
+      // distancias e giros diferentes, uns deitados e outros meio de pe
+      const rng = { rngState: prop.id * 7919 + 13 };
+      const roll = (min: number, max: number) =>
+        min + nextRandom(rng) * (max - min);
+      const scatter = (
+        geometry: THREE.BufferGeometry,
+        material: THREE.Material,
+        reach: number,
+        size: [number, number, number],
+        height: number,
+        tilt: number,
+      ) => {
+        const piece = new THREE.Mesh(geometry, material);
+        // raiz no sorteio: espalha por igual na area, sem amontoar no centro
+        const far = Math.sqrt(nextRandom(rng)) * reach;
+        const around = roll(0, Math.PI * 2);
+        piece.position.set(
+          Math.cos(around) * far,
+          height,
+          Math.sin(around) * far,
+        );
+        piece.scale.set(...size);
+        piece.rotation.set(
+          roll(-tilt, tilt),
+          roll(0, Math.PI * 2),
+          roll(-tilt, tilt),
+        );
+        group.add(piece);
+        return piece;
+      };
+      const pieces = Math.round(roll(DEBRIS_PIECES[0], DEBRIS_PIECES[1]));
+      for (let i = 0; i < pieces; i++) {
+        scatter(
+          geo.plank,
+          nextRandom(rng) < 0.6 ? main : trim,
+          DEBRIS_SPREAD,
+          [roll(0.45, 1.25), roll(0.7, 1.7), roll(0.5, 1.2)],
+          // empilham de leve, para nao brigar um com o outro no mesmo plano
+          0.04 + i * 0.011,
+          0.28,
+        );
+      }
+      const chips = Math.round(roll(DEBRIS_CHIPS[0], DEBRIS_CHIPS[1]));
+      for (let i = 0; i < chips; i++) {
+        const size = roll(0.18, 0.38);
+        scatter(
+          geo.plank,
+          nextRandom(rng) < 0.5 ? main : trim,
+          DEBRIS_SPREAD * 1.5,
+          [size, 0.6, size * roll(0.7, 1.6)],
+          0.025,
+          0.5,
+        );
+      }
+      // o que sobra de cada tipo: aro do barril, folhas e cacos do vaso
+      if (variant === 'barrel') {
+        scatter(geo.drum, mat.chestLock, 0.3, [0.33, 0.04, 0.33], 0.05, 0.2);
+      } else if (variant === 'plant' || variant === 'sideboard') {
+        for (let i = 0; i < 4; i++) {
+          const size = roll(0.7, 1.3);
+          // a folha nasce de pe: deita no chao, cada uma num angulo
+          const leaf = scatter(
+            geo.leaf,
+            mat.leaf,
+            0.5,
+            [size, size, size],
+            0.04,
+            0.15,
+          );
+          leaf.rotation.order = 'YXZ';
+          leaf.rotation.x = roll(1.25, 1.5);
+        }
+      }
       scene.add(group);
       return group;
     }
@@ -1586,6 +1654,26 @@ export function createWorldRenderer(
     jumper.wind.visible = false;
   }
 
+  // marca de raiva, escondida: do inimigo em furia e do player que matou
+  function buildRageMark(): THREE.Group {
+    const rage = new THREE.Group();
+    rage.name = 'rageMarker';
+    rage.visible = false;
+    for (let quarter = 0; quarter < 4; quarter++) {
+      const moon = new THREE.Mesh(geo.rageArc, mat.rage);
+      // a geometria e a de cima; as outras sao ela girada em volta do centro
+      const turn = (quarter * Math.PI) / 2;
+      moon.position.set(
+        -Math.sin(turn) * RAGE_MOON_GAP,
+        Math.cos(turn) * RAGE_MOON_GAP,
+        0,
+      );
+      moon.rotation.z = turn;
+      rage.add(moon);
+    }
+    return rage;
+  }
+
   // `seed` (o id do inimigo) decide a forma da poca de sangue dele
   function buildEnemy(kind: EnemyKind, seed: number): EnemyView {
     const jumper = makeJumper(kind);
@@ -1623,22 +1711,8 @@ export function createWorldRenderer(
     // marca de raiva: quatro meias-luas em cruz (cima, baixo e lados), cada
     // uma com a barriga virada para o centro. Fica ao lado da exclamacao e da
     // orelha, para aparecerem juntas.
-    const rage = new THREE.Group();
-    rage.name = 'rageMarker';
+    const rage = buildRageMark();
     rage.position.set(0.5, 0.28, 0);
-    rage.visible = false;
-    for (let quarter = 0; quarter < 4; quarter++) {
-      const moon = new THREE.Mesh(geo.rageArc, mat.rage);
-      // a geometria e a de cima; as outras sao ela girada em volta do centro
-      const turn = (quarter * Math.PI) / 2;
-      moon.position.set(
-        -Math.sin(turn) * RAGE_MOON_GAP,
-        Math.cos(turn) * RAGE_MOON_GAP,
-        0,
-      );
-      moon.rotation.z = turn;
-      rage.add(moon);
-    }
     marker.add(alarm, ear, rage);
     marker.position.y = 1.7;
     character.root.add(marker);
@@ -1813,6 +1887,9 @@ export function createWorldRenderer(
     // kit proprio de quem tem cor; null = usa o kit do jogador local
     kit: ReturnType<typeof createCharacterKit> | null;
     tag: THREE.Sprite | null;
+    // raiva depois de matar: marca sobre a cabeca e contorno vermelho
+    rage: THREE.Group;
+    enraged: boolean;
   };
   const playerViews = new Map<number, PlayerView>();
 
@@ -1862,7 +1939,14 @@ export function createWorldRenderer(
       flash.add(tongue);
     }
     flash.add(new THREE.Mesh(geo.flashCore, mat.flashCore));
+    const rage = buildRageMark();
+    rage.name = 'playerRageMarker';
+    rage.position.y = 1.95;
+    rage.rotation.order = 'YXZ';
+    jumper.character.root.add(rage);
     return {
+      rage,
+      enraged: false,
       jumper,
       held: createHeldGuns(jumper.character, look.weapon),
       flash,
@@ -1934,6 +2018,25 @@ export function createWorldRenderer(
       body.root.add(glow);
     }
     if (glow) glow.visible = !lost && who.invincible > 0;
+    // Raiva: matou, e enquanto dura a adrenalina o contorno do corpo fica
+    // vermelho e a marca pulsa sobre a cabeca. Invisivel nao mostra.
+    const furious = !lost && who.adrenaline > 0 && who.invisible <= 0;
+    if (furious !== view.enraged) {
+      view.enraged = furious;
+      const outline = (view.kit ?? kit).outline;
+      body.root.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        if (furious && child.material === outline) {
+          child.material = mat.rageOutline;
+        } else if (!furious && child.material === mat.rageOutline) {
+          child.material = outline;
+        }
+      });
+    }
+    view.rage.visible = furious;
+    view.rage.scale.setScalar(RAGE_MARK_SIZE * (1 + Math.sin(time * 9) * 0.22));
+    // o root gira com o player; a marca nao
+    view.rage.rotation.set(MARKER_TILT, -body.root.rotation.y, 0);
     if (view.tag) {
       view.tag.position.set(
         body.root.position.x,
@@ -2067,11 +2170,11 @@ export function createWorldRenderer(
         scene.remove(view.group),
       );
 
-      // com arma na mao a espada so sai no F: avisa sobre quem ela pegaria
+      // F sobre quem a espada pegaria. Com arma na mao ela so sai no F; sem
+      // arma, contra inimigo em alerta, o F da o foco do critico
+      const near = world.status === 'playing' ? meleeTarget(world) : undefined;
       const foe =
-        world.status === 'playing' && world.player.weapon
-          ? meleeTarget(world)
-          : undefined;
+        world.player.weapon || near?.state === 'alert' ? near : undefined;
       knifePrompt.visible = !!foe;
       if (foe) {
         knifePrompt.position.set(foe.pos.x, 0, -foe.pos.y);

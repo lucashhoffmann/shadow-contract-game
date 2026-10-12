@@ -78,6 +78,7 @@ import {
   SHURIKEN_DAMAGE,
   SHURIKEN_FIRST,
   SHURIKEN_FROM_LEVEL,
+  SHURIKEN_FROM_ROOM,
   SHURIKEN_INTERVAL,
   SHURIKEN_MIN_GAP,
   SHURIKEN_RANGE,
@@ -530,7 +531,8 @@ function alert(world: World, enemy: Enemy, dt: number): void {
   // ninja de nivel alto arremessa shuriken de longe e segue se aproximando
   if (
     !stats.ranged &&
-    Math.ceil(enemy.roomIndex / SHOP_EVERY) >= SHURIKEN_FROM_LEVEL &&
+    enemy.roomIndex >=
+      (SHURIKEN_FROM_LEVEL - 1) * SHOP_EVERY + SHURIKEN_FROM_ROOM &&
     enemy.throwCooldown === 0 &&
     los &&
     gap >= SHURIKEN_MIN_GAP &&

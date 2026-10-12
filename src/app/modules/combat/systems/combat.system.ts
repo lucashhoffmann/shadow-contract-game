@@ -47,7 +47,11 @@ import {
   STREAK_MAX,
   STREAK_WINDOW,
   STEALTH_BACK_ANGLE,
+  SWORD_CRIT_CHANCE,
+  SWORD_CRIT_FOCUS,
+  SWORD_CRIT_MULT,
   SWORD_DAMAGE,
+  SWORD_RANGE,
 } from '@/app/modules/world/constants/world.constants';
 import type {
   Enemy,
@@ -202,7 +206,7 @@ export function damageEnemy(
   world: World,
   enemy: Enemy,
   damage: number,
-  source: 'stab' | 'shot' | 'headshot' | 'execution' | 'overkill',
+  source: 'stab' | 'critical' | 'shot' | 'headshot' | 'execution' | 'overkill',
 ): void {
   const dealt = Math.min(damage, enemy.hp);
   // um golpe so, de vida cheia a zero
@@ -212,13 +216,16 @@ export function damageEnemy(
     enemy.pos,
     dealt,
     false,
+    // critico da espada mostra o proprio destaque, mesmo matando de uma vez.
     // overkill: execucao furtiva, ou qualquer golpe que leva a vida cheia a
     // zero de uma vez (vale mais que o destaque de headshot)
-    source === 'overkill' || oneHit
-      ? 'overkill'
-      : source === 'headshot'
-        ? 'headshot'
-        : undefined,
+    source === 'critical'
+      ? 'critical'
+      : source === 'overkill' || oneHit
+        ? 'overkill'
+        : source === 'headshot'
+          ? 'headshot'
+          : undefined,
   );
   world.run.stats.damageDealt += dealt;
   world.run.events.push({
@@ -289,10 +296,14 @@ function gunshot(world: World): void {
   }
 }
 
-// quem o golpe de espada pegaria agora: o desavisado mais perto ao alcance,
-// senao o mais perto
+// quem o golpe pegaria agora: o desavisado mais perto ao alcance, senao o
+// mais perto. Espada alcanca SWORD_RANGE; a facada de quem esta com arma de
+// fogo, MELEE_RANGE
 export function meleeTarget(world: World): Enemy | undefined {
-  const close = enemiesInReach(world, MELEE_RANGE);
+  const close = enemiesInReach(
+    world,
+    world.player.weapon ? MELEE_RANGE : SWORD_RANGE,
+  );
   return close.find((e) => e.state !== 'alert') ?? close[0];
 }
 
@@ -318,6 +329,8 @@ export function updateCombat(world: World, dt: number, knife = false): void {
   const player = world.player;
   player.attackCooldown = Math.max(0, player.attackCooldown - dt);
   player.slash = Math.max(0, player.slash - dt);
+  player.focus = Math.max(0, player.focus - dt);
+  player.clash = Math.max(0, player.clash - dt);
   player.shot = Math.max(0, player.shot - dt);
   if (player.attackCooldown > 0) return;
 
@@ -352,8 +365,20 @@ export function updateCombat(world: World, dt: number, knife = false): void {
         unaware.hp,
         player.crouching && behind ? 'overkill' : 'execution',
       );
-    } else
-      damageEnemy(world, struck, attackDamage(world, SWORD_DAMAGE), 'stab');
+    } else {
+      // critico: mais provavel com o foco do F, que este golpe gasta
+      const damage = attackDamage(world, SWORD_DAMAGE);
+      const critical =
+        nextRandom(world) <
+        (player.focus > 0 ? SWORD_CRIT_FOCUS : SWORD_CRIT_CHANCE);
+      player.focus = 0;
+      damageEnemy(
+        world,
+        struck,
+        critical ? damage * SWORD_CRIT_MULT : damage,
+        critical ? 'critical' : 'stab',
+      );
+    }
     return;
   }
 

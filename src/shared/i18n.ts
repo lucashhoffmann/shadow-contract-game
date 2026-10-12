@@ -210,6 +210,7 @@ const pt = {
     shopVisited: (number: number) => `Loja ${number} visitada.`,
     source: {
       stab: 'Facada',
+      critical: 'Golpe crítico',
       shot: 'Tiro',
       headshot: 'Headshot',
       execution: 'Execução',
@@ -284,6 +285,10 @@ const pt = {
           [
             'Espada',
             'por tras elimina na hora; inimigo em alerta leva 30 a 45 de dano',
+          ],
+          [
+            'Critico',
+            'no corpo a corpo, aperte a interação que aparece sobre o inimigo a cada golpe: a chance de dano dobrado sobe de 10% para 60%',
           ],
           [
             'Com arma',
@@ -554,6 +559,7 @@ const en: typeof pt = {
     shopVisited: (number) => `Visited shop ${number}.`,
     source: {
       stab: 'Stab',
+      critical: 'Critical hit',
       shot: 'Shot',
       headshot: 'Headshot',
       execution: 'Execution',
@@ -620,6 +626,10 @@ const en: typeof pt = {
         title: 'Combat',
         entries: [
           ['Sword', 'kills from behind; alerted enemies take 30 to 45 damage'],
+          [
+            'Critical',
+            'in melee, press the action shown over the enemy on every swing: the chance of double damage goes from 10% to 60%',
+          ],
           [
             'With a gun',
             'shoots automatically at range; use the attack action to stab up close',
