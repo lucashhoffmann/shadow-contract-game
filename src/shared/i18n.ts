@@ -29,6 +29,8 @@ const pt = {
     settingsDescription: 'Preferências visuais do jogo.',
     bloodColor: 'Cor do sangue',
     language: 'Idioma',
+    languageName: 'Português',
+    changeLanguage: 'Trocar para inglês',
     instructions:
       'WASD ou setas para andar. Chegue por tras para eliminar. Fique fora do cone de visao.',
     credit: 'Desenvolvido por',
@@ -338,6 +340,8 @@ const en: typeof pt = {
     settingsDescription: 'Game display preferences.',
     bloodColor: 'Blood color',
     language: 'Language',
+    languageName: 'English',
+    changeLanguage: 'Switch to Portuguese',
     instructions:
       'Move with WASD or arrow keys. Approach from behind to eliminate enemies. Stay out of their sight.',
     credit: 'Developed by',

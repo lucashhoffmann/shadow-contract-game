@@ -133,21 +133,19 @@ export function HomePage() {
                 className='h-10 w-14 cursor-pointer bg-transparent'
               />
             </label>
-            <label className='flex items-center justify-between gap-4'>
-              {t.home.language}
-              <select
-                value={language}
-                onChange={(event) =>
-                  setLanguage(event.target.value as 'pt-BR' | 'en')
-                }
-                className='rounded border p-2'
-              >
-                <option value='pt-BR'>Português</option>
-                <option value='en'>English</option>
-              </select>
-            </label>
           </DialogContent>
         </Dialog>
+        <button
+          type='button'
+          className={SECONDARY}
+          aria-label={t.home.changeLanguage}
+          onClick={() => setLanguage(language === 'pt-BR' ? 'en' : 'pt-BR')}
+        >
+          <span aria-hidden className='text-2xl leading-none'>
+            {language === 'pt-BR' ? '🇧🇷' : '🇺🇸'}
+          </span>
+          {t.home.language}: {t.home.languageName}
+        </button>
       </div>
       <InstallApp />
       <p className='relative max-w-xs font-sans text-sm text-white/70'>

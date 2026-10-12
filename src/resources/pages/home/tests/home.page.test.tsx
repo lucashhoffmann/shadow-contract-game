@@ -61,16 +61,21 @@ describe('HomePage', () => {
 
   it('troca o idioma e atualiza os textos da tela', async () => {
     render(<HomePage />);
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Configurações' }),
-    );
-    await userEvent.selectOptions(screen.getByLabelText('Idioma'), 'en');
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    const toggle = screen.getByRole('button', { name: 'Trocar para inglês' });
+    expect(toggle).toHaveTextContent('🇧🇷 Idioma: Português');
+    await userEvent.click(toggle);
     expect(
       screen.getByRole('button', { name: 'Customize character' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Best: room 0')).toBeInTheDocument();
     expect(useLanguage.getState().language).toBe('en');
+    const englishToggle = screen.getByRole('button', {
+      name: 'Switch to Portuguese',
+    });
+    expect(englishToggle).toHaveTextContent('🇺🇸 Language: English');
+    await userEvent.click(englishToggle);
+    expect(screen.getByText('Recorde: sala 0')).toBeInTheDocument();
+    expect(useLanguage.getState().language).toBe('pt-BR');
   });
 });
 
