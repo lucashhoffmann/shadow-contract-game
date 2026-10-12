@@ -12,6 +12,7 @@ const score = (id: number, name: string, alive: boolean) => ({
   deaths: alive ? 0 : 1,
   alive,
   you: id === 0,
+  ping: 0,
 });
 
 it('convidado ve o aviso de espera no lugar de Jogar de novo', () => {

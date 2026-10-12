@@ -743,7 +743,7 @@ function applySnapshot(previous: World | null, snapshot: Snapshot, you: number):
 function cleanInput(payload: unknown): InputState | null;
 ```
 
-- host: a cada `SNAPSHOT_EVERY` passos (20 vezes por segundo) manda o mundo
+- host: a cada `SNAPSHOT_EVERY` passos (30 vezes por segundo) manda o mundo
   em JSON. `rooms` so vai quando `roomsKey` muda (sala nova, caixa quebrada);
   `run.events` so vai com `status: 'dead'`. O fim da partida vai na hora
 - convidado: nao simula. Manda o `InputState` quando ele muda e troca o mundo
@@ -752,6 +752,18 @@ function cleanInput(payload: unknown): InputState | null;
 - host guarda o ultimo input de cada convidado; pulso (`interact`, `open`)
   fica guardado ate o passo seguinte (`mergeInput`, `clearPulses`) e todo
   input passa por `cleanInput`
+- o convidado nao espera o host para desenhar (`prediction.util.ts`). A cada
+  passo local, `predictStep` anda o proprio jogador pelo input (`movePlayer`)
+  e adianta colegas, inimigos e balas em linha reta, na velocidade medida
+  entre os dois ultimos estados, por ate `EXTRAPOLATE_MAX`. A cada estado,
+  `reconcile` poe o jogador onde o host disse e reaplica os inputs locais dos
+  ultimos `rtt` segundos (ping do convidado + ping do host). E so visual: o
+  host continua decidindo tudo
+- ping: cada cliente cronometra `net:ping` a cada 2 s e avisa com
+  `net:latency`; o servidor guarda em `PlayerInfo.ping` e repassa em
+  `session:update`. O `session.store` leva os pings ao `game.store`
+  (`setPings`, por lugar da partida), que os usa na previsao e no placar
+  (`Score.ping`)
 - aba do host em segundo plano para o `requestAnimationFrame`: a partida
   congela para todos ate ele voltar
 

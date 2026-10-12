@@ -670,6 +670,7 @@ describe('partida em rede: placar e menu', () => {
       deaths: 1,
       alive: true,
       you: true,
+      ping: 40,
     },
     {
       id: 1,
@@ -679,6 +680,7 @@ describe('partida em rede: placar e menu', () => {
       deaths: 0,
       alive: false,
       you: false,
+      ping: 120,
     },
   ];
 
@@ -701,6 +703,9 @@ describe('partida em rede: placar e menu', () => {
     expect(rows[0]).toHaveTextContent('5');
     expect(rows[1]).toHaveTextContent('Lucas');
     expect(rows[1]).toHaveAttribute('data-you', 'true');
+    // ping de cada um, so quando ha medida
+    expect(rows[0]).toHaveTextContent('120 ms');
+    expect(rows[1]).toHaveTextContent('40 ms');
   });
 
   it('menu: so o host ve Encerrar partida; todos podem sair', async () => {

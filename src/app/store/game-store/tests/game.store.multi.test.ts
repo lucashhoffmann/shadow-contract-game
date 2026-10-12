@@ -42,7 +42,7 @@ describe('game store no multiplayer', () => {
     expect(store().screen).toBe('intro');
   });
 
-  it('host comeca jogando, sem legenda, e manda o estado 20 vezes por segundo', () => {
+  it('host comeca jogando, sem legenda, e manda o estado 30 vezes por segundo', () => {
     const net = link(true, 0);
     store().startMulti(SEATS, net, 1);
     expect(store().screen).toBe('playing');
@@ -50,7 +50,7 @@ describe('game store no multiplayer', () => {
     expect(net.sendState).toHaveBeenCalledTimes(1);
 
     for (let i = 0; i < 60; i++) store().tick(IDLE, FIXED_DT);
-    expect(net.sendState).toHaveBeenCalledTimes(21);
+    expect(net.sendState).toHaveBeenCalledTimes(31);
     // salas so no primeiro envio
     expect(net.sendState.mock.calls[0][0].rooms).toBeDefined();
     expect(net.sendState.mock.calls[5][0].rooms).toBeUndefined();
@@ -184,5 +184,42 @@ describe('menu e placar da partida em rede', () => {
     expect(store().scoreboard).toBe(true);
     store().backToMenu();
     expect(store()).toMatchObject({ scoreboard: false, online: false });
+  });
+});
+
+describe('ping e previsao do convidado', () => {
+  it('placar leva o ping de cada lugar', () => {
+    store().startMulti(SEATS, link(true, 0), 1);
+    store().setPings([18, 64]);
+    expect(store().scores.map((score) => score.ping)).toEqual([18, 64]);
+    // solo: sem ping
+    store().startRun(1);
+    store().begin();
+    store().tick(IDLE, FIXED_DT);
+    expect(store().scores.every((score) => score.ping === 0)).toBe(true);
+  });
+
+  it('convidado anda o proprio boneco na hora, sem esperar o host', () => {
+    const hostNet = link(true, 0);
+    store().startMulti(SEATS, hostNet, 1);
+    // cada estado chega como um objeto novo: a previsao mexe no que recebeu
+    const text = JSON.stringify(hostNet.sendState.mock.calls[0][0]);
+    const first = () => JSON.parse(text) as Snapshot;
+
+    store().backToMenu();
+    store().startMulti(SEATS, link(false, 1));
+    store().receiveState(first());
+    const from = getWorld()!.player.pos.x;
+    for (let i = 0; i < 12; i++) store().tick(RIGHT, FIXED_DT);
+    expect(getWorld()!.player.pos.x).toBeGreaterThan(from + 0.5);
+
+    // estado do host, que ainda nao viu esse input: sem ping medido, vale a
+    // posicao dele; com ping, o convidado reaplica o que falta
+    store().receiveState(first());
+    expect(getWorld()!.player.pos.x).toBeCloseTo(from);
+    for (let i = 0; i < 12; i++) store().tick(RIGHT, FIXED_DT);
+    store().setPings([50, 50]);
+    store().receiveState(first());
+    expect(getWorld()!.player.pos.x).toBeGreaterThan(from + 0.3);
   });
 });

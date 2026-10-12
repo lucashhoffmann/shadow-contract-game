@@ -73,6 +73,8 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     }
     if (event.repeat) return;
     if (event.code === 'KeyP') useGameStore.getState().togglePause();
+    // so em desenvolvimento: pula para a proxima sala de loja
+    if (event.code === 'F8') useGameStore.getState().devSkipToShop();
     if (event.code === 'Enter') useGameStore.getState().begin();
     if (event.code === 'KeyF' && getWorld()?.status === 'playing')
       input.interact = true;

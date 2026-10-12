@@ -108,3 +108,20 @@ it('convidado nao recomeca, e volta a jogar quando chega o mundo novo', () => {
   expect(store().screen).toBe('playing');
   expect(guest.leave).not.toHaveBeenCalled();
 });
+
+it('atalho de desenvolvimento leva o grupo para a sala da loja; so o host', () => {
+  store().startMulti(SEATS, link(true, 0), 1);
+  store().devSkipToShop();
+  store().tick(IDLE, FIXED_DT);
+  const world = getWorld()!;
+  expect(world.run.roomIndex).toBe(5);
+  const room = world.rooms.find((r) => r.index === 5)!;
+  expect(room.chest).not.toBeNull();
+  expect(room.reviveChest).not.toBeNull();
+  expect(world.players.every((p) => Math.floor(p.pos.y / 19) === 5)).toBe(true);
+
+  store().backToMenu();
+  store().startMulti(SEATS, link(false, 1));
+  store().devSkipToShop();
+  expect(getWorld()).toBeNull();
+});

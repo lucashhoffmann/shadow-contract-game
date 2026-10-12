@@ -26,7 +26,13 @@ import {
   predictStep,
   reconcile,
 } from '@/app/modules/multiplayer/utils/prediction.util';
-import { setRoomSize } from '@/app/modules/world/constants/world.constants';
+import { tileCenter } from '@/app/modules/level/utils/grid.util';
+import {
+  ROOM_H,
+  ROOM_W,
+  setRoomSize,
+  SHOP_EVERY,
+} from '@/app/modules/world/constants/world.constants';
 import {
   buyItem,
   closeShop as closeWorldShop,
@@ -228,6 +234,8 @@ type GameStore = {
   revive: (id: number) => void;
   // ping de cada lugar da partida (session.store mede e avisa)
   setPings: (pings: number[]) => void;
+  // so em desenvolvimento: leva todo mundo para a proxima sala de loja
+  devSkipToShop: () => void;
   intelligence: Record<number, EnemyIntelligence>;
   attackVariance: AttackVariance | null;
   setLook: (patch: Partial<PlayerLook>) => void;
@@ -436,6 +444,20 @@ export const useGameStore = create<GameStore>()(
         setScoreboard: (open) => {
           if (open !== get().scoreboard) set({ scoreboard: open });
         },
+        // Atalho de teste (F8 em `pnpm dev`): loja e bau de revive ficam a 5
+        // salas do comeco. Em rede so o host pode, porque e ele quem simula.
+        devSkipToShop: () => {
+          if (!import.meta.env.DEV || !world || (multi && !multi.host)) return;
+          const shop =
+            (Math.floor(world.run.roomIndex / SHOP_EVERY) + 1) * SHOP_EVERY;
+          const middle = Math.floor(ROOM_W / 2);
+          for (const player of world.players) {
+            if (player.hp <= 0) continue;
+            // lado a lado, logo depois da porta de entrada
+            player.pos = tileCenter(shop, middle - 1 + player.id, ROOM_H - 3);
+            player.dash = 0;
+          }
+        },
         setPings: (pings) => {
           if (!multi) return;
           multi.pings = pings;
@@ -642,3 +664,9 @@ export const useGameStore = create<GameStore>()(
     },
   ),
 );
+
+// So em desenvolvimento: mundo e store no console (`__shadow`), para testar
+// situacoes que dariam trabalho de alcancar jogando.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  Object.assign(window, { __shadow: { getWorld, store: useGameStore } });
+}
