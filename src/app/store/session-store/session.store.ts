@@ -42,6 +42,13 @@ type SessionStore = {
 
 // fora do estado reativo, como o World do game.store
 let socket: SessionSocket | null = null;
+// quem esta em cada lugar da partida (id do socket), na ordem de
+// `world.players`. Fixo desde o comeco: se alguem sai no meio, a lista da
+// sessao encolhe, mas os lugares do mundo nao mudam.
+let roster: string[] = [];
+// mede o ping de tempos em tempos enquanto conectado
+let pinging: ReturnType<typeof setInterval> | undefined;
+const PING_EVERY = 2000;
 
 export const useSessionStore = create<SessionStore>()(
   persist(
@@ -63,6 +70,7 @@ export const useSessionStore = create<SessionStore>()(
         const you = session.players.findIndex((player) => player.id === me);
         if (!socket || you < 0) return;
         const live = socket;
+        roster = session.players.map((player) => player.id);
         set({ status: 'playing', session });
         useGameStore.getState().startMulti(
           session.players.map(({ name, color }) => ({ name, color })),
@@ -75,10 +83,34 @@ export const useSessionStore = create<SessionStore>()(
             leave: () => get().leave(),
           },
         );
+        pings(session);
+      };
+
+      // ping de cada lugar da partida, para o placar e para a previsao
+      const pings = (session: SessionInfo) => {
+        if (get().status !== 'playing') return;
+        useGameStore
+          .getState()
+          .setPings(
+            roster.map(
+              (id) => session.players.find((p) => p.id === id)?.ping ?? 0,
+            ),
+          );
+      };
+
+      // cronometra uma ida e volta ao servidor e avisa o resultado
+      const measure = (live: SessionSocket) => {
+        const sent = performance.now();
+        live.emit('net:ping', () =>
+          live.emit('net:latency', performance.now() - sent),
+        );
       };
 
       const listen = (live: SessionSocket) => {
         live.on('connect', () => {
+          clearInterval(pinging);
+          pinging = setInterval(() => measure(live), PING_EVERY);
+          measure(live);
           set({ status: 'lobby', error: null });
           live.emit('session:list', (sessions) => set({ sessions }));
         });
@@ -89,7 +121,10 @@ export const useSessionStore = create<SessionStore>()(
           }),
         );
         live.on('session:list', (sessions) => set({ sessions }));
-        live.on('session:update', (session) => set({ session }));
+        live.on('session:update', (session) => {
+          set({ session });
+          pings(session);
+        });
         live.on('session:started', play);
         live.on('session:closed', () => {
           const playing = get().status === 'playing';
@@ -104,10 +139,7 @@ export const useSessionStore = create<SessionStore>()(
           if (playing) useGameStore.getState().backToMenu();
         });
         live.on('game:input', (from, payload) => {
-          const index =
-            get().session?.players.findIndex((player) => player.id === from) ??
-            -1;
-          useGameStore.getState().receiveInput(index, payload);
+          useGameStore.getState().receiveInput(roster.indexOf(from), payload);
         });
         live.on('game:state', (payload) =>
           useGameStore.getState().receiveState(payload as Snapshot),
@@ -147,6 +179,7 @@ export const useSessionStore = create<SessionStore>()(
           socket.emit('session:list', (sessions) => set({ sessions }));
         },
         disconnect: () => {
+          clearInterval(pinging);
           socket?.close();
           socket = null;
           set({

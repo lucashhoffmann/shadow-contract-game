@@ -20,6 +20,12 @@ import {
   roomsKey,
   type Snapshot,
 } from '@/app/modules/multiplayer/utils/snapshot.util';
+import {
+  createPrediction,
+  type Prediction,
+  predictStep,
+  reconcile,
+} from '@/app/modules/multiplayer/utils/prediction.util';
 import { setRoomSize } from '@/app/modules/world/constants/world.constants';
 import {
   buyItem,
@@ -96,6 +102,8 @@ export type Score = {
   alive: boolean;
   // e o jogador deste navegador
   you: boolean;
+  // ida e volta ate o servidor de salas, em ms; 0 = sem medida (ou solo)
+  ping: number;
 };
 
 // aparencia do player: so visual, nao entra no World
@@ -218,6 +226,8 @@ type GameStore = {
   reviving: boolean;
   // escolhe quem reviver (`player.id`)
   revive: (id: number) => void;
+  // ping de cada lugar da partida (session.store mede e avisa)
+  setPings: (pings: number[]) => void;
   intelligence: Record<number, EnemyIntelligence>;
   attackVariance: AttackVariance | null;
   setLook: (patch: Partial<PlayerLook>) => void;
@@ -281,10 +291,14 @@ let multi:
       seats: Seat[];
       // acoes do jogador local a mandar no proximo passo (loja, revive, arma)
       actions: Partial<InputState>;
+      // ping de cada lugar ate o servidor de salas, em ms
+      pings: number[];
+      // convidado: o que ele adianta entre um estado do host e outro
+      prediction: Prediction;
     })
   | null = null;
-// o host manda o estado a cada tantos passos: 60 / 3 = 20 vezes por segundo
-const SNAPSHOT_EVERY = 3;
+// o host manda o estado a cada tantos passos: 60 / 2 = 30 vezes por segundo
+const SNAPSHOT_EVERY = 2;
 
 export const joystickInput: InputState = { moveX: 0, moveY: 0, dash: false };
 
@@ -343,7 +357,10 @@ export const useGameStore = create<GameStore>()(
             ? 'shop'
             : SCREEN_BY_STATUS[world.status];
         const scoreKey = world.players
-          .map((p) => `${p.kills}/${p.deaths}/${p.hp > 0}`)
+          .map(
+            (p) =>
+              `${p.kills}/${p.deaths}/${p.hp > 0}/${multi?.pings[p.id] ?? 0}`,
+          )
           .join();
         const prev = get();
         const changed =
@@ -371,6 +388,7 @@ export const useGameStore = create<GameStore>()(
               deaths: p.deaths,
               alive: p.hp > 0,
               you: p === you,
+              ping: multi?.pings[p.id] ?? 0,
             })),
           });
         }
@@ -417,6 +435,11 @@ export const useGameStore = create<GameStore>()(
         menu: false,
         setScoreboard: (open) => {
           if (open !== get().scoreboard) set({ scoreboard: open });
+        },
+        setPings: (pings) => {
+          if (!multi) return;
+          multi.pings = pings;
+          sync();
         },
         reviving: false,
         revive: (id) => {
@@ -467,6 +490,8 @@ export const useGameStore = create<GameStore>()(
             sentInput: '',
             seats,
             actions: {},
+            pings: [],
+            prediction: createPrediction(),
           };
           sentScores = '';
           set({ online: true, host: link.host, menu: false, scores: [] });
@@ -490,6 +515,11 @@ export const useGameStore = create<GameStore>()(
         receiveState: (snapshot) => {
           if (!multi || multi.host) return;
           world = applySnapshot(world, snapshot, multi.you);
+          // ida e volta convidado -> servidor -> host e de volta: e o quanto
+          // o host esta atrasado em relacao ao que o convidado ja apertou
+          const rtt =
+            ((multi.pings[multi.you] ?? 0) + (multi.pings[0] ?? 0)) / 1000;
+          reconcile(world, multi.prediction, rtt);
           sync();
         },
         // toda run abre na legenda; `begin` solta a simulacao
@@ -529,6 +559,8 @@ export const useGameStore = create<GameStore>()(
               multi.sentInput = next;
               multi.sendInput(input);
             }
+            // nao espera o host: anda o proprio boneco e adianta os outros
+            if (world) predictStep(world, input, dt, multi.prediction);
             return;
           }
           if (!world || world.status !== 'playing') return;
