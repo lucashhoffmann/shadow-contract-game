@@ -1,6 +1,7 @@
 import { Banknote, Shield } from 'lucide-react';
 
 import { SHOP_ITEMS } from '@/app/modules/shop/constants/shop.constants';
+import { refillPrice } from '@/app/modules/shop/systems/shop.system';
 import type {
   ItemDef,
   ItemId,
@@ -22,8 +23,10 @@ type ShopDialogProps = {
   open: boolean;
   money: number;
   market: Market;
+  // armas de fogo que o player ja tem: viram recarga, mais barata
+  arsenal: { id: WeaponId; ammo: number }[];
   // foto de cada arma, vinda da engine (data URL)
-  previews: Record<WeaponId | 'sword', string>;
+  previews: Record<WeaponId | 'sword' | 'ammo', string>;
   onBuy: (id: ItemId) => void;
   onClose: () => void;
 };
@@ -59,13 +62,22 @@ type ItemCardProps = {
   item: ItemDef;
   price: number;
   affordable: boolean;
+  // balas que a recarga repoe; undefined = item novo, nao recarga
+  refill?: number;
   // colete nao tem modelo: fica sem foto e leva o icone de escudo
   preview?: string;
   onBuy: () => void;
 };
 
 // cartao colorido com a foto do item e o preco embaixo; sem saldo fica apagado
-function ItemCard({ item, price, affordable, preview, onBuy }: ItemCardProps) {
+function ItemCard({
+  item,
+  price,
+  affordable,
+  refill,
+  preview,
+  onBuy,
+}: ItemCardProps) {
   return (
     <button
       type='button'
@@ -99,7 +111,11 @@ function ItemCard({ item, price, affordable, preview, onBuy }: ItemCardProps) {
           )}
         </span>
         <span className='text-[11px] font-bold opacity-90'>
-          {describeItem(item)}
+          {refill === undefined
+            ? describeItem(item)
+            : refill > 0
+              ? `Recarga: +${refill} balas`
+              : 'Municao cheia'}
         </span>
       </span>
       <span className='flex items-center gap-1.5 rounded-xl border-4 border-white bg-green-500 px-3 py-0.5 text-lg font-black text-white shadow-md group-disabled:bg-slate-500 group-disabled:text-white/70'>
@@ -110,7 +126,11 @@ function ItemCard({ item, price, affordable, preview, onBuy }: ItemCardProps) {
         {price}
       </span>
       <span className='h-4 text-xs font-bold'>
-        <PriceChange change={percent(price / item.price)} />
+        {refill === undefined ? (
+          <PriceChange change={percent(price / item.price)} />
+        ) : (
+          <span className='text-sky-300'>voce ja tem</span>
+        )}
       </span>
     </button>
   );
@@ -120,6 +140,7 @@ export function ShopDialog({
   open,
   money,
   market,
+  arsenal,
   previews,
   onBuy,
   onClose,
@@ -132,10 +153,11 @@ export function ShopDialog({
       <DialogContent
         showCloseButton={false}
         // entra com atraso: da tempo de ver a tampa do bau abrir
-        className='fill-mode-backwards border-4 border-white/80 bg-[#16345c] delay-500 sm:max-w-2xl'
+        // sem painel: os cartoes flutuam direto sobre o jogo escurecido
+        className='fill-mode-backwards border-0 bg-transparent shadow-none delay-500 sm:max-w-2xl'
       >
         <DialogHeader className='items-center sm:text-center'>
-          <DialogTitle className='-mt-11 rounded-full border-4 border-white bg-[#1f4f8f] px-5 py-2 text-base font-black tracking-wide text-white uppercase shadow-lg'>
+          <DialogTitle className='rounded-full border-4 border-white bg-[#1f4f8f] px-5 py-2 text-base font-black tracking-wide text-white uppercase shadow-lg'>
             Escolha o equipamento
           </DialogTitle>
           <DialogDescription className='text-xs font-bold tracking-wide text-white/80 uppercase'>
@@ -145,14 +167,24 @@ export function ShopDialog({
         </DialogHeader>
         <div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
           {SHOP_ITEMS.map((item) => {
-            const price = market.prices[item.id];
+            const owned = arsenal.find((weapon) => weapon.id === item.id);
+            const refill = owned && item.ammo - owned.ammo;
+            const price = owned
+              ? refillPrice(market.prices[item.id])
+              : market.prices[item.id];
             return (
               <ItemCard
                 key={item.id}
                 item={item}
                 price={price}
-                affordable={money >= price}
-                preview={item.id === 'armor' ? undefined : previews[item.id]}
+                refill={refill}
+                affordable={money >= price && refill !== 0}
+                // recarga mostra a municao, nao a arma
+                preview={
+                  item.id === 'armor'
+                    ? undefined
+                    : previews[owned ? 'ammo' : item.id]
+                }
                 onBuy={() => onBuy(item.id)}
               />
             );

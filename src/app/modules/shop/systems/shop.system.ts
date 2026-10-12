@@ -1,4 +1,5 @@
 import {
+  AMMO_REFILL_PRICE,
   DEMAND_MARKUP,
   INFLATION_PER_SHOP,
   ITEMS,
@@ -12,6 +13,7 @@ import type {
   ItemId,
   Market,
   Room,
+  Weapon,
   World,
 } from '@/app/modules/world/types/world.types';
 import { distance } from '@/shared/utils/math.util';
@@ -53,32 +55,57 @@ export function rollMarket(world: World): void {
   };
 }
 
+// preco de recarregar uma arma que custa `price` na loja
+export function refillPrice(price: number): number {
+  return Math.max(PRICE_STEP, roundPrice(price * AMMO_REFILL_PRICE));
+}
+
+function ownedWeapon(world: World, id: ItemId): Weapon | undefined {
+  return world.player.arsenal.find((weapon) => weapon.id === id);
+}
+
+// O que o item custa agora: arma que o player ja tem vende so a recarga.
+export function itemPrice(world: World, id: ItemId): number {
+  const price = world.market.prices[id];
+  return ownedWeapon(world, id) ? refillPrice(price) : price;
+}
+
 export function canBuy(world: World, id: ItemId): boolean {
-  return world.run.money >= world.market.prices[id];
+  const owned = ownedWeapon(world, id);
+  // arma cheia nao tem o que recarregar
+  if (owned && owned.ammo >= ITEMS[owned.id].ammo) return false;
+  return world.run.money >= itemPrice(world, id);
 }
 
 export function buyItem(world: World, id: ItemId): boolean {
   if (!canBuy(world, id)) return false;
-  const price = world.market.prices[id];
+  const price = itemPrice(world, id);
+  const owned = ownedWeapon(world, id);
   world.run.money -= price;
   if (id === 'armor') {
     const previousHp = world.player.hp;
     world.player.maxHp += ITEMS.armor.bonusHp;
     world.player.hp = world.player.maxHp;
     world.run.stats.healthRecovered += world.player.hp - previousHp;
+  } else if (owned) {
+    owned.ammo = ITEMS[id].ammo;
+    world.player.weapon = owned;
   } else {
-    world.player.weapon = { id, ammo: ITEMS[id].ammo };
+    // arma nova entra no arsenal e vai para a mao; as outras ficam guardadas
+    const weapon = { id, ammo: ITEMS[id].ammo };
+    world.player.arsenal.push(weapon);
+    world.player.weapon = weapon;
   }
   world.run.events.push({
     at: world.run.seconds,
-    text: `Comprou ${ITEMS[id].name} por $${price}.`,
+    text: `${owned ? 'Recarregou' : 'Comprou'} ${ITEMS[id].name} por $${price}.`,
   });
   // objeto novo a cada mudanca: o store compara por referencia
   world.market = {
     ...world.market,
     prices: {
       ...world.market.prices,
-      [id]: roundPrice(price * DEMAND_MARKUP),
+      [id]: roundPrice(world.market.prices[id] * DEMAND_MARKUP),
     },
   };
   return true;

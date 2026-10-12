@@ -17,6 +17,9 @@ export const SHOP_EVERY = 5;
 export const PLAYER_RADIUS = 0.35;
 export const PLAYER_SPEED = 4.5;
 export const PLAYER_MAX_HP = 100;
+export const IDLE_WARNING_DELAY = 10;
+export const IDLE_WARNING_INTERVAL = 5;
+export const IDLE_MAX_ENEMIES = 5;
 export const MELEE_RANGE = 1.1;
 export const ATTACK_COOLDOWN = 0.5;
 export const PICKUP_RADIUS = 0.7;
@@ -42,8 +45,16 @@ export const ADRENALINE_BOOST = 1.35;
 export const DASH_TIME = 0.4;
 export const DASH_SPEED = 9;
 export const DASH_COOLDOWN = 0.9;
+// saltos guardados: cada salto gasta um; so caixa quebrada repoe
+export const DASH_MAX = 6;
+// morto de um golpe so (vida cheia): o corpo voa na direcao do golpe,
+// freando ate parar; parede segura
+export const LAUNCH_TIME = 0.5;
+export const LAUNCH_DISTANCE = 2.2;
 // quem morre derruba o cenario em volta
 export const PROP_BREAK_RADIUS = 1.5;
+// distancia em que a porta de correr abre para quem pode passar
+export const DOOR_RANGE = 2.4;
 // distancia do centro do bau em que a tecla B abre a loja
 export const CHEST_RANGE = 1.4;
 
@@ -84,7 +95,10 @@ export const FIRE_INTERVAL = 0.8;
 // balas
 export const BULLET_RADIUS = 0.12;
 export const PLAYER_BULLET_SPEED = 12;
-export const PLAYER_BULLET_DAMAGE = 30;
+// dano da bala cai com a distancia: cheio ate FALLOFF_START do alcance da
+// arma, depois desce em linha ate FALLOFF_MIN no alcance maximo
+export const FALLOFF_START = 0.4;
+export const FALLOFF_MIN = 0.12;
 export const ENEMY_BULLET_SPEED = 8;
 export const ENEMY_BULLET_DAMAGE = 20;
 // a bala voa um pouco alem do alcance de mira
@@ -134,6 +148,14 @@ export const SEARCH_TIME = 4;
 // Valores em fracao de `maxHp`.
 export const LOOT_HEART_CHANCE = 0.25;
 export const LOOT_SHIELD_CHANCE = 0.2;
+export const LOOT_DASH_CHANCE = 0.2;
+// quantos saltos um item de salto repoe
+export const DASH_LOOT_MIN = 1;
+export const DASH_LOOT_MAX = 6;
+// municao: so sai de caixa com o player armado
+export const LOOT_AMMO_CHANCE = 0.15;
+export const AMMO_LOOT_MIN = 4;
+export const AMMO_LOOT_MAX = 12;
 // coracao cura pouco na maioria das vezes (sorteio ao quadrado), ate 60%
 export const HEART_MIN = 0.1;
 export const HEART_MAX = 0.6;

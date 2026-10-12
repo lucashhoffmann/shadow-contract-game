@@ -12,7 +12,11 @@ import {
   PLAYER_RADIUS,
   PLAYER_SPEED,
 } from '@/app/modules/world/constants/world.constants';
-import type { InputState, World } from '@/app/modules/world/types/world.types';
+import type {
+  InputState,
+  WeaponId,
+  World,
+} from '@/app/modules/world/types/world.types';
 
 const DEAD_ZONE = 0.01;
 
@@ -24,7 +28,14 @@ export function movePlayer(world: World, input: InputState, dt: number): void {
   player.crouching = false;
   player.noise = NOISE_IDLE;
   const length = Math.hypot(input.moveX, input.moveY);
-  if (input.dash && player.dashCooldown === 0) {
+  // na sala inicial o salto e livre: so comeca a gastar depois de sair dela
+  const counting = world.run.roomIndex > 0;
+  if (
+    input.dash &&
+    player.dashCooldown === 0 &&
+    (player.dashes > 0 || !counting)
+  ) {
+    if (counting) player.dashes--;
     player.dash = DASH_TIME;
     player.dashCooldown = DASH_COOLDOWN;
     // salta para onde o input aponta; sem input, para onde ja olha
@@ -67,4 +78,23 @@ export function movePlayer(world: World, input: InputState, dt: number): void {
     PLAYER_RADIUS,
   );
   world.player.facing = Math.atan2(input.moveY, input.moveX);
+}
+
+// Poe na mao a arma `id` do arsenal; null = espada. Arma que o player nao
+// tem e ignorada. Vale mesmo sem bala: ela so nao atira.
+export function selectWeapon(world: World, id: WeaponId | null): void {
+  const player = world.player;
+  if (id === null) {
+    player.weapon = null;
+    return;
+  }
+  const owned = player.arsenal.find((weapon) => weapon.id === id);
+  if (owned) player.weapon = owned;
+}
+
+// proxima da fila: espada, depois cada arma do arsenal, e volta
+export function cycleWeapon(world: World): void {
+  const player = world.player;
+  const slots = [null, ...player.arsenal];
+  player.weapon = slots[(slots.indexOf(player.weapon) + 1) % slots.length];
 }

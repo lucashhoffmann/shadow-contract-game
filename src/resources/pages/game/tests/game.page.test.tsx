@@ -2,7 +2,10 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { createGameEngine } from '@/app/engine/game-engine';
-import { createMarket } from '@/app/modules/shop/systems/shop.system';
+import {
+  createMarket,
+  refillPrice,
+} from '@/app/modules/shop/systems/shop.system';
 import { createArenaWorld } from '@/test/world.fixture';
 import type { Hud as HudData } from '@/app/store/game-store/game.store';
 import { useGameStore } from '@/app/store/game-store/game.store';
@@ -26,12 +29,14 @@ const PREVIEWS = {
   pistol: 'data:pistol',
   silenced: 'data:silenced',
   shotgun: 'data:shotgun',
+  ammo: 'data:ammo',
 };
 
 const HUD: HudData = {
   hp: 50,
   maxHp: 100,
   shield: 0,
+  dashes: 4,
   money: 250,
   room: 3,
   kills: 2,
@@ -48,6 +53,8 @@ describe('Hud', () => {
     render(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={HUD}
       />,
     );
@@ -58,7 +65,7 @@ describe('Hud', () => {
     expect(screen.getByText('Sala 3')).toBeInTheDocument();
     expect(screen.getByText('$ 250')).toBeInTheDocument();
     expect(screen.getByText('Pistola')).toBeInTheDocument();
-    expect(screen.getByLabelText('Balas: 4 de 8')).toBeInTheDocument();
+    expect(screen.getByLabelText('Balas: 4 de 30')).toBeInTheDocument();
   });
 
   it.each(['pistol', 'silenced', 'shotgun'] as const)(
@@ -67,6 +74,8 @@ describe('Hud', () => {
       const { container } = render(
         <Hud
           previews={PREVIEWS}
+          arsenal={[]}
+          onSelectWeapon={vi.fn()}
           hud={{ ...HUD, weaponId }}
         />,
       );
@@ -81,6 +90,8 @@ describe('Hud', () => {
     const { container } = render(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={{ ...HUD, weaponId: null, ammo: 0 }}
       />,
     );
@@ -89,10 +100,82 @@ describe('Hud', () => {
     expect(screen.queryByLabelText(/Balas/)).not.toBeInTheDocument();
   });
 
+  it('mostra os saltos guardados em tracos, de 6', () => {
+    const { container } = render(
+      <Hud
+        previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
+        hud={{ ...HUD, dashes: 4 }}
+      />,
+    );
+    const pips = screen.getByRole('img', { name: 'Saltos: 4 de 6' });
+    expect(pips.querySelectorAll('[data-state="full"]')).toHaveLength(4);
+    expect(pips.querySelectorAll('[data-state="empty"]')).toHaveLength(2);
+    expect(container).toContainElement(pips);
+  });
+
+  it('sem arma de fogo nao mostra a escolha de arma', () => {
+    render(
+      <Hud
+        previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
+        hud={{ ...HUD, weaponId: null, ammo: 0 }}
+      />,
+    );
+    expect(
+      screen.queryByRole('group', { name: 'Armas' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('deixa escolher a arma, e a sem bala fica cinza mas escolhivel', async () => {
+    const onSelectWeapon = vi.fn();
+    render(
+      <Hud
+        previews={PREVIEWS}
+        arsenal={[
+          { id: 'pistol', ammo: 0 },
+          { id: 'shotgun', ammo: 7 },
+        ]}
+        onSelectWeapon={onSelectWeapon}
+        hud={{ ...HUD, weaponId: 'shotgun', ammo: 7 }}
+      />,
+    );
+    const pistol = screen.getByRole('button', { name: /Pistola: 0/ });
+    const shotgun = screen.getByRole('button', { name: /Escopeta: 7/ });
+    expect(shotgun).toHaveAttribute('aria-pressed', 'true');
+    expect(pistol).toHaveAttribute('aria-pressed', 'false');
+    expect(pistol).toHaveAttribute('data-empty', 'true');
+    expect(pistol).toHaveClass('grayscale');
+    expect(shotgun).not.toHaveClass('grayscale');
+
+    await userEvent.click(pistol);
+    expect(onSelectWeapon).toHaveBeenCalledWith('pistol');
+    await userEvent.click(screen.getByRole('button', { name: 'Espada' }));
+    expect(onSelectWeapon).toHaveBeenLastCalledWith(null);
+  });
+
+  it('arma na mao sem bala aparece cinza no cartao', () => {
+    const { container } = render(
+      <Hud
+        previews={PREVIEWS}
+        arsenal={[{ id: 'pistol', ammo: 0 }]}
+        onSelectWeapon={vi.fn()}
+        hud={{ ...HUD, weaponId: 'pistol', ammo: 0 }}
+      />,
+    );
+    expect(container.querySelector('[data-empty="true"]')).toHaveClass(
+      'grayscale',
+    );
+  });
+
   it('escudo soma na barra em azul, na proporcao de vida + escudo', () => {
     const { rerender } = render(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={{ ...HUD, hp: 100, maxHp: 100, shield: 25 }}
       />,
     );
@@ -104,6 +187,8 @@ describe('Hud', () => {
     rerender(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={{ ...HUD, hp: 50, maxHp: 100, shield: 0 }}
       />,
     );
@@ -115,6 +200,8 @@ describe('Hud', () => {
     const { container } = render(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={{ ...HUD, room: 3 }}
       />,
     );
@@ -128,6 +215,8 @@ describe('Hud', () => {
     const start = render(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={{ ...HUD, room: 0 }}
       />,
     );
@@ -137,6 +226,8 @@ describe('Hud', () => {
     const shop = render(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={{ ...HUD, room: 5 }}
       />,
     );
@@ -148,6 +239,8 @@ describe('Hud', () => {
     render(
       <Hud
         previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
         hud={{ ...HUD, room: 7 }}
       />,
     );
@@ -162,6 +255,7 @@ describe('ShopDialog', () => {
       <ShopDialog
         open
         previews={PREVIEWS}
+        arsenal={[]}
         money={250}
         market={createMarket()}
         onBuy={onBuy}
@@ -183,6 +277,7 @@ describe('ShopDialog', () => {
       <ShopDialog
         open
         previews={PREVIEWS}
+        arsenal={[]}
         money={250}
         market={{
           inflation: 1.12,
@@ -205,12 +300,44 @@ describe('ShopDialog', () => {
     );
   });
 
+  it('arma que o player ja tem vira recarga mais barata; cheia, bloqueia', async () => {
+    const onBuy = vi.fn();
+    const market = createMarket();
+    render(
+      <ShopDialog
+        open
+        previews={PREVIEWS}
+        arsenal={[
+          { id: 'pistol', ammo: 5 },
+          { id: 'shotgun', ammo: 30 },
+        ]}
+        money={5000}
+        market={market}
+        onBuy={onBuy}
+        onClose={vi.fn()}
+      />,
+    );
+    const pistol = screen.getByRole('button', {
+      name: /^Pistola(?! silenciada)/,
+    });
+    expect(pistol).toHaveTextContent('Recarga: +25 balas');
+    expect(pistol.querySelector('img')).toHaveAttribute('src', 'data:ammo');
+    expect(pistol).toHaveTextContent(String(refillPrice(market.prices.pistol)));
+    await userEvent.click(pistol);
+    expect(onBuy).toHaveBeenCalledWith('pistol');
+
+    const shotgun = screen.getByRole('button', { name: /Escopeta/ });
+    expect(shotgun).toHaveTextContent('Municao cheia');
+    expect(shotgun).toBeDisabled();
+  });
+
   it('Continuar fecha a loja', async () => {
     const onClose = vi.fn();
     render(
       <ShopDialog
         open
         previews={PREVIEWS}
+        arsenal={[]}
         money={0}
         market={createMarket()}
         onBuy={vi.fn()}
@@ -226,6 +353,7 @@ describe('ShopDialog', () => {
       <ShopDialog
         open={false}
         previews={PREVIEWS}
+        arsenal={[]}
         money={0}
         market={createMarket()}
         onBuy={vi.fn()}
@@ -407,4 +535,16 @@ it('borda vermelha aparece so quando a vida cai', () => {
   expect(screen.queryByTestId('damage-vignette')).toBeNull();
   setHp(80);
   expect(screen.getByTestId('damage-vignette')).toBeInTheDocument();
+});
+
+it('borda azul usa o mesmo pulso quando ha aviso de inatividade', () => {
+  act(() => useGameStore.setState({ idleWarnings: 0 }));
+  render(<GamePage />);
+  expect(screen.queryByTestId('idle-vignette')).toBeNull();
+
+  act(() => useGameStore.setState({ idleWarnings: 1 }));
+  expect(screen.getByTestId('idle-vignette')).toHaveClass('animate-damage');
+  expect(screen.getByTestId('idle-vignette').style.background).toContain(
+    '59, 130, 246',
+  );
 });

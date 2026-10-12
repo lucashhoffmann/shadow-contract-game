@@ -4,6 +4,7 @@ import {
 } from '@/app/modules/combat/systems/combat.system';
 import {
   circleHitsWall,
+  doorsSealed,
   hasLineOfSight,
   moveCircle,
 } from '@/app/modules/level/utils/grid.util';
@@ -30,6 +31,8 @@ import {
   HEAR_MAX_BONUS,
   HEAR_PER_ROOM,
   HEAR_TIME,
+  LAUNCH_DISTANCE,
+  LAUNCH_TIME,
   HEARING_YELLOW,
   NINJA_DAMAGE,
   NINJA_REACH,
@@ -118,6 +121,7 @@ export function createEnemy(
     hearing: 0,
     heard: null,
     searchTimer: 0,
+    launch: 0,
   };
 }
 
@@ -146,7 +150,7 @@ function navigate(
 ): void {
   enemy.repathTimer -= dt;
   if (enemy.repathTimer <= 0) {
-    enemy.route = findPath(world, enemy.pos, target);
+    enemy.route = findPath(world, enemy.pos, target, doorsSealed(world));
     enemy.repathTimer =
       REPATH_INTERVAL /
       (enemy.state === 'alert' ? enemy.intelligence.pursuit : 1);
@@ -166,6 +170,7 @@ function navigate(
     (next.x - enemy.pos.x) * step,
     (next.y - enemy.pos.y) * step,
     ENEMY_RADIUS,
+    doorsSealed(world),
   );
 }
 
@@ -269,6 +274,7 @@ function alert(world: World, enemy: Enemy, dt: number): void {
       Math.cos(enemy.facing) * step,
       Math.sin(enemy.facing) * step,
       ENEMY_RADIUS,
+      doorsSealed(world),
     );
     // ninja pousa ao alcancar o player, em vez de passar por ele
     if (!stats.ranged && distance(enemy.pos, player.pos) <= reach) {
@@ -291,16 +297,30 @@ function alert(world: World, enemy: Enemy, dt: number): void {
       gap > reach
         ? [toward]
         : [toward + (side * Math.PI) / 2, toward - (side * Math.PI) / 2];
-    const probe = DASH_SPEED * enemy.intelligence.dash * (DASH_TIME / 2);
-    const angle = angles.find(
-      (candidate) =>
-        !circleHitsWall(
-          world,
-          enemy.pos.x + Math.cos(candidate) * probe,
-          enemy.pos.y + Math.sin(candidate) * probe,
-          ENEMY_RADIUS,
-        ),
-    );
+    // confere o trajeto inteiro do salto, nao so um ponto: com parede, caixa
+    // ou bau no caminho, nao salta (antes saltava contra o obstaculo e
+    // escorregava pela quina no ar, parecendo atravessar)
+    const leap = DASH_SPEED * enemy.intelligence.dash * DASH_TIME;
+    const sealed = doorsSealed(world);
+    const clear = (candidate: number) => {
+      for (let d = ENEMY_RADIUS; d <= leap; d += ENEMY_RADIUS) {
+        // quem salta para cima do player para ao chegar nele
+        if (gap > reach && d > gap) break;
+        if (
+          circleHitsWall(
+            world,
+            enemy.pos.x + Math.cos(candidate) * d,
+            enemy.pos.y + Math.sin(candidate) * d,
+            ENEMY_RADIUS,
+            sealed,
+          )
+        ) {
+          return false;
+        }
+      }
+      return true;
+    };
+    const angle = angles.find(clear);
     if (angle !== undefined) {
       enemy.facing = angle;
       enemy.dash = DASH_TIME;
@@ -333,16 +353,41 @@ function alert(world: World, enemy: Enemy, dt: number): void {
       ENEMY_BULLET_SPEED,
       ENEMY_BULLET_DAMAGE,
       FIRE_RANGE,
+      'pistol',
+      enemy.id,
     );
   } else {
-    damagePlayer(world, NINJA_DAMAGE);
+    damagePlayer(world, NINJA_DAMAGE, enemy.pos);
   }
   enemy.attack = SLASH_TIME;
 }
 
+// corpo lancado por um golpe so: anda LAUNCH_DISTANCE em LAUNCH_TIME,
+// freando em linha ate parar; parede segura
+function fly(world: World, enemy: Enemy, dt: number): void {
+  if (enemy.launch <= 0) return;
+  const span = Math.min(dt, enemy.launch);
+  // velocidade media do trecho: comeca em 2D/T e chega a zero
+  const speed =
+    ((2 * LAUNCH_DISTANCE) / LAUNCH_TIME) *
+    ((enemy.launch - span / 2) / LAUNCH_TIME);
+  enemy.launch = Math.max(0, enemy.launch - dt);
+  moveCircle(
+    world,
+    enemy.pos,
+    Math.cos(enemy.facing) * speed * span,
+    Math.sin(enemy.facing) * speed * span,
+    ENEMY_RADIUS,
+    doorsSealed(world),
+  );
+}
+
 export function updateEnemies(world: World, dt: number): void {
   for (const enemy of world.enemies) {
-    if (enemy.state === 'dead') continue;
+    if (enemy.state === 'dead') {
+      fly(world, enemy, dt);
+      continue;
+    }
     enemy.attack = Math.max(0, enemy.attack - dt);
     // detection cheia vem de ver o player ou de levar tiro (damageEnemy)
     if (enemy.state !== 'alert' && enemy.detection >= 1) enterAlert(enemy);

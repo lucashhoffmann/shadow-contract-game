@@ -79,6 +79,8 @@ export type Enemy = {
   dashCooldown: number;
   // segundos entre saltos em alerta; 0 = nao salta
   dashEvery: number;
+  // morto de um golpe so: segundos restantes do voo para frente; 0 = parado
+  launch: number;
   // 0..1: quanto ja ouviu do player; cheio, vai investigar
   hearing: number;
   // onde ouviu o player; null = nada a investigar
@@ -96,6 +98,11 @@ export type Projectile = {
   vel: Vec2;
   damage: number;
   life: number;
+  // alcance da arma e distancia ja percorrida: o dano cai com a distancia
+  range: number;
+  travelled: number;
+  // id do inimigo que atirou: o aviso de dano ou erro sobe sobre ele
+  shooter?: number;
 };
 
 // objeto de cenario destrutivel; ocupa um tile ('o') enquanto inteiro
@@ -106,15 +113,17 @@ export type Prop = {
   broken: boolean;
 };
 
-// dinheiro, coracao (cura) ou escudo; os dois ultimos saem de caixa quebrada
-export type PickupKind = 'money' | 'heart' | 'shield';
+// dinheiro, coracao (cura), escudo, salto ou municao; os quatro ultimos saem
+// de caixa quebrada
+export type PickupKind = 'money' | 'heart' | 'shield' | 'dash' | 'ammo';
 
 export type Pickup = {
   id: number;
   kind: PickupKind;
   roomIndex: number;
   pos: Vec2;
-  // dinheiro, pontos de vida ou pontos de escudo, conforme `kind`
+  // dinheiro, pontos de vida, pontos de escudo, saltos ou balas, conforme
+  // `kind`
   value: number;
 };
 
@@ -128,6 +137,8 @@ export type ItemDef = {
   name: string;
   kind: 'weapon' | 'armor';
   price: number;
+  // dano base de cada bala, antes do sorteio e da distancia
+  damage: number;
   range: number;
   ammo: number;
   pellets: number;
@@ -139,6 +150,8 @@ export type Market = {
   inflation: number;
   prices: Record<ItemId, number>;
 };
+
+export type Weapon = { id: WeaponId; ammo: number };
 
 export type Player = {
   pos: Vec2;
@@ -158,12 +171,19 @@ export type Player = {
   dash: number;
   // segundos ate poder saltar de novo
   dashCooldown: number;
+  // saltos guardados, de 0 a DASH_MAX
+  dashes: number;
   // raio do barulho feito neste passo (parado, andando, saltando)
   noise: number;
   // agachado neste passo: mais lento, menos barulho e so e ouvido ate o
   // nivel branco
   crouching: boolean;
-  weapon: { id: WeaponId; ammo: number } | null;
+  // arma de fogo na mao; null = espada. Sem bala continua na mao, so nao
+  // atira
+  weapon: Weapon | null;
+  // armas de fogo que o player tem nesta run, na ordem em que comprou;
+  // `weapon`, quando nao e null, e uma delas
+  arsenal: Weapon[];
 };
 
 export type Run = {
@@ -173,6 +193,9 @@ export type Run = {
   kills: number;
   shops: number;
   seconds: number;
+  lastMovedAt: number;
+  lastIdleWarningAt: number;
+  idleWarnings: number;
   attackVariance: AttackVariance;
   meleeMissChance: number;
   nextMeleeChanceAt: number;
@@ -191,12 +214,16 @@ export type Run = {
 
 export type WorldStatus = 'intro' | 'playing' | 'paused' | 'shop' | 'dead';
 
-// texto que sobe do ponto do golpe: dano causado, ou "Errou!". So visual
+// texto que sobe do ponto do golpe: dano causado ou sofrido, ou "Errou!".
+// So visual
 export type Floater = {
   id: number;
   pos: Vec2;
   // pontos de dano; 0 = errou
   amount: number;
+  // golpe do inimigo contra o player, mostrado sobre o inimigo que bateu
+  // (senao, golpe do player, sobre o inimigo que apanhou)
+  onPlayer?: boolean;
   // segundos desde que apareceu; some em FLOATER_TIME
   age: number;
 };

@@ -1,5 +1,7 @@
 import {
   FIXED_DT,
+  IDLE_WARNING_DELAY,
+  IDLE_WARNING_INTERVAL,
   KILL_MONEY,
 } from '@/app/modules/world/constants/world.constants';
 import { updateRooms } from '@/app/modules/level/systems/level.system';
@@ -96,6 +98,58 @@ describe('stepWorld', () => {
     world.status = 'shop';
     run(world, FORWARD, 1);
     expect(world.player.pos).toEqual({ x: 5.5, y: 2.5 });
+  });
+
+  it('apos ficar parado pulsa o aviso e envia perseguidores ate se mover', () => {
+    const world = createArenaWorld();
+    world.player.hp = 1000;
+    world.player.maxHp = 1000;
+
+    run(world, IDLE, IDLE_WARNING_DELAY + FIXED_DT);
+    expect(world.run.idleWarnings).toBe(1);
+    expect(world.enemies.filter((enemy) => enemy.roomIndex === 0)).toHaveLength(
+      1,
+    );
+    expect(world.enemies.find((enemy) => enemy.roomIndex === 0)?.state).toBe(
+      'alert',
+    );
+    expect(world.run.events.at(-1)?.text).toContain('Inatividade');
+
+    run(world, IDLE, IDLE_WARNING_INTERVAL + FIXED_DT);
+    expect(world.run.idleWarnings).toBe(2);
+    expect(world.enemies.filter((enemy) => enemy.roomIndex === 0)).toHaveLength(
+      2,
+    );
+
+    run(world, FORWARD, FIXED_DT);
+    run(world, IDLE, IDLE_WARNING_DELAY - FIXED_DT);
+    expect(world.run.idleWarnings).toBe(2);
+    run(world, IDLE, 2 * FIXED_DT);
+    expect(world.run.idleWarnings).toBe(3);
+  });
+
+  it('alerta um inimigo existente antes de criar outro', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 10.5, Math.PI / 2);
+    enemy.viewRange = 0;
+
+    run(world, IDLE, IDLE_WARNING_DELAY + FIXED_DT);
+
+    expect(enemy.state).toBe('alert');
+    expect(world.enemies.filter((current) => current.roomIndex === 0)).toEqual([
+      enemy,
+    ]);
+  });
+
+  it('pausa nao conta como tempo parado', () => {
+    const world = createArenaWorld();
+    run(world, IDLE, IDLE_WARNING_DELAY - 1);
+    togglePause(world);
+    run(world, IDLE, 5);
+    expect(world.run.idleWarnings).toBe(0);
+    togglePause(world);
+    run(world, IDLE, 1 + FIXED_DT);
+    expect(world.run.idleWarnings).toBe(1);
   });
 
   it('pausa congela e despausa retoma', () => {

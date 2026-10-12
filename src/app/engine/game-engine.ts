@@ -48,16 +48,20 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   const input: InputState = { moveX: 0, moveY: 0, dash: false };
   const onKeyDown = (event: KeyboardEvent) => {
     keys.add(event.code);
-    // Ctrl agacha: sem isto Ctrl+S, Ctrl+D e Ctrl+A abririam coisas do
-    // navegador no meio do jogo. Ctrl+W (fechar aba) o navegador nao deixa
-    // bloquear; por isso C tambem agacha.
-    if (event.ctrlKey && getWorld()?.status === 'playing')
+    // Ctrl agacha e as setas movem: evita atalhos e rolagem do navegador.
+    // Ctrl+W (fechar aba) o navegador nao deixa bloquear; por isso C tambem agacha.
+    if (
+      (event.ctrlKey || event.code.startsWith('Arrow')) &&
+      getWorld()?.status === 'playing'
+    )
       event.preventDefault();
     if (event.repeat) return;
     if (event.code === 'KeyP') useGameStore.getState().togglePause();
     if (event.code === 'Enter') useGameStore.getState().begin();
     if (event.code === 'KeyF' && getWorld()?.status === 'playing')
       input.interact = true;
+    // Q troca a arma na mao: espada, depois cada arma do arsenal
+    if (event.code === 'KeyQ') useGameStore.getState().cycleWeapon();
     // B abre o bau ao alcance e fecha a loja aberta
     if (event.code === 'KeyB') {
       if (getWorld()?.status === 'shop') useGameStore.getState().closeShop();

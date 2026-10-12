@@ -13,6 +13,14 @@ const { setLook, setWeapon, dispose } = vi.hoisted(() => ({
 vi.mock('@/app/engine/character-preview', () => ({
   createCharacterPreview: vi.fn(() => ({ setLook, setWeapon, dispose })),
 }));
+vi.mock('@/app/engine/weapon-preview', () => ({
+  renderWeaponPreviews: () => ({
+    sword: 'data:sword',
+    pistol: 'data:pistol',
+    silenced: 'data:silenced',
+    shotgun: 'data:shotgun',
+  }),
+}));
 
 beforeEach(() => {
   setLook.mockClear();

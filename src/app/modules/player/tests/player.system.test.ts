@@ -1,11 +1,16 @@
 import { breakPropAt } from '@/app/modules/level/utils/grid.util';
-import { movePlayer } from '@/app/modules/player/systems/player.system';
+import {
+  cycleWeapon,
+  movePlayer,
+  selectWeapon,
+} from '@/app/modules/player/systems/player.system';
 import {
   ADRENALINE_BOOST,
   ADRENALINE_TIME,
   CROUCH_NOISE,
   CROUCH_SPEED,
   DASH_COOLDOWN,
+  DASH_MAX,
   DASH_SPEED,
   DASH_TIME,
   FIXED_DT,
@@ -142,4 +147,84 @@ it('agachado anda mais devagar e faz menos barulho; o salto levanta', () => {
   movePlayer(world, { ...crouch, dash: true }, FIXED_DT);
   expect(world.player.crouching).toBe(false);
   expect(world.player.noise).toBe(NOISE_DASH);
+});
+
+it('cada salto gasta um dos saltos guardados; sem nenhum, nao salta', () => {
+  const world = createArenaWorld();
+  // ja saiu da sala inicial
+  world.run.roomIndex = 1;
+  const dash = { moveX: 0, moveY: 0, dash: true };
+  expect(world.player.dashes).toBe(DASH_MAX);
+
+  movePlayer(world, dash, FIXED_DT);
+  expect(world.player.dashes).toBe(DASH_MAX - 1);
+  expect(world.player.dash).toBeGreaterThan(0);
+
+  // segurar a tecla nao gasta outro enquanto dura o cooldown
+  movePlayer(world, dash, FIXED_DT);
+  expect(world.player.dashes).toBe(DASH_MAX - 1);
+
+  world.player.dashes = 0;
+  world.player.dash = 0;
+  world.player.dashCooldown = 0;
+  const before = { ...world.player.pos };
+  movePlayer(world, dash, FIXED_DT);
+  expect(world.player.dash).toBe(0);
+  expect(world.player.pos).toEqual(before);
+});
+
+it('na sala inicial o salto nao gasta, nem com os saltos zerados', () => {
+  const world = createArenaWorld();
+  const dash = { moveX: 0, moveY: 0, dash: true };
+  expect(world.run.roomIndex).toBe(0);
+
+  movePlayer(world, dash, FIXED_DT);
+  expect(world.player.dash).toBeGreaterThan(0);
+  expect(world.player.dashes).toBe(DASH_MAX);
+
+  world.player.dashes = 0;
+  world.player.dash = 0;
+  world.player.dashCooldown = 0;
+  movePlayer(world, dash, FIXED_DT);
+  expect(world.player.dash).toBeGreaterThan(0);
+  expect(world.player.dashes).toBe(0);
+});
+
+describe('escolha da arma', () => {
+  function armed() {
+    const world = createArenaWorld();
+    world.player.arsenal = [
+      { id: 'pistol', ammo: 0 },
+      { id: 'shotgun', ammo: 4 },
+    ];
+    return world;
+  }
+
+  it('poe na mao a arma escolhida, mesmo sem bala; null volta para a espada', () => {
+    const world = armed();
+    selectWeapon(world, 'pistol');
+    expect(world.player.weapon).toBe(world.player.arsenal[0]);
+
+    selectWeapon(world, 'shotgun');
+    expect(world.player.weapon).toBe(world.player.arsenal[1]);
+
+    selectWeapon(world, null);
+    expect(world.player.weapon).toBeNull();
+  });
+
+  it('ignora arma que o player nao tem', () => {
+    const world = armed();
+    selectWeapon(world, 'silenced');
+    expect(world.player.weapon).toBeNull();
+  });
+
+  it('Q roda espada, cada arma do arsenal, e volta', () => {
+    const world = armed();
+    const seen = [];
+    for (let i = 0; i < 4; i++) {
+      cycleWeapon(world);
+      seen.push(world.player.weapon?.id ?? 'sword');
+    }
+    expect(seen).toEqual(['pistol', 'shotgun', 'sword', 'pistol']);
+  });
 });

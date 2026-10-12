@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import {
+  cycleWeapon as cycleWorldWeapon,
+  selectWeapon as selectWorldWeapon,
+} from '@/app/modules/player/systems/player.system';
+import {
   buyItem,
   closeShop as closeWorldShop,
   createMarket,
@@ -18,6 +22,7 @@ import type {
   InputState,
   ItemId,
   Market,
+  Weapon,
   WeaponId,
   World,
   WorldStatus,
@@ -32,6 +37,8 @@ export type Hud = {
   hp: number;
   maxHp: number;
   shield: number;
+  // saltos guardados, de 0 a DASH_MAX
+  dashes: number;
   money: number;
   room: number;
   kills: number;
@@ -104,10 +111,10 @@ function validAttackVariance(saved: unknown): AttackVariance | null {
   if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null;
   const { min, max } = saved as Partial<AttackVariance>;
   return typeof min === 'number' &&
-    min >= 0.5 &&
-    min <= 1 &&
+    min >= 1 &&
+    min <= 1.1 &&
     typeof max === 'number' &&
-    max >= 1 &&
+    max >= 1.4 &&
     max <= 1.5
     ? { min, max }
     : null;
@@ -133,10 +140,13 @@ function mergeLook(look: PlayerLook, patch: Partial<PlayerLook>): PlayerLook {
 type GameStore = {
   screen: Screen;
   hud: Hud;
+  // armas de fogo da run, em ordem; copia do `World` para a UI
+  arsenal: Weapon[];
   market: Market;
   best: number;
   look: PlayerLook;
   bloodColor: string;
+  idleWarnings: number;
   intelligence: Record<number, EnemyIntelligence>;
   attackVariance: AttackVariance | null;
   setLook: (patch: Partial<PlayerLook>) => void;
@@ -147,6 +157,8 @@ type GameStore = {
   togglePause: () => void;
   tick: (input: InputState, dt: number) => void;
   buy: (id: ItemId) => void;
+  selectWeapon: (id: WeaponId | null) => void;
+  cycleWeapon: () => void;
   closeShop: () => void;
   backToMenu: () => void;
 };
@@ -155,6 +167,7 @@ const EMPTY_HUD: Hud = {
   hp: 0,
   maxHp: 0,
   shield: 0,
+  dashes: 0,
   money: 0,
   room: 0,
   kills: 0,
@@ -190,6 +203,7 @@ function readHud(w: World): Hud {
     hp: Math.max(0, w.player.hp),
     maxHp: w.player.maxHp,
     shield: w.player.shield,
+    dashes: w.player.dashes,
     money: w.run.money,
     room: w.run.roomIndex,
     kills: w.run.kills,
@@ -202,26 +216,40 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => {
       // so chama set quando algo visivel mudou, para a UI nao renderizar a 60 Hz
+      // assinatura do arsenal ja publicado: so copia de novo quando muda
+      let arsenalKey = '';
       const sync = () => {
         if (!world) return;
         const hud = readHud(world);
+        const key = world.player.arsenal
+          .map((weapon) => `${weapon.id}:${weapon.ammo}`)
+          .join();
         const screen = SCREEN_BY_STATUS[world.status];
         const prev = get();
         const changed =
           screen !== prev.screen ||
+          key !== arsenalKey ||
           world.market !== prev.market ||
           world.intelligence !== prev.intelligence ||
           world.run.attackVariance !== prev.attackVariance ||
+          world.run.idleWarnings !== prev.idleWarnings ||
           (Object.keys(hud) as (keyof Hud)[]).some(
             (key) => hud[key] !== prev.hud[key],
           );
         if (!changed) return;
+        if (key !== arsenalKey) {
+          arsenalKey = key;
+          set({
+            arsenal: world.player.arsenal.map((weapon) => ({ ...weapon })),
+          });
+        }
         set({
           hud,
           screen,
           market: world.market,
           intelligence: world.intelligence,
           attackVariance: world.run.attackVariance,
+          idleWarnings: world.run.idleWarnings,
           best: Math.max(prev.best, hud.room),
         });
       };
@@ -229,10 +257,12 @@ export const useGameStore = create<GameStore>()(
       return {
         screen: 'menu',
         hud: EMPTY_HUD,
+        arsenal: [],
         market: createMarket(),
         best: 0,
         look: DEFAULT_LOOK,
         bloodColor: DEFAULT_BLOOD_COLOR,
+        idleWarnings: 0,
         intelligence: {},
         attackVariance: null,
         // so antes da run: a engine le `look` uma vez, ao criar o renderer
@@ -270,6 +300,16 @@ export const useGameStore = create<GameStore>()(
         },
         buy: (id) => {
           if (world && buyItem(world, id)) sync();
+        },
+        selectWeapon: (id) => {
+          if (!world) return;
+          selectWorldWeapon(world, id);
+          sync();
+        },
+        cycleWeapon: () => {
+          if (!world || world.status !== 'playing') return;
+          cycleWorldWeapon(world);
+          sync();
         },
         closeShop: () => {
           if (!world) return;

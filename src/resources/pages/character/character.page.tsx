@@ -4,7 +4,7 @@ import { LookEditor } from '@/resources/pages/character/components/look-editor.c
 import { useCharacterPage } from '@/resources/pages/character/use-character.page';
 
 export function CharacterPage() {
-  const { canvasRef, look, setLook, weapon, setWeapon, backToMenu } =
+  const { canvasRef, look, setLook, weapon, setWeapon, previews, backToMenu } =
     useCharacterPage();
 
   return (
@@ -26,6 +26,7 @@ export function CharacterPage() {
         />
         <WeaponPicker
           weapon={weapon}
+          previews={previews}
           onChange={setWeapon}
         />
         <Button

@@ -13,12 +13,15 @@ import {
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import {
   ATTACK_COOLDOWN,
+  DASH_MAX,
   ENEMY_BULLET_DAMAGE,
   ENEMY_BULLET_SPEED,
+  ENEMY_KINDS,
+  FALLOFF_MIN,
   FIXED_DT,
   FLOATER_TIME,
   KILL_MONEY,
-  PLAYER_BULLET_DAMAGE,
+  LAUNCH_TIME,
   PLAYER_BULLET_SPEED,
   PLAYER_MAX_HP,
   SHIELD_MAX,
@@ -26,6 +29,7 @@ import {
   SWORD_DAMAGE,
   SHOP_EVERY,
 } from '@/app/modules/world/constants/world.constants';
+import { createEmptyWorld } from '@/app/modules/world/systems/world.system';
 import type { World } from '@/app/modules/world/types/world.types';
 import { addEnemy, createArenaWorld } from '@/test/world.fixture';
 
@@ -45,8 +49,9 @@ function shootUp(world: World) {
     world.player.pos,
     UP,
     PLAYER_BULLET_SPEED,
-    PLAYER_BULLET_DAMAGE,
-    8,
+    ITEMS.pistol.damage,
+    // alcance longo: os alvos dos testes ficam na faixa de dano cheio
+    12,
   );
 }
 
@@ -158,7 +163,7 @@ describe('updateCombat corpo a corpo', () => {
   it('sorteia o dano de cada acerto dentro da faixa da run', () => {
     const attack = (seed: number) => {
       const world = createArenaWorld();
-      world.run.attackVariance = { min: 0.75, max: 1.25 };
+      world.run.attackVariance = { min: 1, max: 1.5 };
       world.run.meleeMissChance = 0;
       world.run.nextMeleeChanceAt = Infinity;
       world.rngState = seed;
@@ -170,8 +175,8 @@ describe('updateCombat corpo a corpo', () => {
 
     const low = attack(0);
     const high = attack(9);
-    expect(low).toBeGreaterThanOrEqual(23);
-    expect(high).toBeLessThanOrEqual(38);
+    expect(low).toBeGreaterThanOrEqual(30);
+    expect(high).toBeLessThanOrEqual(45);
     expect(low).not.toBe(high);
   });
 
@@ -200,12 +205,12 @@ describe('updateCombat corpo a corpo', () => {
     expect(world.run.meleeMissChance).toBeLessThan(0.3);
   });
 
-  it('com arma, ainda mata em silencio e nao gasta municao', () => {
+  it('com arma, a facada so sai no F: mata em silencio e nao gasta municao', () => {
     const world = createArenaWorld();
     world.player.weapon = { id: 'pistol', ammo: 3 };
     const enemy = addEnemy(world, 5.5, 3.3, UP);
 
-    updateCombat(world, FIXED_DT);
+    updateCombat(world, FIXED_DT, true);
 
     expect(enemy.state).toBe('dead');
     expect(world.projectiles).toHaveLength(0);
@@ -278,14 +283,18 @@ describe('updateCombat com arma', () => {
     expect(world.player.weapon).toEqual({ id: 'shotgun', ammo: 3 });
   });
 
-  it('remove a arma quando a municao acaba', () => {
+  it('sem bala a arma continua na mao, mas nao atira', () => {
     const world = createArenaWorld();
     world.player.weapon = { id: 'pistol', ammo: 1 };
     addEnemy(world, 5.5, 6.5, UP);
 
     updateCombat(world, FIXED_DT);
+    expect(world.player.weapon).toEqual({ id: 'pistol', ammo: 0 });
+    expect(world.projectiles).toHaveLength(1);
 
-    expect(world.player.weapon).toBeNull();
+    updateCombat(world, ATTACK_COOLDOWN + FIXED_DT);
+    expect(world.projectiles).toHaveLength(1);
+    expect(world.player.weapon).toEqual({ id: 'pistol', ammo: 0 });
   });
 
   it('nao atira sem linha de visao nem fora do alcance', () => {
@@ -494,9 +503,9 @@ describe('coracao e escudo', () => {
   it('escudo absorve o dano antes da vida', () => {
     const world = createArenaWorld();
     world.player.shield = 15;
-    damagePlayer(world, 10);
+    damagePlayer(world, 10, world.player.pos);
     expect(world.player).toMatchObject({ shield: 5, hp: PLAYER_MAX_HP });
-    damagePlayer(world, 10);
+    damagePlayer(world, 10, world.player.pos);
     expect(world.player).toMatchObject({ shield: 0, hp: PLAYER_MAX_HP - 5 });
     expect(world.run.stats).toMatchObject({
       damageBlocked: 15,
@@ -569,5 +578,250 @@ describe('floaters', () => {
 
     updateFloaters(world, FLOATER_TIME / 2);
     expect(world.floaters).toHaveLength(0);
+  });
+});
+
+describe('floaters do inimigo', () => {
+  it('dano sofrido aparece sobre o inimigo que bateu, com o golpe inteiro', () => {
+    const world = createArenaWorld();
+    world.player.shield = 5;
+    damagePlayer(world, 20, { x: 7.5, y: 6.5 });
+    expect(world.floaters).toHaveLength(1);
+    expect(world.floaters[0]).toMatchObject({
+      pos: { x: 7.5, y: 6.5 },
+      amount: 20,
+      onPlayer: true,
+    });
+  });
+
+  // terno em (2.5, 8.5) atira; `angle` decide se acerta o player em (5.5, 2.5)
+  function suitShot(angle: number) {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 2.5, 8.5, angle);
+    spawnProjectile(
+      world,
+      'enemy',
+      enemy.pos,
+      angle,
+      ENEMY_BULLET_SPEED,
+      ENEMY_BULLET_DAMAGE,
+      8,
+      'pistol',
+      enemy.id,
+    );
+    fly(world, 2);
+    expect(world.projectiles).toHaveLength(0);
+    expect(world.floaters).toHaveLength(1);
+    return { world, enemy };
+  }
+
+  it('bala inimiga que acerta mostra o dano sobre quem atirou', () => {
+    const { world, enemy } = suitShot(Math.atan2(2.5 - 8.5, 5.5 - 2.5));
+    expect(world.player.hp).toBeLessThan(PLAYER_MAX_HP);
+    expect(world.floaters[0]).toMatchObject({ pos: enemy.pos, onPlayer: true });
+    expect(world.floaters[0].amount).toBeGreaterThan(0);
+  });
+
+  it('bala inimiga que erra avisa o erro sobre quem atirou', () => {
+    const { world, enemy } = suitShot(0);
+    expect(world.player.hp).toBe(PLAYER_MAX_HP);
+    expect(world.floaters[0]).toMatchObject({
+      pos: enemy.pos,
+      amount: 0,
+      onPlayer: true,
+    });
+  });
+});
+
+describe('dano do player', () => {
+  // bala de `damage` saindo do player para cima, alvo a `gap` de distancia
+  function hitAt(gap: number, damage: number, range: number) {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, world.player.pos.y + gap, UP);
+    spawnProjectile(
+      world,
+      'player',
+      world.player.pos,
+      UP,
+      PLAYER_BULLET_SPEED,
+      damage,
+      range,
+    );
+    fly(world, 1);
+    return ENEMY_KINDS.suit.hp - enemy.hp;
+  }
+
+  it('faixa sorteada nunca fica abaixo do dano base: dois golpes matam', () => {
+    for (const seed of [1, 2, 3, 40, 500]) {
+      const { min, max } = createEmptyWorld(seed).run.attackVariance;
+      expect(min).toBeGreaterThanOrEqual(1);
+      expect(min).toBeLessThanOrEqual(1.1);
+      expect(max).toBeGreaterThanOrEqual(1.4);
+      expect(max).toBeLessThanOrEqual(1.5);
+      expect(2 * Math.round(SWORD_DAMAGE * min)).toBeGreaterThanOrEqual(
+        ENEMY_KINDS.suit.hp,
+      );
+    }
+  });
+
+  it('cada bala disparada sorteia o proprio dano no disparo', () => {
+    const world = createArenaWorld();
+    world.run.attackVariance = { min: 1, max: 1.5 };
+    world.player.weapon = { id: 'shotgun', ammo: 2 };
+    addEnemy(world, 5.5, 5.5, UP);
+
+    updateCombat(world, FIXED_DT);
+
+    const damages = world.projectiles.map((bullet) => bullet.damage);
+    expect(damages).toHaveLength(ITEMS.shotgun.pellets);
+    expect(new Set(damages).size).toBeGreaterThan(1);
+    for (const damage of damages) {
+      expect(damage).toBeGreaterThanOrEqual(ITEMS.shotgun.damage);
+      expect(damage).toBeLessThanOrEqual(ITEMS.shotgun.damage * 1.5 + 1);
+    }
+  });
+
+  it('chumbo da escopeta vale metade da bala da pistola', () => {
+    expect(ITEMS.shotgun.damage * 2).toBe(ITEMS.pistol.damage);
+    expect(ITEMS.shotgun.damage * 4).toBeGreaterThanOrEqual(
+      ENEMY_KINDS.suit.hp,
+    );
+  });
+
+  it('dano da bala cai com a distancia, ate FALLOFF_MIN no alcance maximo', () => {
+    const near = hitAt(2, 30, 6);
+    const middle = hitAt(4.6, 30, 6);
+    const far = hitAt(6.3, 30, 6);
+
+    expect(near).toBe(30);
+    expect(middle).toBeLessThan(near);
+    expect(middle).toBeGreaterThan(far);
+    expect(far).toBeGreaterThanOrEqual(Math.round(30 * FALLOFF_MIN));
+    expect(far).toBeLessThan(8);
+  });
+});
+
+describe('item de salto', () => {
+  function drop(world: World, value: number) {
+    world.pickups.push({
+      id: world.nextId++,
+      kind: 'dash',
+      roomIndex: 0,
+      pos: { ...world.player.pos },
+      value,
+    });
+  }
+
+  it('repoe saltos ate DASH_MAX', () => {
+    const world = createArenaWorld();
+    world.player.dashes = 1;
+
+    drop(world, 3);
+    collectPickups(world);
+    expect(world.player.dashes).toBe(4);
+    expect(world.pickups).toHaveLength(0);
+
+    drop(world, 6);
+    collectPickups(world);
+    expect(world.player.dashes).toBe(DASH_MAX);
+  });
+
+  it('fica no chao com os saltos cheios', () => {
+    const world = createArenaWorld();
+    expect(world.player.dashes).toBe(DASH_MAX);
+    drop(world, 2);
+    collectPickups(world);
+    expect(world.pickups).toHaveLength(1);
+  });
+});
+
+describe('lancamento de quem morre de um golpe so', () => {
+  it('execucao de vida cheia lanca para longe do player', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 3.3, UP);
+    updateCombat(world, FIXED_DT);
+    expect(enemy.state).toBe('dead');
+    expect(enemy.launch).toBe(LAUNCH_TIME);
+    expect(enemy.facing).toBeCloseTo(UP);
+  });
+
+  it('morte no segundo golpe nao lanca', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 3.3, UP);
+    enemy.hp -= 1;
+    updateCombat(world, FIXED_DT);
+    expect(enemy.state).toBe('dead');
+    expect(enemy.launch).toBe(0);
+  });
+});
+
+it('com arma e sem F, nao esfaqueia nem atira em quem esta encostado', () => {
+  const world = createArenaWorld();
+  world.player.weapon = { id: 'pistol', ammo: 3 };
+  const enemy = addEnemy(world, 5.5, 3.3, UP);
+
+  for (let i = 0; i < 60; i++) updateCombat(world, FIXED_DT);
+
+  expect(enemy.state).not.toBe('dead');
+  expect(world.player.slash).toBe(0);
+  expect(world.projectiles).toHaveLength(0);
+  expect(world.player.weapon?.ammo).toBe(3);
+});
+
+describe('item de municao', () => {
+  function drop(world: World, value: number) {
+    world.pickups.push({
+      id: world.nextId++,
+      kind: 'ammo',
+      roomIndex: 0,
+      pos: { ...world.player.pos },
+      value,
+    });
+  }
+
+  it('toda arma de fogo vem com 30 balas', () => {
+    for (const id of ['pistol', 'silenced', 'shotgun'] as const) {
+      expect(ITEMS[id].ammo).toBe(30);
+    }
+  });
+
+  it('completa a arma na mao, ate o que ela traz de fabrica', () => {
+    const world = createArenaWorld();
+    world.player.weapon = { id: 'pistol', ammo: 5 };
+
+    drop(world, 8);
+    collectPickups(world);
+    expect(world.player.weapon.ammo).toBe(13);
+    expect(world.pickups).toHaveLength(0);
+
+    drop(world, 100);
+    collectPickups(world);
+    expect(world.player.weapon.ammo).toBe(ITEMS.pistol.ammo);
+  });
+
+  it('com a espada na mao, vai para a arma do arsenal que tem espaco', () => {
+    const world = createArenaWorld();
+    const full = { id: 'pistol' as const, ammo: ITEMS.pistol.ammo };
+    const empty = { id: 'shotgun' as const, ammo: 0 };
+    world.player.arsenal = [full, empty];
+    world.player.weapon = null;
+
+    drop(world, 7);
+    collectPickups(world);
+
+    expect(empty.ammo).toBe(7);
+    expect(full.ammo).toBe(ITEMS.pistol.ammo);
+    expect(world.pickups).toHaveLength(0);
+  });
+
+  it('fica no chao sem arma ou com a arma cheia', () => {
+    const world = createArenaWorld();
+    drop(world, 8);
+    collectPickups(world);
+    expect(world.pickups).toHaveLength(1);
+
+    world.player.weapon = { id: 'pistol', ammo: ITEMS.pistol.ammo };
+    collectPickups(world);
+    expect(world.pickups).toHaveLength(1);
   });
 });

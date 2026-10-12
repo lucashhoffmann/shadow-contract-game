@@ -4,6 +4,7 @@ import {
   type CharacterPreview,
   createCharacterPreview,
 } from '@/app/engine/character-preview';
+import { renderWeaponPreviews } from '@/app/engine/weapon-preview';
 import type { WeaponId } from '@/app/modules/world/types/world.types';
 import { useGameStore } from '@/app/store/game-store/game.store';
 
@@ -15,6 +16,8 @@ export function useCharacterPage() {
   const backToMenu = useGameStore((state) => state.backToMenu);
   // so do preview: qual arma o personagem segura; null = espada
   const [weapon, setWeapon] = useState<WeaponId | null>(null);
+  // fotos das armas para os cartoes, tiradas uma vez por montagem
+  const [previews] = useState(renderWeaponPreviews);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -35,5 +38,13 @@ export function useCharacterPage() {
     previewRef.current?.setWeapon(weapon);
   }, [weapon]);
 
-  return { canvasRef, look, setLook, weapon, setWeapon, backToMenu };
+  return {
+    canvasRef,
+    look,
+    setLook,
+    weapon,
+    setWeapon,
+    previews,
+    backToMenu,
+  };
 }

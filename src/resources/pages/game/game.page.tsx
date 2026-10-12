@@ -12,7 +12,10 @@ export function GamePage() {
     canvasRef,
     screen,
     hud,
+    arsenal,
+    selectWeapon,
     hits,
+    idleWarnings,
     market,
     best,
     legend,
@@ -30,9 +33,15 @@ export function GamePage() {
         className='block h-full w-full'
       />
       <DamageVignette hits={hits} />
+      <DamageVignette
+        hits={idleWarnings}
+        color='blue'
+      />
       <Hud
         hud={hud}
+        arsenal={arsenal}
         previews={previews}
+        onSelectWeapon={selectWeapon}
       />
       <VirtualJoystick onMove={setJoystickInput} />
       <LegendDialog
@@ -43,6 +52,7 @@ export function GamePage() {
         open={screen === 'shop'}
         money={hud.money}
         market={market}
+        arsenal={arsenal}
         previews={previews}
         onBuy={buy}
         onClose={closeShop}

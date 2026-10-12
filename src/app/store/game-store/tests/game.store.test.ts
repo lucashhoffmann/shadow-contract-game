@@ -2,6 +2,7 @@ import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import { createEnemy } from '@/app/modules/enemy/systems/enemy.system';
 import {
   FIXED_DT,
+  IDLE_WARNING_DELAY,
   PLAYER_MAX_HP,
   ROOM_H,
 } from '@/app/modules/world/constants/world.constants';
@@ -85,6 +86,21 @@ describe('game store', () => {
 
     unsubscribe();
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('publica o aviso de inatividade e o zera na proxima run', () => {
+    play();
+    for (let i = 0; i < (IDLE_WARNING_DELAY + FIXED_DT) / FIXED_DT; i++) {
+      store().tick(IDLE, FIXED_DT);
+    }
+
+    expect(store().idleWarnings).toBe(1);
+    expect(
+      JSON.parse(localStorage.getItem('shadow-contract')!).state.idleWarnings,
+    ).toBeUndefined();
+
+    store().startRun(2);
+    expect(store().idleWarnings).toBe(0);
   });
 
   it('buy debita, mostra a arma no hud e publica o mercado novo', () => {
@@ -188,8 +204,8 @@ describe('game store', () => {
   it('salva a variacao de ataque em JSON e reutiliza a faixa', () => {
     play();
     const variance = getWorld()!.run.attackVariance;
-    expect(variance.min).toBeGreaterThanOrEqual(0.75);
-    expect(variance.max).toBeLessThanOrEqual(1.25);
+    expect(variance.min).toBeGreaterThanOrEqual(1);
+    expect(variance.max).toBeLessThanOrEqual(1.5);
     expect(
       JSON.parse(localStorage.getItem('shadow-contract')!).state.attackVariance,
     ).toEqual(variance);

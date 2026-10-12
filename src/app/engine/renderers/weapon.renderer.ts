@@ -13,7 +13,8 @@ import type { WeaponId } from '@/app/modules/world/types/world.types';
 // Usados no preview do HUD (engine/weapon-preview.ts) e na mao do player
 // (world.renderer.ts).
 
-export type WeaponModelId = WeaponId | 'sword';
+// 'ammo' nao e arma: e a foto da municao, usada na recarga da loja
+export type WeaponModelId = WeaponId | 'sword' | 'ammo';
 
 export type WeaponModel = { root: THREE.Group; dispose: () => void };
 
@@ -353,6 +354,47 @@ function sword({ paint, add }: Kit): void {
   );
 }
 
+// tres cartuchos em pe, levemente tortos: estojo de latao e ponta de cobre
+function ammo({ paint, add }: Kit): void {
+  const brass = paint(0xd9b84a);
+  const copper = paint(0xd98a5a);
+  const rim = paint(0xa8862c);
+  for (const [x, z, lean] of [
+    [-0.34, 0.06, 0.1],
+    [0, -0.1, -0.04],
+    [0.34, 0.08, -0.12],
+  ]) {
+    add(
+      new THREE.CylinderGeometry(0.15, 0.15, 0.05, 10)
+        .translate(0, 0.025, 0)
+        .rotateZ(lean),
+      rim,
+      x,
+      0,
+      z,
+    );
+    add(
+      new THREE.CylinderGeometry(0.13, 0.13, 0.55, 10)
+        .translate(0, 0.325, 0)
+        .rotateZ(lean),
+      brass,
+      x,
+      0,
+      z,
+    );
+    add(
+      new THREE.SphereGeometry(0.125, 10, 8)
+        .scale(1, 2.2, 1)
+        .translate(0, 0.62, 0)
+        .rotateZ(lean),
+      copper,
+      x,
+      0,
+      z,
+    );
+  }
+}
+
 export function createWeaponModel(id: WeaponModelId): WeaponModel {
   const root = new THREE.Group();
   const owned: { dispose: () => void }[] = [];
@@ -372,7 +414,8 @@ export function createWeaponModel(id: WeaponModelId): WeaponModel {
       root.add(mesh);
     },
   };
-  if (id === 'sword') sword(kit);
+  if (id === 'ammo') ammo(kit);
+  else if (id === 'sword') sword(kit);
   else if (id === 'shotgun') shotgun(kit);
   else pistol(kit, id === 'silenced');
   return {

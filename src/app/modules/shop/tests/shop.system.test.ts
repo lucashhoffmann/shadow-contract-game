@@ -16,6 +16,8 @@ import {
 } from '@/app/modules/shop/constants/shop.constants';
 import {
   buyItem,
+  itemPrice,
+  refillPrice,
   canBuy,
   closeShop,
   rollMarket,
@@ -108,6 +110,54 @@ describe('buyItem', () => {
       -1,
     );
     expect(world.market.prices.pistol).toBe(ITEMS.pistol.price);
+  });
+});
+
+describe('arsenal e recarga', () => {
+  function richWorld() {
+    const world = createArenaWorld();
+    world.run.money = 5000;
+    return world;
+  }
+
+  it('comprar outra arma guarda a anterior no arsenal', () => {
+    const world = richWorld();
+    buyItem(world, 'pistol');
+    buyItem(world, 'shotgun');
+
+    expect(world.player.arsenal.map((weapon) => weapon.id)).toEqual([
+      'pistol',
+      'shotgun',
+    ]);
+    expect(world.player.weapon).toBe(world.player.arsenal[1]);
+  });
+
+  it('arma que ja tem vende so a recarga, mais barata, e enche a municao', () => {
+    const world = richWorld();
+    buyItem(world, 'pistol');
+    const pistol = world.player.arsenal[0];
+    pistol.ammo = 3;
+    const market = world.market.prices.pistol;
+    const before = world.run.money;
+
+    expect(itemPrice(world, 'pistol')).toBe(refillPrice(market));
+    expect(refillPrice(market)).toBeLessThan(market / 2);
+    expect(buyItem(world, 'pistol')).toBe(true);
+
+    expect(world.run.money).toBe(before - refillPrice(market));
+    expect(pistol.ammo).toBe(ITEMS.pistol.ammo);
+    expect(world.player.arsenal).toHaveLength(1);
+    expect(world.run.events.at(-1)?.text).toContain('Recarregou');
+  });
+
+  it('arma cheia nao tem o que recarregar', () => {
+    const world = richWorld();
+    buyItem(world, 'pistol');
+    const before = world.run.money;
+
+    expect(canBuy(world, 'pistol')).toBe(false);
+    expect(buyItem(world, 'pistol')).toBe(false);
+    expect(world.run.money).toBe(before);
   });
 });
 

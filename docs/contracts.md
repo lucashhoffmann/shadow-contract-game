@@ -33,6 +33,9 @@ type World = {
     kills;
     shops;
     seconds;
+    lastMovedAt;
+    lastIdleWarningAt;
+    idleWarnings;
     attackVariance;
     meleeMissChance;
     nextMeleeChanceAt;
@@ -47,6 +50,9 @@ Invariantes:
 
 - so `stepWorld` e acoes do store mutam `World`
 - `status !== 'playing'` congela a simulacao
+- apos 10 segundos sem deslocamento real, `idleWarnings` sobe e a UI pulsa
+  bordas azuis; a cada 5 segundos parado, outro inimigo e alertado ou criado
+  na sala atual (ate 5 inimigos vivos)
 - fora das salas vivas tudo e parede
 - mesmos `seed`, perfis salvos e sequencia de input = mesmo `World`
 - `market` e trocado por um objeto novo a cada mudanca (o store compara por
@@ -83,6 +89,8 @@ simulacao normaliza se o vetor passar de 1.
 `interact` e um pulso da tecla F: quebra a caixa intacta mais proxima dentro de
 `MELEE_RANGE`, vira o player para ela e anima o golpe de espada. Fora de
 `playing`, o pulso e ignorado. O F modelado aparece sobre a caixa ao alcance.
+Com arma de fogo na mao e inimigo em `MELEE_RANGE`, o mesmo pulso vira facada
+nele (tem prioridade sobre a caixa) e o F aparece sobre o inimigo.
 
 `open` e um pulso da tecla B: abre o bau cujo centro esta a ate `CHEST_RANGE`
 do player (`openChest`). Com a loja aberta, a mesma tecla chama `closeShop`
@@ -102,7 +110,10 @@ pela engine. O B modelado aparece sobre o bau ao alcance.
 `dash` (espaco) dispara o salto de esquiva: `DASH_TIME` segundos a `DASH_SPEED`
 em linha reta, para onde o input aponta ou, sem input, para `facing`. No ar o
 input de movimento e ignorado; parede e caixa param o salto como param o andar.
-So repete depois de `DASH_COOLDOWN`. Ainda e so movimento: nao da
+Cada salto gasta um de `player.dashes` (comeca em `DASH_MAX`, 6); com zero nao
+salta, e so o item `dash` das caixas repoe. Na sala inicial o salto e livre:
+so passa a gastar quando `run.roomIndex > 0`, e nao volta a ser livre. So repete depois de
+`DASH_COOLDOWN`. Ainda e so movimento: nao da
 invulnerabilidade nem passa por cima de nada. `player.dash` conta o tempo no
 ar; a engine usa para animar a cambalhota e o vento.
 
@@ -141,7 +152,8 @@ Tipos (numeros em `ENEMY_KINDS`):
 | `suit`  | 60   | para dentro de `FIRE_RANGE` e dispara `Projectile` |
 | `ninja` | 60   | corre ate `NINJA_REACH` e golpeia, sem bala        |
 
-`ninja` so aparece a partir da sala `NINJA_FROM_ROOM`.
+`ninja` aparece normalmente a partir da sala `NINJA_FROM_ROOM`; a pressao por
+inatividade tambem pode chama-lo antes.
 
 Cada contrato de `SHOP_EVERY` salas tem um nivel de inteligencia (a sala inicial
 e nivel 1). O primeiro nivel usa multiplicadores 1; os seguintes aumentam
@@ -164,6 +176,11 @@ Estados:
 | `alert`      | `patrol`     | `ALERT_DURATION` sem linha de visao  |
 | qualquer     | `dead`       | `killEnemy`                          |
 
+- morte de um golpe so (vida cheia a zero num `damageEnemy`): `launch` recebe
+  `LAUNCH_TIME` e `facing` vira a direcao do golpe (do player para o
+  inimigo). `updateEnemies` anda o corpo `LAUNCH_DISTANCE` nesse tempo,
+  freando ate parar; parede segura. Morte em mais de um golpe nao lanca. A
+  engine anima o voo e o tombo por `enemy.launch`
 - o inimigo ve o player no cone ate `viewRange`, ou em qualquer direcao a ate
   `senseRange(enemy)`: `SENSE_RANGE` mais `SENSE_PER_CONTRACT` por contrato
   (`roomIndex / SHOP_EVERY`), ate `+SENSE_MAX_BONUS`. Os dois pedem linha de
@@ -200,6 +217,8 @@ Estados:
   `dashEvery` segundos. `dashEvery` e fixado ao nascer: comeca em
   `ENEMY_DASH_INTERVAL` e cai `ENEMY_DASH_PER_ROOM` por sala, ate
   `ENEMY_DASH_MIN_INTERVAL`; `0` = nao salta
+  - so salta com o trajeto inteiro livre: parede, caixa, bau ou porta selada
+    no caminho cancelam o salto, e ele contorna andando
   - fora do alcance de ataque: salta na direcao do player; `ninja` pousa ao
     chegar em `NINJA_REACH`
   - `suit` ja no alcance de tiro: salta de lado (lado sorteado por `rngState`)
@@ -219,6 +238,9 @@ type Projectile = {
   vel: Vec2; // unidades por segundo
   damage: number;
   life: number; // segundos restantes
+  range: number; // alcance da arma
+  travelled: number; // distancia ja percorrida
+  shooter?: number; // id do inimigo que atirou
 };
 ```
 
@@ -246,13 +268,19 @@ type Prop = { id: number; roomIndex: number; pos: Vec2; broken: boolean };
 - quebra quando uma bala (de qualquer dono) entra no tile, ou quando alguem
   morre a ate `PROP_BREAK_RADIUS`
 - quebrar troca o tile por `.` e marca `broken`; a engine desenha destrocos
-- ao quebrar, sorteia (`rngState`) um `Pickup`: `heart` com chance
-  `LOOT_HEART_CHANCE`, `shield` com `LOOT_SHIELD_CHANCE`, senao nada
+- ao quebrar, sorteia (`rngState`) um `Pickup` pela tabela `LOOT`
+  (`level/utils/grid.util.ts`): cada item ocupa a sua `chance` da reta de 0 a
+  1, em ordem (`heart` `LOOT_HEART_CHANCE`, `shield` `LOOT_SHIELD_CHANCE`,
+  `dash` `LOOT_DASH_CHANCE`, `ammo` `LOOT_AMMO_CHANCE`); o que sobra e caixa
+  vazia. Item com `when` (municao: so com o player armado) que nao vale no
+  momento tambem vira caixa vazia. Um segundo sorteio
+  define o valor. Item novo entra no fim da tabela, para nao mudar o que as
+  faixas anteriores soltam
 
 ## `Pickup`
 
 ```ts
-type PickupKind = 'money' | 'heart' | 'shield';
+type PickupKind = 'money' | 'heart' | 'shield' | 'dash' | 'ammo';
 type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
 ```
 
@@ -262,7 +290,14 @@ type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
   `HEART_MAX` de `maxHp`, com sorteio ao quadrado (cura pouca e o comum)
 - `shield`: soma `value` em `player.shield`, ate `SHIELD_MAX * maxHp`. `value`
   nasce entre `SHIELD_MIN` e `SHIELD_MAX` de `maxHp`
-- `heart` com vida cheia e `shield` com escudo no teto ficam no chao
+- `dash`: repoe `value` saltos em `player.dashes`, ate `DASH_MAX`. `value` e
+  um inteiro de `DASH_LOOT_MIN` a `DASH_LOOT_MAX`, todos com a mesma chance
+- `ammo`: soma `value` balas na arma na mao ou, se ela esta cheia ou a mao
+  esta com a espada, na primeira do arsenal com espaco, ate `ItemDef.ammo` (30 em
+  toda arma de fogo). `value` e um inteiro de `AMMO_LOOT_MIN` a
+  `AMMO_LOOT_MAX`. So sai de caixa com alguma arma de fogo no arsenal
+- `heart` com vida cheia, `shield` com escudo no teto, `dash` com os saltos
+  cheios e `ammo` sem arma ou com todas cheias ficam no chao
 - todo dano no player passa por `damagePlayer`: gasta `shield` antes de `hp`
 - some junto com a sala
 
@@ -270,8 +305,10 @@ type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
 
 O player comeca com a espada e nunca a perde.
 
-- encostado (`MELEE_RANGE`) em alguem, com ou sem arma de fogo: golpe de
-  espada, sem gastar municao
+- sem arma de fogo, encostado (`MELEE_RANGE`) em alguem: golpe de espada
+  automatico. Com arma de fogo, a espada so sai no pulso `interact` (F) com
+  alguem ao alcance (`meleeTarget`), sem gastar municao; sem o F, nada
+  acontece: nao atira em quem esta ao alcance da espada
   - a chance de erro e sorteada a cada `MELEE_MISS_INTERVAL` segundos ativos:
     normalmente entre 10% e 30%, com 25% de chance de pico entre 45% e 70%
   - cada erro alerta o alvo; as mudancas de chance entram em `run.events`
@@ -279,7 +316,8 @@ O player comeca com a espada e nunca a perde.
   - inimigo `alert`: leva `SWORD_DAMAGE` com variacao de ataque
 - senao, com arma de fogo: mira no inimigo vivo mais proximo dentro de `range`
   e com linha de visao, dispara `pellets` balas abertas em `spread` radianos,
-  gasta 1 de municao; municao zerada remove a arma
+  gasta 1 de municao; municao zerada nao remove a arma: ela fica na mao e
+  no arsenal, so nao atira
 - inimigo morto solta `Pickup` de `KILL_MONEY`
 - cada morte da `ADRENALINE_TIME` segundos de velocidade multiplicada por
   `ADRENALINE_BOOST`
@@ -289,9 +327,10 @@ O player comeca com a espada e nunca a perde.
 - `run.stats` registra tentativas/acertos de espada, projeteis disparados e
   acertados, dano causado/sofrido/bloqueado e vida recuperada
 - `run.attackVariance` guarda a faixa sorteada para a forca dos ataques:
-  minimo entre 75% e 85% e maximo entre 115% e 125% do dano base. Cada
-  facada em inimigo alerta e cada projetil disparado sorteiam um dano na
-  faixa; execucoes furtivas continuam instantaneas. A faixa fica em
+  minimo entre 100% e 110% e maximo entre 140% e 150% do dano base (nunca
+  abaixo do base: dois golpes de 30 sempre matam 60 de vida). Cada facada em
+  inimigo alerta e cada projetil sorteiam o proprio dano na faixa quando o
+  ataque comeca (o projetil no disparo, nao no impacto); execucoes furtivas continuam instantaneas. A faixa fica em
   `localStorage` e os acertos registram o dano efetivo em `run.events`
 - `run.events` guarda o registro cronologico da partida; `run.seconds` nao
   avanca durante pausa, loja ou legenda
@@ -299,7 +338,13 @@ O player comeca com a espada e nunca a perde.
 ## `Floater` (dano flutuante)
 
 ```ts
-type Floater = { id: number; pos: Vec2; amount: number; age: number };
+type Floater = {
+  id: number;
+  pos: Vec2;
+  amount: number;
+  age: number;
+  onPlayer?: boolean;
+};
 ```
 
 - nasce em cada golpe do player: `amount` e o dano causado (a execucao de
@@ -307,12 +352,20 @@ type Floater = { id: number; pos: Vec2; amount: number; age: number };
 - erro: facada que falha, ou bala do player que acaba ou bate na parede sem
   acertar ninguem. Erros a menos de `FLOATER_MISS_GAP` um do outro viram um
   so (chumbo da escopeta)
+- golpe do inimigo (`onPlayer`): aparece sobre o inimigo que bateu, nao
+  sobre o player. Todo `damagePlayer(world, dano, from)` poe em `from` o dano
+  do golpe inteiro, incluindo o que o escudo segurou; bala inimiga que acaba
+  ou bate na parede sem acertar poe um erro sobre quem atirou
+  (`Projectile.shooter`). A engine desenha `-N` sempre em vermelho
 - `updateFloaters` soma `age` e remove em `FLOATER_TIME`
 - a engine desenha `+N` ou `Errou!` (em claro) na fonte Creepster. Cor do
   numero pelo dano: 30 ou mais vermelho, abaixo de 30 amarelo, abaixo de 5
   verde
-- golpe do player tira 30 (`SWORD_DAMAGE`, `PLAYER_BULLET_DAMAGE`) de 60 de
-  vida do inimigo: dois golpes matam
+- dano base: espada `SWORD_DAMAGE` (30); bala `ItemDef.damage` (pistolas
+  30, chumbo da escopeta 15). Inimigo tem 60 de vida
+- dano da bala cai com a distancia: cheio ate `FALLOFF_START` do alcance da
+  arma, depois desce em linha ate `FALLOFF_MIN` no alcance maximo
+  (`Projectile.travelled / range`). Bala inimiga nao perde dano
 - a fonte e carregada no `index.html`; o texto estoura de tamanho, assenta,
   sobe e some
 
@@ -324,6 +377,7 @@ type ItemDef = {
   name: string;
   kind: 'weapon' | 'armor';
   price: number; // preco base
+  damage: number; // dano base de cada bala
   range: number;
   ammo: number;
   pellets: number;
@@ -333,6 +387,23 @@ type ItemDef = {
 ```
 
 Equipamento vale so para a run atual; `startRun` cria `World` novo.
+
+### Arsenal
+
+```ts
+type Weapon = { id: WeaponId; ammo: number };
+player.weapon: Weapon | null; // arma de fogo na mao; null = espada
+player.arsenal: Weapon[]; // armas de fogo da run, na ordem de compra
+```
+
+- `player.weapon`, quando nao e null, e um dos objetos de `player.arsenal`
+- comprar arma nova poe ela no arsenal e na mao; as outras ficam guardadas
+- comprar arma que ja esta no arsenal e recarga: custa `refillPrice` do
+  preco de mercado (`AMMO_REFILL_PRICE`), enche a municao e poe na mao.
+  `itemPrice(world, id)` devolve o preco cobrado; arma cheia nao se compra
+- `selectWeapon(world, id | null)` troca o que esta na mao (arma que o
+  player nao tem e ignorada); `cycleWeapon` roda espada, cada arma, e volta
+- arma sem bala pode ser escolhida; o HUD mostra ela cinza e opaca
 
 `WeaponId` e `'pistol' | 'silenced' | 'shotgun'`. `silenced` e a pistola com
 silenciador: mesmos numeros da pistola, mas o tiro nao faz barulho (ver
@@ -377,6 +448,7 @@ hud: {
   hp;
   maxHp;
   shield;
+  dashes; // saltos guardados, de 0 a DASH_MAX
   money;
   room;
   kills;
@@ -387,6 +459,7 @@ market: Market;
 best: number; // maior sala alcancada, persistido em localStorage
 look: PlayerLook; // aparencia do player, persistida em localStorage
 bloodColor: string; // cor das pocas, persistida em localStorage
+idleWarnings: number; // pulsos azuis da run atual, nao persistido
 intelligence: Record<number, EnemyIntelligence>; // perfis por nivel, persistidos em localStorage
 attackVariance: AttackVariance | null; // faixa de dano, persistida em localStorage
 ```
@@ -420,6 +493,8 @@ Acoes:
 | `togglePause()`        | UI, engine | `playing` <-> `paused`                  |
 | `tick(input, dt)`      | engine     | `stepWorld` e sincroniza `hud`/`screen` |
 | `buy(itemId)`          | UI         | `buyItem` e sincroniza                  |
+| `selectWeapon(id)`     | UI         | troca a arma na mao; null = espada      |
+| `cycleWeapon()`        | engine (Q) | proxima arma; so em `playing`           |
 | `closeShop()`          | UI, engine | volta para `playing`                    |
 | `backToMenu()`         | UI         | descarta `World`, `screen = 'menu'`     |
 | `openCharacter()`      | UI (menu)  | `screen = 'character'`; em run, nada    |
@@ -447,8 +522,23 @@ function createGameEngine(canvas: HTMLCanvasElement): { dispose(): void };
 - a cada frame: acumula tempo, chama `tick` em passos de `FIXED_DT`, depois
   `renderer.sync(world)` e desenha (inclusive em `intro` e `paused`)
 - teclas: WASD/setas movem, `P` chama `togglePause`, `Enter` chama `begin`,
-  `F` pulsa `interact`, `B` pulsa `open` ou chama `closeShop`
+  `F` pulsa `interact`, `B` pulsa `open` ou chama `closeShop`, `Q` chama
+  `cycleWeapon`
 - nunca muta `World`
+- porta de correr na saida da sala inicial e de cada loja (entrada de cada
+  nivel), nos tiles `isDoorTile` (`level/utils/grid.util.ts`)
+  - player passa sempre
+  - inimigo nao passa nem a porta abre para ele enquanto `doorsSealed(world)`:
+    movimento, salto e rota (`moveCircle`, `circleHitsWall`, `findPath` com
+    `sealed`) tratam a porta como parede
+  - `doorsSealed` vira falso com o player parado ha `IDLE_WARNING_DELAY` (a
+    mesma inatividade que manda inimigos atras dele); voltou a andar, sela de
+    novo. Inimigo que ficou no vao pode sair
+  - aberta ou fechada e decidido por `doorOpen(world, ty)`: player a ate
+    `DOOR_RANGE`, ou porta liberada e inimigo vivo a ate `DOOR_RANGE`. A
+    engine desenha as folhas pelo mesmo criterio
+  - fechada, segura bala (de qualquer dono) e visao: `isWall` conta porta
+    fechada como parede, entao cone, linha de visao e mira param nela
 - parede muda a cada contrato (nivel): tom e papel de parede derivados so do
   indice do nivel (`wallpaper` em `world.renderer.ts`), sem campo no `World`
 - animacao so visual, derivada do `World` a cada frame: inclinar ao andar,
@@ -459,7 +549,7 @@ function createGameEngine(canvas: HTMLCanvasElement): { dispose(): void };
 ### Modelos e preview de arma
 
 ```ts
-type WeaponModelId = WeaponId | 'sword';
+type WeaponModelId = WeaponId | 'sword' | 'ammo'; // 'ammo': foto da municao
 function createWeaponModel(id: WeaponModelId): {
   root: THREE.Group;
   dispose(): void;

@@ -13,6 +13,8 @@ import {
   ENEMY_DASH_MIN_INTERVAL,
   FIXED_DT,
   HEARING_YELLOW,
+  LAUNCH_DISTANCE,
+  LAUNCH_TIME,
   NOISE_DASH,
   NOISE_WALK,
   SENSE_MAX_BONUS,
@@ -298,6 +300,30 @@ describe('updateEnemies', () => {
     expect(enemy.pos.y).toBeLessThan(world.player.pos.y);
   });
 
+  it('ninja nao salta com caixa ou bau no trajeto, e nunca entra no tile', () => {
+    // linha 9 do template = y 3: bau em (5, 3), entre o ninja e o player
+    for (const tile of ['C', 'o']) {
+      const world = createArenaWorld({ 9: `#....${tile}....#` });
+      world.player.pos = { x: 5.5, y: 6.5 };
+      const enemy = addEnemy(world, 5.5, 1.5, Math.PI / 2, 'ninja');
+      enemy.dashEvery = 1;
+      enemy.detection = 1;
+
+      let jumped = false;
+      for (let i = 0; i < 240; i++) {
+        updateEnemies(world, FIXED_DT);
+        // ainda do lado de la do obstaculo: so pode contornar andando
+        if (enemy.pos.y < 3 && enemy.dash > 0) jumped = true;
+        expect(
+          Math.floor(enemy.pos.x) === 5 && Math.floor(enemy.pos.y) === 3,
+        ).toBe(false);
+      }
+      expect(jumped).toBe(false);
+      // deu a volta e chegou perto do player
+      expect(enemy.pos.y).toBeGreaterThan(4);
+    }
+  });
+
   it('terno no alcance salta de lado e continua atirando', () => {
     const world = createArenaWorld();
     world.player.pos = { x: 5.5, y: 9.5 };
@@ -455,4 +481,29 @@ it('player agachado e ouvido so ate o branco: investiga, nunca alerta', () => {
     updateEnemies(world, FIXED_DT);
   }
   expect(enemy.state).toBe('alert');
+});
+
+describe('corpo lancado', () => {
+  it('anda LAUNCH_DISTANCE na direcao do golpe e para', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 5.5, Math.PI / 2);
+    enemy.state = 'dead';
+    enemy.launch = LAUNCH_TIME;
+    run(world, LAUNCH_TIME / 2);
+    // freando: mais da metade do caminho na primeira metade do tempo
+    expect(enemy.pos.y - 5.5).toBeGreaterThan(LAUNCH_DISTANCE * 0.6);
+    run(world, LAUNCH_TIME);
+    expect(enemy.launch).toBe(0);
+    expect(enemy.pos.y).toBeCloseTo(5.5 + LAUNCH_DISTANCE, 1);
+    expect(enemy.pos.x).toBeCloseTo(5.5);
+  });
+
+  it('parede segura o corpo', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 11, Math.PI / 2);
+    enemy.state = 'dead';
+    enemy.launch = LAUNCH_TIME;
+    run(world, LAUNCH_TIME * 2);
+    expect(enemy.pos.y).toBeLessThan(12);
+  });
 });

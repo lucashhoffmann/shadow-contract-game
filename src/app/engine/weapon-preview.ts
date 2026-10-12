@@ -62,6 +62,7 @@ export function renderWeaponPreviews(): Record<WeaponModelId, string> {
     pistol: shoot('pistol'),
     silenced: shoot('silenced'),
     shotgun: shoot('shotgun'),
+    ammo: shoot('ammo'),
   };
   renderer.dispose();
   renderer.forceContextLoss();

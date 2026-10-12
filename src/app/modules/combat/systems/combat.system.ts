@@ -10,7 +10,12 @@ import {
   ATTACK_COOLDOWN,
   BULLET_RADIUS,
   BULLET_RANGE_MARGIN,
+  DASH_MAX,
   ENEMY_RADIUS,
+  FALLOFF_MIN,
+  FALLOFF_START,
+  ENEMY_KINDS,
+  LAUNCH_TIME,
   KILL_MONEY,
   MELEE_RANGE,
   MELEE_MISS_BASE,
@@ -21,7 +26,6 @@ import {
   MELEE_MISS_PEAK_SWING,
   NOISE_SHOT,
   PICKUP_RADIUS,
-  PLAYER_BULLET_DAMAGE,
   PLAYER_BULLET_SPEED,
   PLAYER_RADIUS,
   PROP_BREAK_RADIUS,
@@ -52,21 +56,30 @@ export function spawnProjectile(
   damage: number,
   range: number,
   weapon: WeaponId = 'pistol',
+  shooter?: number,
 ): void {
   world.projectiles.push({
     id: world.nextId++,
     owner,
     weapon,
+    ...(shooter !== undefined && { shooter }),
     pos: { ...from },
     vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
     damage,
     life: (range * BULLET_RANGE_MARGIN) / speed,
+    range,
+    travelled: 0,
   });
 }
 
 // numero de dano sobre o alvo; `amount` 0 mostra "Errou!". Erros em rajada
 // (chumbo da escopeta) viram um aviso so.
-function addFloater(world: World, pos: Vec2, amount: number): void {
+function addFloater(
+  world: World,
+  pos: Vec2,
+  amount: number,
+  onPlayer = false,
+): void {
   if (
     amount === 0 &&
     world.floaters.some((f) => f.amount === 0 && f.age < FLOATER_MISS_GAP)
@@ -78,6 +91,7 @@ function addFloater(world: World, pos: Vec2, amount: number): void {
     pos: { ...pos },
     amount,
     age: 0,
+    ...(onPlayer && { onPlayer }),
   });
 }
 
@@ -109,7 +123,8 @@ export function killEnemy(world: World, enemy: Enemy): void {
 }
 
 // escudo absorve primeiro; o que sobra vai na vida
-export function damagePlayer(world: World, damage: number): void {
+// `from`: onde esta quem bateu; o numero do dano sobe ali
+export function damagePlayer(world: World, damage: number, from: Vec2): void {
   const player = world.player;
   const absorbed = Math.min(player.shield, damage);
   player.shield -= absorbed;
@@ -117,6 +132,8 @@ export function damagePlayer(world: World, damage: number): void {
   player.hp -= damage - absorbed;
   world.run.stats.damageBlocked += absorbed;
   world.run.stats.damageTaken += lost;
+  // mostra o golpe inteiro, mesmo a parte que o escudo segurou
+  addFloater(world, from, damage, true);
   world.run.events.push({
     at: world.run.seconds,
     text: lost
@@ -133,6 +150,8 @@ export function damageEnemy(
   source: 'Facada' | 'Tiro' | 'Execução',
 ): void {
   const dealt = Math.min(damage, enemy.hp);
+  // um golpe so, de vida cheia a zero
+  const oneHit = enemy.hp === ENEMY_KINDS[enemy.kind].hp && damage >= enemy.hp;
   addFloater(world, enemy.pos, dealt);
   world.run.stats.damageDealt += dealt;
   world.run.events.push({
@@ -143,10 +162,26 @@ export function damageEnemy(
         : `${source} acertou: ${dealt} de dano.`,
   });
   enemy.hp -= damage;
-  if (enemy.hp <= 0) killEnemy(world, enemy);
-  else enemy.detection = 1;
+  if (enemy.hp > 0) {
+    enemy.detection = 1;
+    return;
+  }
+  killEnemy(world, enemy);
+  if (!oneHit) return;
+  // voa para longe do player e cai de frente nessa direcao (enemy.system)
+  enemy.launch = LAUNCH_TIME;
+  enemy.facing = angleTo(world.player.pos, enemy.pos);
 }
 
+// fracao do dano que sobra depois da distancia percorrida pela bala
+function rangeFalloff(bullet: Projectile): number {
+  const far =
+    (bullet.travelled / bullet.range - FALLOFF_START) / (1 - FALLOFF_START);
+  return 1 - Math.min(1, Math.max(0, far)) * (1 - FALLOFF_MIN);
+}
+
+// sorteio proprio de cada ataque, feito quando ele comeca: no golpe de espada
+// e no disparo de cada bala (nao no impacto)
 function attackDamage(world: World, base: number): number {
   const { min, max } = world.run.attackVariance;
   return Math.max(
@@ -184,10 +219,19 @@ function gunshot(world: World): void {
   }
 }
 
-// Ataque automatico. Encostado em alguem: golpe de espada, sem gastar
-// municao (desavisado morre na hora, em alerta leva SWORD_DAMAGE).
-// Senao, com arma de fogo: atira no mais proximo.
-export function updateCombat(world: World, dt: number): void {
+// quem o golpe de espada pegaria agora: o desavisado mais perto ao alcance,
+// senao o mais perto
+export function meleeTarget(world: World): Enemy | undefined {
+  const close = enemiesInReach(world, MELEE_RANGE);
+  return close.find((e) => e.state !== 'alert') ?? close[0];
+}
+
+// Sem arma de fogo, encostado em alguem: golpe de espada automatico
+// (desavisado morre na hora, em alerta leva SWORD_DAMAGE).
+// Com arma de fogo: atira sozinho no mais proximo, menos em quem esta ao
+// alcance da espada. Ali nada e automatico: espera `knife` (pulso do F) e
+// golpeia, sem gastar municao.
+export function updateCombat(world: World, dt: number, knife = false): void {
   if (world.run.seconds >= world.run.nextMeleeChanceAt) {
     const peak = nextRandom(world) < MELEE_MISS_PEAK_RATE;
     world.run.meleeMissChance = peak
@@ -205,9 +249,10 @@ export function updateCombat(world: World, dt: number): void {
   player.shot = Math.max(0, player.shot - dt);
   if (player.attackCooldown > 0) return;
 
-  const close = enemiesInReach(world, MELEE_RANGE);
-  const unaware = close.find((e) => e.state !== 'alert');
-  const struck = unaware ?? close[0];
+  const struck = meleeTarget(world);
+  const unaware = struck?.state !== 'alert' ? struck : undefined;
+  // armado e sem F: nem esfaqueia nem atira a queima-roupa
+  if (struck && player.weapon && !knife) return;
   if (struck) {
     player.facing = angleTo(player.pos, struck.pos);
     player.slash = SLASH_TIME;
@@ -227,7 +272,8 @@ export function updateCombat(world: World, dt: number): void {
     return;
   }
 
-  if (!player.weapon) return;
+  // sem bala a arma fica na mao, mas nao atira
+  if (!player.weapon || player.weapon.ammo <= 0) return;
   const item = ITEMS[player.weapon.id];
   const target = enemiesInReach(world, item.range)[0];
   if (!target) return;
@@ -243,7 +289,7 @@ export function updateCombat(world: World, dt: number): void {
       player.pos,
       aim + offset,
       PLAYER_BULLET_SPEED,
-      attackDamage(world, PLAYER_BULLET_DAMAGE),
+      attackDamage(world, item.damage),
       item.range,
       player.weapon.id,
     );
@@ -256,7 +302,12 @@ export function updateCombat(world: World, dt: number): void {
   player.attackCooldown = ATTACK_COOLDOWN;
   player.shot = SHOT_TIME;
   if (player.weapon.id !== 'silenced') gunshot(world);
-  if (--player.weapon.ammo <= 0) player.weapon = null;
+  player.weapon.ammo--;
+}
+
+// onde esta o inimigo que disparou; sem ele (sumiu com a sala), a bala
+function shooterPos(world: World, bullet: Projectile): Vec2 {
+  return world.enemies.find((e) => e.id === bullet.shooter)?.pos ?? bullet.pos;
 }
 
 // anda as balas e resolve contato: parede some, personagem leva dano
@@ -266,9 +317,12 @@ export function updateProjectiles(world: World, dt: number): void {
     bullet.pos.x += bullet.vel.x * dt;
     bullet.pos.y += bullet.vel.y * dt;
     bullet.life -= dt;
+    bullet.travelled += Math.hypot(bullet.vel.x, bullet.vel.y) * dt;
     if (bullet.life <= 0 || isWall(world, bullet.pos.x, bullet.pos.y)) {
-      // bala do player que acabou sem acertar ninguem
+      // bala que acabou sem acertar ninguem. A do inimigo avisa sobre quem
+      // atirou
       if (bullet.owner === 'player') addFloater(world, bullet.pos, 0);
+      else addFloater(world, shooterPos(world, bullet), 0, true);
       return false;
     }
     // caixa segura a bala e quebra
@@ -277,7 +331,7 @@ export function updateProjectiles(world: World, dt: number): void {
       if (distance(bullet.pos, player.pos) > PLAYER_RADIUS + BULLET_RADIUS) {
         return true;
       }
-      damagePlayer(world, bullet.damage);
+      damagePlayer(world, bullet.damage, shooterPos(world, bullet));
       return false;
     }
     const hit = world.enemies.find(
@@ -287,7 +341,12 @@ export function updateProjectiles(world: World, dt: number): void {
     );
     if (!hit) return true;
     world.run.stats.projectilesHit++;
-    damageEnemy(world, hit, bullet.damage, 'Tiro');
+    damageEnemy(
+      world,
+      hit,
+      Math.max(1, Math.round(bullet.damage * rangeFalloff(bullet))),
+      'Tiro',
+    );
     return false;
   });
 }
@@ -305,19 +364,43 @@ export function collectPickups(world: World): void {
       });
       return false;
     }
-    // coracao e escudo ficam no chao enquanto nao servem para nada
-    const stat = pickup.kind === 'heart' ? 'hp' : 'shield';
-    const cap =
-      pickup.kind === 'heart'
-        ? player.maxHp
-        : Math.round(player.maxHp * SHIELD_MAX);
+    // municao: completa a arma na mao; se ela esta cheia (ou a mao esta com a
+    // espada), a primeira do arsenal com espaco. Sem nenhuma, fica no chao
+    if (pickup.kind === 'ammo') {
+      const weapon = [player.weapon, ...player.arsenal].find(
+        (owned) => owned && owned.ammo < ITEMS[owned.id].ammo,
+      );
+      if (!weapon) return true;
+      const gained = Math.min(
+        ITEMS[weapon.id].ammo - weapon.ammo,
+        pickup.value,
+      );
+      weapon.ammo += gained;
+      world.run.events.push({
+        at: world.run.seconds,
+        text: `Coletou municao de ${ITEMS[weapon.id].name}: +${gained}.`,
+      });
+      return false;
+    }
+    // coracao, escudo e salto ficam no chao enquanto nao servem para nada
+    const { stat, cap, text } = (
+      {
+        heart: { stat: 'hp', cap: player.maxHp, text: 'Recuperou vida' },
+        shield: {
+          stat: 'shield',
+          cap: Math.round(player.maxHp * SHIELD_MAX),
+          text: 'Coletou escudo',
+        },
+        dash: { stat: 'dashes', cap: DASH_MAX, text: 'Recuperou saltos' },
+      } as const
+    )[pickup.kind];
     if (player[stat] >= cap) return true;
     const gained = Math.min(cap - player[stat], pickup.value);
     player[stat] += gained;
     if (pickup.kind === 'heart') world.run.stats.healthRecovered += gained;
     world.run.events.push({
       at: world.run.seconds,
-      text: `${pickup.kind === 'heart' ? 'Recuperou vida' : 'Coletou escudo'}: +${gained}.`,
+      text: `${text}: +${gained}.`,
     });
     return false;
   });

@@ -1,4 +1,8 @@
-import { isSolidTile, tileAt } from '@/app/modules/level/utils/grid.util';
+import {
+  isDoorTile,
+  isSolidTile,
+  tileAt,
+} from '@/app/modules/level/utils/grid.util';
 import type { Vec2, World } from '@/app/modules/world/types/world.types';
 
 const DIRS = [
@@ -12,10 +16,18 @@ const DIRS = [
 // curto, e sem diagonal nao corta quina de parede.
 // Devolve os centros dos tiles depois do inicial, terminando em `to`.
 // Vazio quando nao ha caminho.
-export function findPath(world: World, from: Vec2, to: Vec2): Vec2[] {
+// `sealed`: porta conta como parede (rota de inimigo com a porta selada).
+export function findPath(
+  world: World,
+  from: Vec2,
+  to: Vec2,
+  sealed = false,
+): Vec2[] {
+  const blocked = (x: number, y: number) =>
+    isSolidTile(tileAt(world, x, y)) || (sealed && isDoorTile(x, y));
   const goalX = Math.floor(to.x);
   const goalY = Math.floor(to.y);
-  if (isSolidTile(tileAt(world, goalX, goalY))) return [];
+  if (blocked(goalX, goalY)) return [];
 
   const queue: [number, number][] = [[Math.floor(from.x), Math.floor(from.y)]];
   const parents = [-1];
@@ -34,7 +46,7 @@ export function findPath(world: World, from: Vec2, to: Vec2): Vec2[] {
       const nx = x + dx;
       const ny = y + dy;
       const key = `${nx},${ny}`;
-      if (seen.has(key) || isSolidTile(tileAt(world, nx, ny))) continue;
+      if (seen.has(key) || blocked(nx, ny)) continue;
       seen.add(key);
       parents.push(i);
       queue.push([nx, ny]);

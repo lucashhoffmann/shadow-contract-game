@@ -8,9 +8,12 @@ export function useGamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const screen = useGameStore((state) => state.screen);
   const hud = useGameStore((state) => state.hud);
+  const idleWarnings = useGameStore((state) => state.idleWarnings);
   const market = useGameStore((state) => state.market);
   const best = useGameStore((state) => state.best);
   const buy = useGameStore((state) => state.buy);
+  const arsenal = useGameStore((state) => state.arsenal);
+  const selectWeapon = useGameStore((state) => state.selectWeapon);
   const closeShop = useGameStore((state) => state.closeShop);
   const startRun = useGameStore((state) => state.startRun);
   const begin = useGameStore((state) => state.begin);
@@ -52,7 +55,10 @@ export function useGamePage() {
     canvasRef,
     screen,
     hud,
+    arsenal,
+    selectWeapon,
     hits: damage.hits,
+    idleWarnings,
     market,
     best,
     legend,

@@ -1,19 +1,27 @@
 import {
   collectPickups,
+  meleeTarget,
   updateCombat,
   updateFloaters,
   updateProjectiles,
 } from '@/app/modules/combat/systems/combat.system';
-import { updateEnemies } from '@/app/modules/enemy/systems/enemy.system';
+import {
+  createEnemy,
+  updateEnemies,
+} from '@/app/modules/enemy/systems/enemy.system';
 import {
   spawnRoom,
   updateRooms,
 } from '@/app/modules/level/systems/level.system';
 import {
   breakProp,
+  isSolidTile,
   nearbyProp,
+  roomIndexAt,
+  tileAt,
   tileCenter,
 } from '@/app/modules/level/utils/grid.util';
+import { findPath } from '@/app/modules/level/utils/pathfinding.util';
 import { movePlayer } from '@/app/modules/player/systems/player.system';
 import {
   createMarket,
@@ -21,16 +29,23 @@ import {
 } from '@/app/modules/shop/systems/shop.system';
 import {
   ATTACK_COOLDOWN,
+  DASH_MAX,
+  IDLE_MAX_ENEMIES,
+  IDLE_WARNING_DELAY,
+  IDLE_WARNING_INTERVAL,
   PLAYER_MAX_HP,
+  ROOM_H,
+  ROOM_W,
   SLASH_TIME,
 } from '@/app/modules/world/constants/world.constants';
 import type {
   AttackVariance,
   EnemyIntelligence,
   InputState,
+  Vec2,
   World,
 } from '@/app/modules/world/types/world.types';
-import { angleTo } from '@/shared/utils/math.util';
+import { angleTo, distance } from '@/shared/utils/math.util';
 import { nextRandom } from '@/shared/utils/rng.util';
 
 // mundo sem salas; usado pela fixture de teste para montar geometria propria
@@ -41,8 +56,9 @@ export function createEmptyWorld(
 ): World {
   const attackRng = { rngState: seed ^ 0x51f15e };
   const attackVariance = savedAttackVariance ?? {
-    min: (75 + Math.floor(nextRandom(attackRng) * 11)) / 100,
-    max: (115 + Math.floor(nextRandom(attackRng) * 11)) / 100,
+    // minimo nunca abaixo do dano base: dois golpes sempre matam
+    min: (100 + Math.floor(nextRandom(attackRng) * 11)) / 100,
+    max: (140 + Math.floor(nextRandom(attackRng) * 11)) / 100,
   };
   return {
     rngState: seed | 0,
@@ -60,9 +76,11 @@ export function createEmptyWorld(
       adrenaline: 0,
       dash: 0,
       dashCooldown: 0,
+      dashes: DASH_MAX,
       noise: 0,
       crouching: false,
       weapon: null,
+      arsenal: [],
     },
     enemies: [],
     projectiles: [],
@@ -77,6 +95,9 @@ export function createEmptyWorld(
       kills: 0,
       shops: 0,
       seconds: 0,
+      lastMovedAt: 0,
+      lastIdleWarningAt: 0,
+      idleWarnings: 0,
       attackVariance,
       meleeMissChance: 0,
       nextMeleeChanceAt: 0,
@@ -124,20 +145,80 @@ export function togglePause(world: World): void {
   else if (world.status === 'paused') world.status = 'playing';
 }
 
+function sendIdleEnemy(world: World): void {
+  const player = world.player.pos;
+  const living = world.enemies.filter((enemy) => enemy.state !== 'dead');
+  const reachable = living
+    .filter((enemy) => findPath(world, enemy.pos, player).length > 0)
+    .sort((a, b) => distance(a.pos, player) - distance(b.pos, player));
+  const available = reachable.find((enemy) => enemy.state !== 'alert');
+  if (available) {
+    available.detection = 1;
+    available.route = [];
+    available.repathTimer = 0;
+    return;
+  }
+  if (reachable.length >= IDLE_MAX_ENEMIES) return;
+
+  const room = world.rooms.find((room) => room.index === roomIndexAt(player.y));
+  if (!room) return;
+  const spots: Vec2[] = [];
+  for (let row = 0; row < ROOM_H; row++) {
+    for (let col = 0; col < ROOM_W; col++) {
+      const pos = tileCenter(room.index, col, row);
+      if (
+        isSolidTile(tileAt(world, col, Math.floor(pos.y))) ||
+        distance(pos, player) < 3 ||
+        living.some((enemy) => distance(enemy.pos, pos) < 1)
+      )
+        continue;
+      spots.push(pos);
+    }
+  }
+  spots.sort((a, b) => distance(b, player) - distance(a, player));
+  const spot = spots.find((pos) => findPath(world, pos, player).length > 0);
+  if (!spot) return;
+  const enemy = createEnemy(world, room.index, [spot], 'ninja');
+  enemy.detection = 1;
+  world.enemies.push(enemy);
+}
+
+function updateIdlePressure(world: World, before: Vec2): void {
+  const run = world.run;
+  if (distance(before, world.player.pos) > 0.001) {
+    run.lastMovedAt = run.seconds;
+    return;
+  }
+  if (
+    run.seconds - run.lastMovedAt < IDLE_WARNING_DELAY ||
+    run.seconds - run.lastIdleWarningAt < IDLE_WARNING_INTERVAL
+  )
+    return;
+  run.lastIdleWarningAt = run.seconds;
+  run.idleWarnings++;
+  run.events.push({ at: run.seconds, text: 'Inatividade: inimigos enviados.' });
+  sendIdleEnemy(world);
+}
+
 export function stepWorld(world: World, input: InputState, dt: number): void {
   if (world.status !== 'playing') return;
   world.run.seconds += dt;
+  const before = { ...world.player.pos };
   movePlayer(world, input, dt);
   updateRooms(world);
+  updateIdlePressure(world, before);
   updateEnemies(world, dt);
-  const prop = input.interact && nearbyProp(world);
+  // F com arma na mao e inimigo ao alcance e facada, nao caixa
+  const knife =
+    !!input.interact && !!world.player.weapon && !!meleeTarget(world);
+  const prop = input.interact && !knife && nearbyProp(world);
   if (prop) {
     world.player.facing = angleTo(world.player.pos, prop.pos);
     world.player.slash = SLASH_TIME;
     world.player.attackCooldown = ATTACK_COOLDOWN;
     breakProp(world, prop);
   }
-  updateCombat(world, dt);
+  updateCombat(world, dt, knife);
   updateProjectiles(world, dt);
   updateFloaters(world, dt);
   collectPickups(world);

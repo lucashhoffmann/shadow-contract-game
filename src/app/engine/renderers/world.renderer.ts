@@ -12,6 +12,7 @@ import {
 } from '@/app/engine/renderers/character.renderer';
 import {
   castRay,
+  doorOpen,
   isSolidTile,
   nearbyProp,
   tileAt,
@@ -22,9 +23,11 @@ import {
   GUNS,
   HAND_Y,
 } from '@/app/engine/renderers/weapon.renderer';
+import { meleeTarget } from '@/app/modules/combat/systems/combat.system';
 import { nearbyChest } from '@/app/modules/shop/systems/shop.system';
 import {
   DASH_TIME,
+  LAUNCH_TIME,
   FLOATER_TIME,
   HEARING_YELLOW,
   ROOM_H,
@@ -90,6 +93,10 @@ const CARDINALS = [
   [0, 1],
   [0, -1],
 ];
+// F da facada: acima da cabeca e do marcador do inimigo
+const KNIFE_PROMPT_Y = 2.2;
+// altura maxima do corpo lancado por um golpe so
+const LAUNCH_HEIGHT = 0.5;
 // altura do root deitado: a cabeca encosta no chao
 const DEAD_Y = 0.3;
 // recuo no pico: braco sobe, arma volta para o ombro, corpo vai para tras
@@ -112,8 +119,10 @@ const FLOATER_POP_END = 0.18;
 // verde; erro em claro, para nao parecer acerto
 const FLOATER_STRONG = 30;
 const FLOATER_WEAK = 5;
-function floaterColor(amount: number): string {
+function floaterColor(amount: number, onPlayer?: boolean): string {
   if (amount <= 0) return '#f4f1e8';
+  // dano sofrido e sempre vermelho
+  if (onPlayer) return '#ff2b2b';
   if (amount < FLOATER_WEAK) return '#4be06a';
   if (amount < FLOATER_STRONG) return '#ffd21f';
   return '#ff2b2b';
@@ -126,6 +135,10 @@ const PROMPT_TILT = -0.9;
 const PROMPT_SCALE = 1.4;
 const PROMPT_HOP = 0.22;
 const PROMPT_PULSE = 0.09;
+// porta de correr na saida da sala inicial e de cada loja (entrada do nivel)
+const DOOR_X = ROOM_W / 2;
+// quanto cada folha corre para o lado ao abrir
+const DOOR_SLIDE = 1.45;
 // giro da tampa do bau aberta, em torno da dobradica
 const CHEST_OPEN = -1.9;
 const BLOOD_GROW_TIME = 2.5;
@@ -355,6 +368,33 @@ function shieldGeometry(): THREE.BufferGeometry {
   }).translate(0, 0, -0.035);
 }
 
+// salto: duas setas (>>) lado a lado, extrudadas com chanfro
+function dashGeometry(): THREE.BufferGeometry {
+  const chevron = (x: number) =>
+    new THREE.Shape(
+      [
+        [0, 0.22],
+        [0.13, 0.22],
+        [0.31, 0],
+        [0.13, -0.22],
+        [0, -0.22],
+        [0.18, 0],
+      ].map(([px, py]) => new THREE.Vector2(x + px, py)),
+    );
+  return (
+    new THREE.ExtrudeGeometry([chevron(0), chevron(0.25)], {
+      depth: 0.12,
+      bevelThickness: 0.025,
+      bevelSize: 0.02,
+      bevelSegments: 1,
+    })
+      .center()
+      .scale(1.5, 1.5, 1.5)
+      // deitado para tras: de cima, em pe, as setas viram um risco
+      .rotateX(-0.75)
+  );
+}
+
 function lambert(color: number): THREE.Material {
   return new THREE.MeshLambertMaterial({ color });
 }
@@ -399,6 +439,7 @@ export function createWorldRenderer(
     aura: new THREE.SphereGeometry(0.45, 12, 8),
     heart: heartGeometry(),
     shield: shieldGeometry(),
+    dash: dashGeometry(),
     // municao ao longo de +x, ponta na frente
     bulletCase: new THREE.CylinderGeometry(0.05, 0.05, 0.17, 8)
       .rotateZ(-Math.PI / 2)
@@ -453,6 +494,11 @@ export function createWorldRenderer(
     floor: lambert(0x4a4f6a),
     chestLight: lambert(0xdcb980),
     chestLock: lambert(0x9aa0aa),
+    doorFrame: lambert(0xd4d6da),
+    doorPanel: lambert(0x1d2028),
+    doorSeam: lambert(0x2c303b),
+    doorAccent: flat(0xf08a24),
+    doorLight: flat(0x7df3ee),
     flash: new THREE.MeshBasicMaterial({
       color: 0xffc94a,
       transparent: true,
@@ -467,6 +513,10 @@ export function createWorldRenderer(
     }),
     shield: new THREE.MeshLambertMaterial({
       color: 0xd9dce3,
+      flatShading: true,
+    }),
+    dash: new THREE.MeshLambertMaterial({
+      color: 0x39d0ff,
       flatShading: true,
     }),
     coin: new THREE.MeshLambertMaterial({
@@ -607,8 +657,11 @@ export function createWorldRenderer(
     floaterTextures.clear();
   });
 
-  function floaterTexture(amount: number): THREE.Texture | null {
-    const text = amount > 0 ? `+${amount}` : 'Errou!';
+  function floaterTexture(
+    amount: number,
+    onPlayer?: boolean,
+  ): THREE.Texture | null {
+    const text = amount > 0 ? `${onPlayer ? '-' : '+'}${amount}` : 'Errou!';
     const cached = floaterTextures.get(text);
     if (cached) return cached;
     const canvas = document.createElement('canvas');
@@ -622,7 +675,7 @@ export function createWorldRenderer(
     context.lineJoin = 'round';
     context.lineWidth = 12;
     context.strokeStyle = '#1b0508';
-    context.fillStyle = floaterColor(amount);
+    context.fillStyle = floaterColor(amount, onPlayer);
     const [x, y] = [canvas.width / 2, canvas.height / 2 + 4];
     context.strokeText(text, x, y);
     context.fillText(text, x, y);
@@ -639,6 +692,77 @@ export function createWorldRenderer(
 
   // parede de cada nivel ja visto, por indice do nivel
   const wallpapers = new Map<number, ReturnType<typeof wallpaper>>();
+  // folhas da porta de cada sala que tem porta, por indice da sala; `y` e a
+  // face da parede onde ela fica
+  const doors = new Map<number, { leaves: THREE.Group[]; y: number }>();
+
+  // Porta de correr futurista: moldura clara com cantos chanfrados, duas
+  // folhas escuras com faixa de luz ciano e puxador laranja, base com friso
+  // laranja. Origem no chao, no meio do vao; a frente e +z (para a camera).
+  // So visual: nao bloqueia passagem nem bala.
+  function buildDoor(): { group: THREE.Group; leaves: THREE.Group[] } {
+    const group = new THREE.Group();
+    const part = (
+      parent: THREE.Group,
+      material: THREE.Material,
+      [w, h, d]: number[],
+      [x, y, z]: number[],
+      turn = 0,
+    ) => {
+      const mesh = new THREE.Mesh(geo.box, material);
+      mesh.scale.set(w, h, d);
+      mesh.position.set(x, y, z);
+      mesh.rotation.z = turn;
+      parent.add(mesh);
+    };
+    // verga com o visor escuro
+    part(group, mat.doorFrame, [3.56, 0.36, 0.26], [0, 1.38, 0.1]);
+    part(group, mat.doorPanel, [1.9, 0.12, 0.04], [0, 1.44, 0.24]);
+    for (const side of [1, -1]) {
+      // poste, canto chanfrado, pe com friso laranja e luz na borda de dentro
+      part(group, mat.doorFrame, [0.28, 1.5, 0.26], [side * 1.64, 0.75, 0.1]);
+      part(
+        group,
+        mat.doorFrame,
+        [0.34, 0.34, 0.26],
+        [side * 1.47, 1.17, 0.1],
+        Math.PI / 4,
+      );
+      part(group, mat.doorFrame, [0.46, 0.26, 0.32], [side * 1.57, 0.13, 0.1]);
+      part(group, mat.doorPanel, [0.47, 0.05, 0.33], [side * 1.57, 0.025, 0.1]);
+      part(group, mat.doorAccent, [0.47, 0.05, 0.33], [side * 1.57, 0.1, 0.1]);
+      part(
+        group,
+        mat.doorLight,
+        [0.03, 0.78, 0.02],
+        [side * 1.49, 0.66, 0.235],
+      );
+    }
+    // folhas: [esquerda, direita]; cada uma corre para o seu lado
+    const leaves = [-1, 1].map((side) => {
+      const leaf = new THREE.Group();
+      // recuada para dentro da parede: aberta, some dentro dela
+      leaf.position.z = -0.1;
+      // mais baixa que a parede: aberta, o topo nao disputa o plano com ela
+      part(leaf, mat.doorPanel, [1.5, 1.16, 0.08], [side * 0.75, 0.58, 0]);
+      // divisoes do painel
+      part(leaf, mat.doorSeam, [1.5, 0.015, 0.085], [side * 0.75, 0.86, 0]);
+      part(leaf, mat.doorSeam, [1.5, 0.015, 0.085], [side * 0.75, 0.36, 0]);
+      part(leaf, mat.doorLight, [0.62, 0.05, 0.02], [side * 0.98, 0.62, 0.045]);
+      part(leaf, mat.doorSeam, [0.2, 0.56, 0.02], [side * 0.14, 0.62, 0.045]);
+      part(leaf, mat.doorAccent, [0.07, 0.4, 0.03], [side * 0.14, 0.62, 0.055]);
+      part(
+        leaf,
+        mat.doorLight,
+        [0.015, 1.14, 0.02],
+        [side * 0.012, 0.57, 0.045],
+      );
+      group.add(leaf);
+      return leaf;
+    });
+    return { group, leaves };
+  }
+
   // tampa do bau de cada sala de loja, por indice da sala
   const chestLids = new Map<number, THREE.Group>();
 
@@ -695,6 +819,14 @@ export function createWorldRenderer(
         }
       }
     });
+    // saida da sala inicial e de cada loja: porta na face de dentro da parede
+    if (room.index % SHOP_EVERY === 0) {
+      const y = (room.index + 1) * ROOM_H - 1;
+      const door = buildDoor();
+      door.group.position.set(DOOR_X, 0, -y);
+      group.add(door.group);
+      doors.set(room.index, { leaves: door.leaves, y });
+    }
     if (room.chest) {
       const chest = buildChest();
       chest.group.position.set(room.chest.x, 0, -room.chest.y);
@@ -754,10 +886,32 @@ export function createWorldRenderer(
     return group;
   }
 
-  // coracao ou escudo: uma peca so, flutuando; dinheiro: pilhas de moedas
+  // municao: tres cartuchos; coracao, escudo ou salto: uma peca so; todos
+  // flutuando; dinheiro: pilhas de moedas
   // levemente tortas, com aura dourada em volta
   function buildPickup(kind: PickupKind): THREE.Group {
     const group = new THREE.Group();
+    if (kind === 'ammo') {
+      // tres cartuchos em pe: o mesmo estojo e ponta da bala disparada, maior
+      group.name = 'ammoPickup';
+      for (const [x, z, lean] of [
+        [-0.2, 0.04, 0.12],
+        [0.02, -0.08, -0.06],
+        [0.22, 0.06, -0.16],
+      ]) {
+        const round = new THREE.Group();
+        round.add(
+          new THREE.Mesh(geo.bulletCase, mat.brass),
+          new THREE.Mesh(geo.bulletTip, mat.copper),
+        );
+        round.scale.setScalar(3);
+        round.rotation.z = Math.PI / 2 + lean;
+        round.position.set(x, 0, z);
+        group.add(round);
+      }
+      scene.add(group);
+      return group;
+    }
     if (kind !== 'money') {
       group.name = `${kind}Pickup`;
       group.add(new THREE.Mesh(geo[kind], mat[kind]));
@@ -908,10 +1062,22 @@ export function createWorldRenderer(
   }
 
   // morto: estirado de brucos, centrado em `pos`, sem giro nem vento
-  function layDead(jumper: Jumper, pos: Vec2, facing: number) {
+  // `launch`: tempo que falta do voo de quem morreu de um golpe so. O corpo
+  // sai de pe, sobe em arco e vai tombando de frente ate deitar.
+  function layDead(jumper: Jumper, pos: Vec2, facing: number, launch = 0) {
     const { character } = jumper;
-    character.root.position.set(pos.x, DEAD_Y * character.head.scale.x, -pos.y);
-    character.root.rotation.set(0, facing, -Math.PI / 2);
+    const t = 1 - launch / LAUNCH_TIME;
+    const fall = t * t * (3 - 2 * t);
+    const rest = DEAD_Y * character.head.scale.x;
+    character.root.position.set(
+      pos.x,
+      // de pe o tronco fica na propria altura; deitado, rente ao chao
+      FLIP_PIVOT_Y +
+        (rest - FLIP_PIVOT_Y) * fall +
+        Math.sin(Math.PI * t) * LAUNCH_HEIGHT,
+      -pos.y,
+    );
+    character.root.rotation.set(0, facing, (-Math.PI / 2) * fall);
     poseDead(character);
     // se voltar a viver (run nova), encaixa sem deslizar
     character.last = null;
@@ -1067,6 +1233,9 @@ export function createWorldRenderer(
   // B sobre o bau ao alcance
   const chestPrompt = buildPrompt('chestPrompt', geo.letterB);
   scene.add(chestPrompt);
+  const knifePrompt = buildPrompt('knifePrompt', geo.letterF);
+  knifePrompt.visible = false;
+  scene.add(knifePrompt);
   let lastTime = 0;
 
   return {
@@ -1081,6 +1250,20 @@ export function createWorldRenderer(
       for (const index of chestLids.keys()) {
         if (!rooms.has(index)) chestLids.delete(index);
       }
+      // porta abre sozinha com o player por perto e fecha quando ele se afasta
+      for (const [index, door] of doors) {
+        if (!rooms.has(index)) {
+          doors.delete(index);
+          continue;
+        }
+        // mesmo criterio que segura bala e visao na simulacao
+        const near = doorOpen(world, door.y);
+        const ease = Math.min(1, dt * 7);
+        door.leaves.forEach((leaf, i) => {
+          const target = near ? (i ? 1 : -1) * DOOR_SLIDE : 0;
+          leaf.position.x += (target - leaf.position.x) * ease;
+        });
+      }
 
       for (const prop of world.props) {
         const view = props.get(prop.id);
@@ -1092,7 +1275,18 @@ export function createWorldRenderer(
         scene.remove(view.group),
       );
 
-      const prop = world.status === 'playing' && nearbyProp(world);
+      // com arma na mao a espada so sai no F: avisa sobre quem ela pegaria
+      const foe =
+        world.status === 'playing' && world.player.weapon
+          ? meleeTarget(world)
+          : undefined;
+      knifePrompt.visible = !!foe;
+      if (foe) {
+        knifePrompt.position.set(foe.pos.x, 0, -foe.pos.y);
+        animatePrompt(knifePrompt, KNIFE_PROMPT_Y, time);
+      }
+
+      const prop = world.status === 'playing' && !foe && nearbyProp(world);
       prompt.visible = !!prop;
       if (prop) {
         props.get(prop.id)?.group.add(prompt);
@@ -1103,7 +1297,7 @@ export function createWorldRenderer(
       for (const floater of world.floaters) {
         let sprite = floaters.get(floater.id);
         if (!sprite) {
-          const map = floaterTexture(floater.amount);
+          const map = floaterTexture(floater.amount, floater.onPlayer);
           if (!map) continue;
           sprite = new THREE.Sprite(
             new THREE.SpriteMaterial({
@@ -1210,13 +1404,17 @@ export function createWorldRenderer(
         }
         const dead = enemy.state === 'dead';
         if (dead) {
-          if (view.deathAt === null) view.deathAt = time;
-          const progress = Math.min(1, (time - view.deathAt) / BLOOD_GROW_TIME);
+          // a poca so comeca quando o corpo pousa
+          if (view.deathAt === null && enemy.launch === 0) view.deathAt = time;
+          const progress = Math.min(
+            1,
+            (time - (view.deathAt ?? time)) / BLOOD_GROW_TIME,
+          );
           const eased = progress * progress * (3 - 2 * progress);
           const radius = 0.05 + 0.8 * eased;
           view.blood.position.set(enemy.pos.x, 0.015, -enemy.pos.y);
           view.blood.scale.set(radius, radius * 0.78, 1);
-          layDead(view, enemy.pos, enemy.facing);
+          layDead(view, enemy.pos, enemy.facing, enemy.launch);
         } else {
           view.deathAt = null;
           animateJumper(
@@ -1278,7 +1476,7 @@ export function createWorldRenderer(
         );
         view.cone.material = coneMat[enemy.state];
         view.cone.visible = !dead;
-        view.blood.visible = dead;
+        view.blood.visible = dead && enemy.launch === 0;
         view.character.shadow.visible = !dead;
       }
       reconcile(enemies, new Set(world.enemies.map((e) => e.id)), removeEnemy);
@@ -1336,6 +1534,7 @@ export function createWorldRenderer(
       scene.remove(player.root);
       prompt.removeFromParent();
       chestPrompt.removeFromParent();
+      knifePrompt.removeFromParent();
       held.dispose();
       reconcile(floaters, new Set(), removeFloater);
       for (const texture of floaterTextures.values()) texture.dispose();
