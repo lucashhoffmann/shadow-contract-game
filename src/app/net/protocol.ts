@@ -1,6 +1,5 @@
-import { COLORS } from '@/shared/colors';
-// Contrato entre o servidor de salas e o jogo. Copia de
-// shadow-contract-server/src/protocol.ts: mudou la, copiar de novo.
+// Contrato entre o servidor de salas e o jogo. O front copia este arquivo:
+// mudou aqui, muda la.
 //
 // O servidor nao simula nada. Quem cria a sessao (host) roda o jogo no
 // proprio navegador; o servidor so junta os jogadores e repassa mensagens.
@@ -8,18 +7,15 @@ import { COLORS } from '@/shared/colors';
 export const MAX_PLAYERS = 4;
 export const NAME_MAX = 16;
 // cor de cada jogador, pela ordem de entrada
-export const PLAYER_COLORS = [
-  COLORS.ui.playerOrange,
-  COLORS.ui.playerCyan,
-  COLORS.ui.playerMint,
-  COLORS.ui.playerPink,
-];
+export const PLAYER_COLORS = ['#ff8a3c', '#39d0ff', '#3fe08a', '#ff5fa2'];
 
 export type PlayerInfo = {
   id: string;
   name: string;
   color: string;
   host: boolean;
+  // ida e volta ate o servidor, em ms; 0 enquanto nao mediu
+  ping: number;
 };
 
 export type SessionInfo = {
@@ -48,6 +44,10 @@ export type ClientEvents = {
     reply: (result: Joined | Failure) => void,
   ) => void;
   'session:leave': () => void;
+  // medir o ping: o cliente cronometra ate a resposta chegar
+  'net:ping': (reply: () => void) => void;
+  // avisar o ping medido, para os outros verem no placar
+  'net:latency': (ms: number) => void;
   // so o host: fecha a entrada e avisa todo mundo
   'session:start': (reply: (result: { ok: true } | Failure) => void) => void;
   // convidado -> host: input do jogador, formato definido pelo jogo
