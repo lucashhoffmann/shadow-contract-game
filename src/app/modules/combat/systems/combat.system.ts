@@ -29,6 +29,7 @@ import {
   PLAYER_BULLET_SPEED,
   PLAYER_RADIUS,
   PROP_BREAK_RADIUS,
+  REVIVE_MAX,
   SHIELD_MAX,
   SEARCH_TIME,
   FLOATER_MISS_GAP,
@@ -399,6 +400,16 @@ export function collectPickups(world: World): void {
       world.run.events.push({
         at: world.run.seconds,
         text: `Coletou $${pickup.value}.`,
+      });
+      return false;
+    }
+    // ficha de revive: guarda ate REVIVE_MAX; no teto, fica no chao
+    if (pickup.kind === 'revive') {
+      if (world.run.revives >= REVIVE_MAX) return true;
+      world.run.revives += pickup.value;
+      world.run.events.push({
+        at: world.run.seconds,
+        text: `Ficha de revive: ${world.run.revives} de ${REVIVE_MAX}.`,
       });
       return false;
     }

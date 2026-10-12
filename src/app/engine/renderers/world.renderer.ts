@@ -476,6 +476,33 @@ function shieldGeometry(): THREE.BufferGeometry {
   }).translate(0, 0, -0.035);
 }
 
+// ficha de revive: cruz de pe, haste mais longa embaixo, extrudada com chanfro
+function reviveGeometry(): THREE.BufferGeometry {
+  const [arm, half, top, bottom] = [0.07, 0.2, 0.22, -0.3];
+  const cross = new THREE.Shape(
+    [
+      [-arm, top],
+      [arm, top],
+      [arm, arm],
+      [half, arm],
+      [half, -arm],
+      [arm, -arm],
+      [arm, bottom],
+      [-arm, bottom],
+      [-arm, -arm],
+      [-half, -arm],
+      [-half, arm],
+      [-arm, arm],
+    ].map(([x, y]) => new THREE.Vector2(x, y + 0.04)),
+  );
+  return new THREE.ExtrudeGeometry(cross, {
+    depth: 0.08,
+    bevelSize: 0.02,
+    bevelThickness: 0.02,
+    bevelSegments: 1,
+  }).translate(0, 0, -0.04);
+}
+
 // salto: duas setas (>>) lado a lado, extrudadas com chanfro
 function dashGeometry(): THREE.BufferGeometry {
   const chevron = (x: number) =>
@@ -525,6 +552,43 @@ function crosshairGeometry(): THREE.BufferGeometry {
     .rotateX(-0.75);
 }
 
+// Poca de sangue: mancha de contorno irregular, diferente para cada `seed`,
+// mas sempre com a area de um circulo de raio 1 (quem usa escala o tamanho).
+// O raio ondula em volta do circulo somando algumas ondas de fase sorteada.
+const BLOOD_WAVES = [
+  [2, 0.22],
+  [3, 0.16],
+  [4, 0.1],
+  [5, 0.07],
+  [7, 0.05],
+];
+export function bloodPoolGeometry(seed: number): THREE.BufferGeometry {
+  // sorteio fixo por seed: o mesmo inimigo tem sempre a mesma mancha
+  const roll = (n: number) =>
+    Math.abs(Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453) % 1;
+  const points: THREE.Vector2[] = [];
+  const steps = 28;
+  for (let i = 0; i < steps; i++) {
+    const angle = (i / steps) * Math.PI * 2;
+    let radius = 1;
+    for (const [waves, size] of BLOOD_WAVES) {
+      radius += size * Math.sin(waves * angle + roll(waves) * Math.PI * 2);
+    }
+    points.push(
+      new THREE.Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius),
+    );
+  }
+  const shape = new THREE.Shape()
+    .moveTo(points[0].x, points[0].y)
+    .splineThru([...points.slice(1), points[0]]);
+  // mesmo tamanho sempre: ajusta para a area do circulo de raio 1
+  const area = Math.abs(THREE.ShapeUtils.area(shape.getPoints(8)));
+  const fit = Math.sqrt(Math.PI / area);
+  return new THREE.ShapeGeometry(shape, 8)
+    .scale(fit, fit, 1)
+    .rotateZ(roll(0) * Math.PI * 2);
+}
+
 function lambert(color: number): THREE.Material {
   return new THREE.MeshLambertMaterial({ color });
 }
@@ -570,6 +634,7 @@ export function createWorldRenderer(
     heart: heartGeometry(),
     shield: shieldGeometry(),
     dash: dashGeometry(),
+    revive: reviveGeometry(),
     headshot: crosshairGeometry(),
     // municao ao longo de +x, ponta na frente
     shuriken: shurikenGeometry(),
@@ -614,7 +679,6 @@ export function createWorldRenderer(
       .rotateZ(-Math.PI / 2)
       .translate(0.8, 0, 0),
     flashCore: new THREE.SphereGeometry(0.3, 8, 6),
-    blood: new THREE.CircleGeometry(1, 16),
     crate: new THREE.BoxGeometry(0.78, 0.62, 0.78),
     plank: new THREE.BoxGeometry(0.34, 0.06, 0.2),
     // nota de dinheiro e a faixa clara do meio
@@ -662,6 +726,10 @@ export function createWorldRenderer(
     }),
     headshot: new THREE.MeshLambertMaterial({
       color: 0xff3b3b,
+      flatShading: true,
+    }),
+    revive: new THREE.MeshLambertMaterial({
+      color: 0x3fe08a,
       flatShading: true,
     }),
     coin: new THREE.MeshLambertMaterial({
@@ -1403,7 +1471,8 @@ export function createWorldRenderer(
     jumper.wind.visible = false;
   }
 
-  function buildEnemy(kind: EnemyKind): EnemyView {
+  // `seed` (o id do inimigo) decide a forma da poca de sangue dele
+  function buildEnemy(kind: EnemyKind, seed: number): EnemyView {
     const jumper = makeJumper(kind);
     const { character } = jumper;
     // sobre a cabeca, de frente para a camera. Exclamacao: amarela ao
@@ -1452,7 +1521,7 @@ export function createWorldRenderer(
     // vertices mudam todo frame; o bounding do three ficaria velho
     cone.frustumCulled = false;
     scene.add(cone);
-    const blood = new THREE.Mesh(geo.blood, mat.blood);
+    const blood = new THREE.Mesh(bloodPoolGeometry(seed), mat.blood);
     blood.name = 'bloodPool';
     blood.rotation.x = -Math.PI / 2;
     blood.visible = false;
@@ -1473,6 +1542,7 @@ export function createWorldRenderer(
   function removeEnemy(view: EnemyView) {
     scene.remove(view.character.root, view.cone, view.blood);
     view.cone.geometry.dispose();
+    view.blood.geometry.dispose();
   }
 
   // leque de raios: cada raio para na primeira parede
@@ -1751,7 +1821,7 @@ export function createWorldRenderer(
         let view = enemies.get(enemy.id);
         const dead = enemy.state === 'dead';
         if (!view) {
-          view = buildEnemy(enemy.kind);
+          view = buildEnemy(enemy.kind, enemy.id);
           // quem ja aparece morto nao explode de novo
           view.burst = dead;
           enemies.set(enemy.id, view);

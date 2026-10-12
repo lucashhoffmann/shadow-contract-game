@@ -37,6 +37,7 @@ const HUD: HudData = {
   maxHp: 100,
   shield: 0,
   dashes: 4,
+  revives: 0,
   money: 250,
   room: 3,
   kills: 2,
@@ -601,4 +602,27 @@ it('botao de pausa do cabecalho pausa o jogo e some fora da partida', async () =
   expect(useGameStore.getState().screen).toBe('paused');
   expect(screen.getByText('Pausado')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Pausar' })).toBeNull();
+});
+
+it('HUD mostra uma cruz por ficha de revive guardada, e nada sem ficha', () => {
+  const { rerender } = render(
+    <Hud
+      previews={PREVIEWS}
+      arsenal={[]}
+      onSelectWeapon={vi.fn()}
+      hud={HUD}
+    />,
+  );
+  expect(screen.queryByRole('img', { name: /Fichas de revive/ })).toBeNull();
+  rerender(
+    <Hud
+      previews={PREVIEWS}
+      arsenal={[]}
+      onSelectWeapon={vi.fn()}
+      hud={{ ...HUD, revives: 2 }}
+    />,
+  );
+  expect(
+    screen.getByRole('img', { name: 'Fichas de revive: 2' }).children,
+  ).toHaveLength(2);
 });

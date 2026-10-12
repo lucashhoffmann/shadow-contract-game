@@ -294,7 +294,8 @@ type Prop = { id: number; roomIndex: number; pos: Vec2; broken: boolean };
 ## `Pickup`
 
 ```ts
-type PickupKind = 'money' | 'heart' | 'shield' | 'dash' | 'ammo' | 'headshot';
+type PickupKind =
+  'money' | 'heart' | 'shield' | 'dash' | 'ammo' | 'headshot' | 'revive';
 type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
 ```
 
@@ -314,6 +315,12 @@ type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
   ate `HEADSHOT_MAX`; no teto fica no chao. `value` vai de
   `HEADSHOT_LOOT_MIN` a `HEADSHOT_LOOT_MAX`. So sai com arma de fogo no
   arsenal e em caixa do nivel (contrato) `HEADSHOT_FROM_LEVEL` em diante
+- `revive` (ficha, cruz flutuante): soma 1 em `run.revives`, ate
+  `REVIVE_MAX`; no teto fica no chao. Sai de caixa com `LOOT_REVIVE_CHANCE`.
+  Quando `player.hp` chega a zero com ficha guardada, `stepWorld` gasta uma:
+  o player volta em `run.checkpoint` (ponto em que entrou na sala atual) com
+  `REVIVE_HP` da vida maxima, os inimigos vivos voltam a `patrol` e as balas
+  inimigas somem. Sem ficha, `status` vira `dead`
 - `heart` com vida cheia, `shield` com escudo no teto, `dash` com os saltos
   cheios e `ammo` sem arma ou com todas cheias ficam no chao
 - todo dano no player passa por `damagePlayer`: gasta `shield` antes de `hp`

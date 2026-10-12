@@ -13,6 +13,7 @@ import {
   LOOT_HEART_CHANCE,
   LOOT_AMMO_CHANCE,
   LOOT_DASH_CHANCE,
+  LOOT_REVIVE_CHANCE,
   LOOT_HEADSHOT_CHANCE,
   LOOT_SHIELD_CHANCE,
   MELEE_RANGE,
@@ -256,6 +257,11 @@ const LOOT: {
     chance: LOOT_DASH_CHANCE,
     value: (_world, roll) =>
       DASH_LOOT_MIN + Math.floor(roll * (DASH_LOOT_MAX - DASH_LOOT_MIN + 1)),
+  },
+  {
+    kind: 'revive',
+    chance: LOOT_REVIVE_CHANCE,
+    value: () => 1,
   },
   {
     // bala so serve para quem tem arma de fogo

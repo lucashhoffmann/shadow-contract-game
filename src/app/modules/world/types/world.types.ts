@@ -128,7 +128,9 @@ export type PickupKind =
   | 'dash'
   | 'ammo'
   // mira: soma pontos percentuais na chance de headshot
-  | 'headshot';
+  | 'headshot'
+  // ficha de revive (cruz): guardada na run, gasta ao morrer
+  | 'revive';
 
 export type Pickup = {
   id: number;
@@ -207,6 +209,10 @@ export type Run = {
   roomIndex: number;
   kills: number;
   shops: number;
+  // fichas de revive guardadas, de 0 a REVIVE_MAX
+  revives: number;
+  // onde o player renasce: o ponto em que entrou na sala atual
+  checkpoint: Vec2;
   seconds: number;
   lastMovedAt: number;
   lastIdleWarningAt: number;

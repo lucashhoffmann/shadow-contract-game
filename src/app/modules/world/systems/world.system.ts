@@ -35,6 +35,7 @@ import {
   IDLE_WARNING_DELAY,
   IDLE_WARNING_INTERVAL,
   PLAYER_MAX_HP,
+  REVIVE_HP,
   ROOM_H,
   ROOM_W,
   SLASH_TIME,
@@ -96,6 +97,8 @@ export function createEmptyWorld(
       roomIndex: 0,
       kills: 0,
       shops: 0,
+      revives: 0,
+      checkpoint: tileCenter(0, 5, 10),
       seconds: 0,
       lastMovedAt: 0,
       lastIdleWarningAt: 0,
@@ -202,6 +205,31 @@ function updateIdlePressure(world: World, before: Vec2): void {
   sendIdleEnemy(world);
 }
 
+// Gasta uma ficha: o player volta na entrada da sala com parte da vida. Quem
+// estava em cima dele perde o rastro e as balas no ar somem, para nao morrer
+// de novo no mesmo instante.
+function revive(world: World): void {
+  const { player, run } = world;
+  run.revives--;
+  player.hp = Math.round(player.maxHp * REVIVE_HP);
+  player.pos = { ...run.checkpoint };
+  player.dash = 0;
+  for (const enemy of world.enemies) {
+    if (enemy.state === 'dead') continue;
+    enemy.state = 'patrol';
+    enemy.detection = 0;
+    enemy.hearing = 0;
+    enemy.heard = null;
+    enemy.route = [];
+    enemy.repathTimer = 0;
+  }
+  world.projectiles = world.projectiles.filter((p) => p.owner === 'player');
+  run.events.push({
+    at: run.seconds,
+    text: `Ficha de revive usada: restam ${run.revives}.`,
+  });
+}
+
 export function stepWorld(world: World, input: InputState, dt: number): void {
   if (world.status !== 'playing') return;
   world.run.seconds += dt;
@@ -225,6 +253,7 @@ export function stepWorld(world: World, input: InputState, dt: number): void {
   updateFloaters(world, dt);
   collectPickups(world);
   if (input.open) openChest(world);
+  if (world.player.hp <= 0 && world.run.revives > 0) revive(world);
   if (world.player.hp <= 0) {
     world.status = 'dead';
     world.run.events.push({

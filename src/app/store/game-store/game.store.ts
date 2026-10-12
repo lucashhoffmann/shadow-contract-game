@@ -39,6 +39,8 @@ export type Hud = {
   shield: number;
   // saltos guardados, de 0 a DASH_MAX
   dashes: number;
+  // fichas de revive guardadas, de 0 a REVIVE_MAX
+  revives: number;
   money: number;
   room: number;
   kills: number;
@@ -171,6 +173,7 @@ const EMPTY_HUD: Hud = {
   maxHp: 0,
   shield: 0,
   dashes: 0,
+  revives: 0,
   money: 0,
   room: 0,
   kills: 0,
@@ -218,6 +221,7 @@ function readHud(w: World): Hud {
     maxHp: w.player.maxHp,
     shield: w.player.shield,
     dashes: w.player.dashes,
+    revives: w.run.revives,
     money: w.run.money,
     room: w.run.roomIndex,
     kills: w.run.kills,

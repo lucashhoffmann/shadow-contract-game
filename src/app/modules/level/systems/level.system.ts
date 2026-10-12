@@ -88,6 +88,8 @@ export function spawnRoom(
 export function updateRooms(world: World): void {
   const current = roomIndexAt(world.player.pos.y);
   if (current > world.run.roomIndex) {
+    // entrada da sala nova: e onde renasce quem morrer nela com ficha
+    world.run.checkpoint = { ...world.player.pos };
     world.run.events.push({
       at: world.run.seconds,
       text: `Sala ${current} alcancada.`,

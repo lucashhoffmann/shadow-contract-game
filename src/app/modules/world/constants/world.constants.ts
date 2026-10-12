@@ -168,6 +168,11 @@ export const SEARCH_TIME = 4;
 export const LOOT_HEART_CHANCE = 0.25;
 export const LOOT_SHIELD_CHANCE = 0.2;
 export const LOOT_DASH_CHANCE = 0.2;
+// ficha de revive: rara. Guarda ate REVIVE_MAX; ao morrer gasta uma e
+// renasce na entrada da sala com REVIVE_HP da vida maxima
+export const LOOT_REVIVE_CHANCE = 0.04;
+export const REVIVE_MAX = 3;
+export const REVIVE_HP = 0.5;
 // quantos saltos um item de salto repoe
 export const DASH_LOOT_MIN = 1;
 export const DASH_LOOT_MAX = 6;

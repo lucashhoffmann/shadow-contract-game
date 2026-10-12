@@ -1,4 +1,4 @@
-import { ChevronsRight, Pause } from 'lucide-react';
+import { ChevronsRight, Cross, Pause } from 'lucide-react';
 
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import {
@@ -222,6 +222,22 @@ export function Hud({
           )}
         </div>
         <DashPips dashes={hud.dashes} />
+        {hud.revives > 0 && (
+          <div
+            role='img'
+            aria-label={`Fichas de revive: ${hud.revives}`}
+            className='flex items-center gap-1'
+          >
+            {Array.from({ length: hud.revives }, (_, i) => (
+              <Cross
+                key={i}
+                aria-hidden
+                className='size-4 fill-emerald-400 text-emerald-400'
+                strokeWidth={2}
+              />
+            ))}
+          </div>
+        )}
         <WeaponCard
           hud={hud}
           previews={previews}

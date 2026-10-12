@@ -3,6 +3,9 @@ import {
   IDLE_WARNING_DELAY,
   IDLE_WARNING_INTERVAL,
   KILL_MONEY,
+  PLAYER_MAX_HP,
+  REVIVE_HP,
+  REVIVE_MAX,
 } from '@/app/modules/world/constants/world.constants';
 import { updateRooms } from '@/app/modules/level/systems/level.system';
 import {
@@ -181,5 +184,57 @@ describe('stepWorld', () => {
     run(b, FORWARD, 5);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
     expect(a.run.roomIndex).toBeGreaterThan(0);
+  });
+});
+
+describe('ficha de revive', () => {
+  it('morrer com ficha gasta uma e renasce na entrada da sala', () => {
+    const world = createArenaWorld();
+    world.run.revives = 2;
+    world.run.checkpoint = { x: 5.5, y: 1.5 };
+    world.player.pos = { x: 5.5, y: 6.5 };
+    const enemy = addEnemy(world, 5.5, 9.5, -Math.PI / 2);
+    enemy.state = 'alert';
+    world.player.hp = 0;
+
+    stepWorld(world, IDLE, FIXED_DT);
+
+    expect(world.status).toBe('playing');
+    expect(world.run.revives).toBe(1);
+    expect(world.player.hp).toBe(PLAYER_MAX_HP * REVIVE_HP);
+    expect(world.player.pos).toEqual({ x: 5.5, y: 1.5 });
+    // quem estava em cima perde o rastro
+    expect(enemy.state).toBe('patrol');
+    expect(world.projectiles).toHaveLength(0);
+  });
+
+  it('sem ficha, morrer encerra a run', () => {
+    const world = createArenaWorld();
+    world.player.hp = 0;
+    stepWorld(world, IDLE, FIXED_DT);
+    expect(world.status).toBe('dead');
+  });
+
+  it('coleta guarda ate REVIVE_MAX; a que sobra fica no chao', () => {
+    const world = createArenaWorld();
+    for (let i = 0; i <= REVIVE_MAX; i++) {
+      world.pickups.push({
+        id: world.nextId++,
+        kind: 'revive',
+        roomIndex: 0,
+        pos: { ...world.player.pos },
+        value: 1,
+      });
+    }
+    stepWorld(world, IDLE, FIXED_DT);
+    expect(world.run.revives).toBe(REVIVE_MAX);
+    expect(world.pickups.filter((p) => p.kind === 'revive')).toHaveLength(1);
+  });
+
+  it('entrar em sala nova marca a entrada como ponto de renascer', () => {
+    const world = createWorld(1);
+    world.player.pos = { x: 5.5, y: 13.5 };
+    updateRooms(world);
+    expect(world.run.checkpoint).toEqual({ x: 5.5, y: 13.5 });
   });
 });

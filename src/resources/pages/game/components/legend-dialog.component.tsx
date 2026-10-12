@@ -85,6 +85,10 @@ const SECTIONS: [title: string, entries: Entry[]][] = [
         'cobre de bala e quebra com tiro ou briga; pode soltar vida ou escudo',
       ],
       ['Coracao', 'recupera vida. Escudo: absorve dano antes da vida'],
+      [
+        'Cruz',
+        'ficha de revive: ao morrer, voce volta na entrada da sala. Guarda 3',
+      ],
     ],
   ],
 ];
