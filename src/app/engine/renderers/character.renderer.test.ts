@@ -150,3 +150,12 @@ describe('golpes de espada variados', () => {
     kit.dispose();
   });
 });
+
+it('golpe de salto e sempre o giro, mesmo sendo o primeiro golpe', () => {
+  const character = createCharacterKit(DEFAULT_LOOK).make('player');
+  for (let i = 0; i < 10; i++) {
+    poseAttack(character, SLASH_TIME, true);
+    expect(SWINGS[character.swing].spin).toBeGreaterThan(0);
+    poseAttack(character, 0);
+  }
+});

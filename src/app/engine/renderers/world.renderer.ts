@@ -2003,7 +2003,8 @@ export function createWorldRenderer(
         true,
         who.crouching,
       );
-      poseAttack(body, who.slash);
+      // golpe de salto (no ar ou logo depois de pousar) sai girando
+      poseAttack(body, who.slash, who.dashCooldown > 0);
     }
     body.shadow.visible = !lost;
     // invisivel: some o corpo, fica so a sombra no chao
