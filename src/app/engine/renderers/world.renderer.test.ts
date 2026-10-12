@@ -161,3 +161,48 @@ it('piso tem textura que repete uma vez por tile', () => {
   expect(map?.repeat.toArray()).toEqual([ROOM_W, ROOM_H]);
   renderer.dispose();
 });
+
+it('inimigo em furia: marca de raiva sobre a cabeca e contorno do corpo trocado', () => {
+  const world = createArenaWorld();
+  const enemy = addEnemy(world, 5.5, 8.5, Math.PI / 2);
+  const scene = new THREE.Scene();
+  const renderer = createWorldRenderer(
+    scene,
+    DEFAULT_LOOK,
+    DEFAULT_BLOOD_COLOR,
+  );
+  const rage = () => scene.getObjectByName('rageMarker')!;
+  // pecas de contorno: malha de costas (BackSide) filha de outra peca
+  const outlines = () => {
+    const found = new Set<THREE.Material>();
+    rage().parent!.parent!.traverse((child) => {
+      const material = (child as THREE.Mesh).material as THREE.Material;
+      if (material?.side === THREE.BackSide) found.add(material);
+    });
+    return found;
+  };
+
+  renderer.sync(world, 1);
+  expect(rage().visible).toBe(false);
+  const calm = [...outlines()];
+  expect(calm).toHaveLength(1);
+
+  enemy.enraged = true;
+  renderer.sync(world, 1.1);
+  expect(rage().visible).toBe(true);
+  expect(rage().parent!.visible).toBe(true);
+  const furious = [...outlines()];
+  expect(furious).toHaveLength(1);
+  expect(furious[0]).not.toBe(calm[0]);
+  // pulsa: o tamanho da marca muda com o tempo
+  const size = rage().scale.x;
+  renderer.sync(world, 1.3);
+  expect(rage().scale.x).not.toBe(size);
+
+  // morto, volta ao contorno normal e a marca some
+  enemy.state = 'dead';
+  renderer.sync(world, 1.4);
+  expect(rage().visible).toBe(false);
+  expect([...outlines()][0]).toBe(calm[0]);
+  renderer.dispose();
+});

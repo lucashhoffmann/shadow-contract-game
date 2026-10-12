@@ -13,10 +13,18 @@ import {
   enemyMultiplier,
   threatBoost,
 } from '@/app/modules/world/utils/players.util';
-import { roomIndexAt, tileCenter } from '@/app/modules/level/utils/grid.util';
 import {
+  circleHitsWall,
+  roomIndexAt,
+  tileCenter,
+} from '@/app/modules/level/utils/grid.util';
+import {
+  BUDDY_CHANCE,
+  BUDDY_GAP,
+  ENEMY_RADIUS,
   NINJA_CHANCE,
   NINJA_FROM_ROOM,
+  ROOM_ENEMY_MAX,
   ROOMS_AHEAD,
   ROOMS_BEHIND,
   ROOMS_PER_EXTRA_ENEMY,
@@ -25,6 +33,7 @@ import {
 } from '@/app/modules/world/constants/world.constants';
 import type {
   RoomTemplate,
+  Vec2,
   World,
 } from '@/app/modules/world/types/world.types';
 import { nextRandom } from '@/shared/utils/rng.util';
@@ -49,6 +58,30 @@ export function pickTemplate(world: World, index: number): RoomTemplate {
   if (index === 0) return start;
   if (index % SHOP_EVERY === 0) return shop;
   return combat[Math.floor(nextRandom(world) * combat.length)];
+}
+
+// A mesma ronda, deslocada BUDDY_GAP para um lado em que todos os pontos
+// caem em chao livre; null se nao cabe de lado nenhum.
+function buddyPatrol(world: World, patrol: Vec2[]): Vec2[] | null {
+  for (const [dx, dy] of [
+    [BUDDY_GAP, 0],
+    [-BUDDY_GAP, 0],
+    [0, BUDDY_GAP],
+    [0, -BUDDY_GAP],
+  ]) {
+    const beside = patrol.map((point) => ({
+      x: point.x + dx,
+      y: point.y + dy,
+    }));
+    if (
+      beside.every(
+        (point) => !circleHitsWall(world, point.x, point.y, ENEMY_RADIUS),
+      )
+    ) {
+      return beside;
+    }
+  }
+  return null;
 }
 
 export function spawnRoom(
@@ -84,7 +117,8 @@ export function spawnRoom(
       (1 + Math.floor(threat / ROOMS_PER_EXTRA_ENEMY)) * enemyMultiplier(world),
     ),
   );
-  for (let i = 0; i < enemyCount; i++) {
+  let spawned = 0;
+  for (let i = 0; i < enemyCount && spawned < ROOM_ENEMY_MAX; i++) {
     const patrol = template.enemies[i].path.map(([col, row]) =>
       tileCenter(index, col, row),
     );
@@ -93,6 +127,14 @@ export function spawnRoom(
         ? 'ninja'
         : 'suit';
     world.enemies.push(createEnemy(world, index, patrol, kind));
+    spawned++;
+    // parceiro: a primeira ronda sempre vem em dupla
+    if (spawned >= ROOM_ENEMY_MAX) break;
+    if (i > 0 && nextRandom(world) >= BUDDY_CHANCE) continue;
+    const beside = buddyPatrol(world, patrol);
+    if (!beside) continue;
+    world.enemies.push(createEnemy(world, index, beside, kind));
+    spawned++;
   }
 
   template.tiles.forEach((line, row) => {

@@ -345,7 +345,9 @@ describe('updateEnemies', () => {
     };
     const stars = thrown(SHOP_EVERY * SHURIKEN_FROM_LEVEL);
     expect(stars.length).toBeGreaterThan(0);
-    expect(stars[0]).toMatchObject({ owner: 'enemy', damage: SHURIKEN_DAMAGE });
+    expect(stars[0].owner).toBe('enemy');
+    // no nivel 10 o dano ja cresceu acima do base
+    expect(stars[0].damage).toBeGreaterThan(SHURIKEN_DAMAGE);
     expect(stars[0].vel.y).toBeGreaterThan(0);
     expect(thrown(SHOP_EVERY * (SHURIKEN_FROM_LEVEL - 1))).toHaveLength(0);
   });

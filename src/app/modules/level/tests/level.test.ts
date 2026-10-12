@@ -27,9 +27,11 @@ import {
   HEADSHOT_LOOT_MAX,
   HEADSHOT_LOOT_MIN,
   HEART_MAX,
+  BUDDY_GAP,
   HEART_MIN,
   IDLE_WARNING_DELAY,
   PLAYER_MAX_HP,
+  ROOM_ENEMY_MAX,
   ROOM_H,
   ROOM_W,
   SHIELD_MAX,
@@ -145,9 +147,36 @@ describe('geracao de salas', () => {
     const plaza = COMBAT_TEMPLATES.find((t) => t.id === 'plaza')!;
     const world = createEmptyWorld(1);
     spawnRoom(world, 1, plaza);
-    expect(world.enemies).toHaveLength(1);
+    const early = world.enemies.length;
     spawnRoom(world, 6, plaza);
-    expect(world.enemies).toHaveLength(1 + 3);
+    expect(world.enemies.length - early).toBeGreaterThan(early);
+  });
+
+  it('desde a primeira sala os inimigos vem em dupla, lado a lado', () => {
+    for (const template of COMBAT_TEMPLATES) {
+      const world = createEmptyWorld(1);
+      spawnRoom(world, 1, template);
+      const [leader, buddy] = world.enemies;
+      expect(world.enemies).toHaveLength(2);
+      expect(buddy.kind).toBe(leader.kind);
+      // mesma ronda, deslocada: nascem perto e andam juntos
+      expect(buddy.patrol).toHaveLength(leader.patrol.length);
+      expect(
+        Math.hypot(buddy.pos.x - leader.pos.x, buddy.pos.y - leader.pos.y),
+      ).toBeCloseTo(BUDDY_GAP);
+      expect(hasLineOfSight(world, leader.pos, buddy.pos)).toBe(true);
+    }
+  });
+
+  it('a sala nunca passa de ROOM_ENEMY_MAX inimigos', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const world = createEmptyWorld(seed);
+      for (const template of COMBAT_TEMPLATES) {
+        world.enemies = [];
+        spawnRoom(world, 300, template);
+        expect(world.enemies.length).toBeLessThanOrEqual(ROOM_ENEMY_MAX);
+      }
+    }
   });
 });
 

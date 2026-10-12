@@ -73,6 +73,9 @@ export type Character = {
 
 export type CharacterKit = {
   make: (kind: CharacterKind) => Character;
+  // material do contorno de todo personagem do kit: quem desenha pode
+  // troca-lo num personagem para destacar (furia do inimigo)
+  outline: THREE.Material;
   dispose: () => void;
 };
 
@@ -340,6 +343,7 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
 
   return {
     make,
+    outline: mat.outline,
     dispose() {
       for (const item of [ramp, ...Object.values(geo), ...Object.values(mat)]) {
         item.dispose();

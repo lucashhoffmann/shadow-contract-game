@@ -104,6 +104,19 @@ const NAME_TAG_FONT = "64px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
 const NAME_TAG_CANVAS = [512, 96];
 const NAME_TAG_SIZE = [2.4, 0.45];
 const NAME_TAG_Y = 2.05;
+// conversa entre inimigos calmos e proximos: balao de fala que se reveza
+const TALK_RANGE = 1.8;
+// segundos de cada fala
+const TALK_TURN = 1.6;
+const TALK_LINES = ['...', '?', 'zzz', '$$$', 'hm', '!', 'ha ha', 'psiu'];
+const BUBBLE_FONT = "64px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
+const BUBBLE_CANVAS = [256, 176];
+const BUBBLE_SIZE = [1.05, 0.72];
+const BUBBLE_Y = 2.25;
+// distancia de cada meia-lua da marca de raiva ate o centro dela
+const RAGE_MOON_GAP = 0.2;
+// marca de raiva do inimigo em furia: tamanho em relacao a exclamacao
+const RAGE_MARK_SIZE = 1.5;
 // F da facada: acima da cabeca e do marcador do inimigo
 const KNIFE_PROMPT_Y = 2.2;
 // altura maxima do corpo lancado por um golpe so
@@ -130,6 +143,8 @@ const FLOATER_POP_END = 0.18;
 const FLOATER_BANNER = {
   HEADSHOT: COLORS.ui.headshot,
   OVERKILL: COLORS.ui.overkill,
+  // critico do inimigo: vermelho vivo, e dano em voce
+  CRITICAL: '#ff2b2b',
 };
 // cor pelo tamanho do golpe: forte em vermelho, medio em amarelo, fraco em
 // verde; erro em claro, para nao parecer acerto
@@ -238,6 +253,13 @@ type EnemyView = Jumper & {
   // icones do marcador: exclamacao (viu) e orelha (ouviu)
   alarm: THREE.Group;
   ear: THREE.Group;
+  // furia: icone ao lado dos outros, e o contorno do corpo ja trocado
+  rage: THREE.Group;
+  enraged: boolean;
+  // balao de fala (conversa entre inimigos por perto); criado no primeiro uso
+  bubble: THREE.Sprite | null;
+  // o que o balao esta mostrando, para so trocar a textura quando muda
+  said: string;
   cone: THREE.Mesh;
   blood: THREE.Mesh;
   deathAt: number | null;
@@ -425,6 +447,24 @@ function wallpaper(level: number): { wall: Paper; floor: Paper } {
     wall: paper(WALLPAPERS[level % WALLPAPERS.length], hue, 0.5, [0.4, 0.52]),
     floor,
   };
+}
+
+// Meia-lua da marca de raiva, a de cima: pontas para fora e para cima, barriga
+// gorda para baixo (o centro da marca), afinando ate as pontas. Extrudada com
+// chanfro, para ficar roliça.
+function rageCrescentGeometry(): THREE.BufferGeometry {
+  const [half, tip, belly, inner] = [0.17, 0.07, -0.19, -0.03];
+  const moon = new THREE.Shape();
+  moon.moveTo(-half, tip);
+  moon.quadraticCurveTo(0, belly, half, tip);
+  moon.quadraticCurveTo(0, inner, -half, tip);
+  return new THREE.ExtrudeGeometry(moon, {
+    depth: 0.04,
+    curveSegments: 10,
+    bevelSize: 0.015,
+    bevelThickness: 0.015,
+    bevelSegments: 2,
+  }).translate(0, 0, -0.02);
 }
 
 // shuriken: estrela de 4 pontas com furo no meio, fina e deitada
@@ -660,6 +700,8 @@ export function createWorldRenderer(
     shellBase: new THREE.CylinderGeometry(0.062, 0.062, 0.1, 8)
       .rotateZ(-Math.PI / 2)
       .translate(-0.11, 0, 0),
+    // furia: uma das quatro meias-luas da marca de raiva
+    rageArc: rageCrescentGeometry(),
     // exclamacao: haste que afina para baixo e ponto
     markerStem: new THREE.CylinderGeometry(0.085, 0.04, 0.3, 12),
     markerDot: new THREE.SphereGeometry(0.07, 12, 10),
@@ -778,6 +820,12 @@ export function createWorldRenderer(
     copper: lambert(COLORS.model.cd98a5a),
     shellRed: lambert(COLORS.model.cc8242c),
     bulletEnemy: flat(COLORS.model.cff4040),
+    // furia: marca de raiva e contorno do corpo, na mesma cor que pulsa
+    rage: new THREE.MeshBasicMaterial({ color: 0xff2020 }),
+    rageOutline: new THREE.MeshBasicMaterial({
+      color: 0xff2020,
+      side: THREE.BackSide,
+    }),
     shuriken: new THREE.MeshLambertMaterial({
       color: COLORS.model.cc8ccd8,
       flatShading: true,
@@ -789,6 +837,8 @@ export function createWorldRenderer(
       depthWrite: false,
     }),
   };
+  // contorno e marca de quem esta em furia; a cor pulsa no `sync`
+  const rageColor = new THREE.Color();
   const markerMat: Record<EnemyState, THREE.Material> = {
     patrol: flat(COLORS.model.cffffff),
     suspicious: flat(COLORS.model.cffd84a),
@@ -1004,10 +1054,11 @@ export function createWorldRenderer(
       context.fillText(text, x, y + 30);
       context.font = FLOATER_FONT.replace(/^\d+/, '46');
       context.fillStyle = FLOATER_BANNER[banner];
-      const title =
-        banner === 'HEADSHOT'
-          ? getTexts().game.headshot
-          : getTexts().game.overkill;
+      const title = {
+        HEADSHOT: getTexts().game.headshot,
+        OVERKILL: getTexts().game.overkill,
+        CRITICAL: getTexts().game.critical,
+      }[banner];
       context.strokeText(title, x, y - 28);
       context.fillText(title, x, y - 28);
     } else {
@@ -1535,7 +1586,26 @@ export function createWorldRenderer(
       part(ear, geo.earWave, 0.06, 0.03),
       part(ear, geo.earWave, 0.06, 0.03, 1.4),
     ];
-    marker.add(alarm, ear);
+    // marca de raiva: quatro meias-luas em cruz (cima, baixo e lados), cada
+    // uma com a barriga virada para o centro. Fica ao lado da exclamacao e da
+    // orelha, para aparecerem juntas.
+    const rage = new THREE.Group();
+    rage.name = 'rageMarker';
+    rage.position.set(0.5, 0.28, 0);
+    rage.visible = false;
+    for (let quarter = 0; quarter < 4; quarter++) {
+      const moon = new THREE.Mesh(geo.rageArc, mat.rage);
+      // a geometria e a de cima; as outras sao ela girada em volta do centro
+      const turn = (quarter * Math.PI) / 2;
+      moon.position.set(
+        -Math.sin(turn) * RAGE_MOON_GAP,
+        Math.cos(turn) * RAGE_MOON_GAP,
+        0,
+      );
+      moon.rotation.z = turn;
+      rage.add(moon);
+    }
+    marker.add(alarm, ear, rage);
     marker.position.y = 1.7;
     character.root.add(marker);
 
@@ -1562,6 +1632,10 @@ export function createWorldRenderer(
       markerParts,
       alarm,
       ear,
+      rage,
+      enraged: false,
+      bubble: null,
+      said: '',
       cone,
       blood,
       deathAt: null,
@@ -1569,10 +1643,106 @@ export function createWorldRenderer(
     };
   }
 
+  // balao de fala: uma textura por texto, repartida entre os inimigos
+  const bubbleTextures = new Map<string, THREE.Texture>();
+  function bubbleTexture(text: string): THREE.Texture | null {
+    const cached = bubbleTextures.get(text);
+    if (cached) return cached;
+    const canvas = document.createElement('canvas');
+    [canvas.width, canvas.height] = BUBBLE_CANVAS;
+    const context = canvas.getContext('2d');
+    // sem canvas 2D (jsdom) nao ha como desenhar
+    if (!context) return null;
+    const [w, h] = BUBBLE_CANVAS;
+    const [pad, tail, radius] = [10, 34, 30];
+    context.lineJoin = 'round';
+    context.lineWidth = 10;
+    context.strokeStyle = '#14141f';
+    context.fillStyle = '#ffffff';
+    // corpo arredondado com o rabicho embaixo, apontando para quem fala
+    context.beginPath();
+    context.roundRect(pad, pad, w - pad * 2, h - pad * 2 - tail, radius);
+    context.moveTo(w * 0.34, h - pad - tail - 2);
+    context.lineTo(w * 0.28, h - pad);
+    context.lineTo(w * 0.5, h - pad - tail - 2);
+    context.stroke();
+    context.fill();
+    context.font = BUBBLE_FONT;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#14141f';
+    context.fillText(text, w / 2, (h - tail) / 2 + 2, w - pad * 5);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    bubbleTextures.set(text, texture);
+    return texture;
+  }
+
+  // mostra `text` no balao do inimigo, ou esconde com null
+  function say(view: EnemyView, text: string | null, time: number) {
+    if (!text) {
+      if (view.bubble) view.bubble.visible = false;
+      return;
+    }
+    if (text !== view.said || !view.bubble) {
+      const map = bubbleTexture(text);
+      if (!map) return;
+      if (!view.bubble) {
+        view.bubble = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map,
+            transparent: true,
+            depthTest: false,
+          }),
+        );
+        view.bubble.name = 'speechBubble';
+        view.bubble.renderOrder = 8;
+        view.character.root.add(view.bubble);
+      }
+      view.bubble.material.map = map;
+      view.said = text;
+    }
+    view.bubble.visible = true;
+    // quica de leve, como quem fala
+    const bounce = 1 + Math.sin(time * 10) * 0.05;
+    view.bubble.scale.set(BUBBLE_SIZE[0] * bounce, BUBBLE_SIZE[1] * bounce, 1);
+    view.bubble.position.set(0.35, BUBBLE_Y, 0);
+  }
+
+  // Conversa: dois inimigos calmos a menos de TALK_RANGE um do outro se
+  // revezam falando. So visual. Devolve o que `enemy` esta dizendo agora.
+  function chatter(world: World, enemy: Enemy, time: number): string | null {
+    const calm = (other: Enemy) =>
+      other.state === 'patrol' && !other.enraged && other.dash === 0;
+    if (!calm(enemy)) return null;
+    let partner: Enemy | undefined;
+    let nearest = TALK_RANGE;
+    for (const other of world.enemies) {
+      if (other === enemy || !calm(other)) continue;
+      const gap = Math.hypot(
+        other.pos.x - enemy.pos.x,
+        other.pos.y - enemy.pos.y,
+      );
+      if (gap < nearest) {
+        nearest = gap;
+        partner = other;
+      }
+    }
+    if (!partner) return null;
+    // cada par tem o proprio ritmo; quem tem o menor id fala nos turnos pares
+    const beat = time / TALK_TURN + (enemy.id + partner.id) * 0.37;
+    const turn = Math.floor(beat);
+    const mine = (turn % 2 === 0) === enemy.id < partner.id;
+    // pausa no fim de cada turno, antes de o outro responder
+    if (!mine || beat - turn > 0.75) return null;
+    return TALK_LINES[(turn + enemy.id) % TALK_LINES.length];
+  }
+
   function removeEnemy(view: EnemyView) {
     scene.remove(view.character.root, view.cone, view.blood);
     view.cone.geometry.dispose();
     view.blood.geometry.dispose();
+    view.bubble?.material.dispose();
   }
 
   // leque de raios: cada raio para na primeira parede
@@ -1808,6 +1978,11 @@ export function createWorldRenderer(
 
     sync(world, time) {
       const dt = lastTime ? Math.min(0.1, time - lastTime) : 0;
+      // furia: vermelho que vai do escuro ao vivo, como pulso
+      const fury = 0.5 + 0.5 * Math.sin(time * 9);
+      rageColor.setRGB(0.55 + 0.45 * fury, 0.04 + 0.1 * fury, 0.04);
+      mat.rage.color.copy(rageColor);
+      mat.rageOutline.color.copy(rageColor);
       lastTime = time;
       // congela junto com o jogo: pausado ou na loja, nada cai
       if (world.status === 'playing' || world.status === 'dead') {
@@ -1875,7 +2050,9 @@ export function createWorldRenderer(
               ? 'HEADSHOT'
               : floater.overkill
                 ? 'OVERKILL'
-                : undefined,
+                : floater.critical
+                  ? 'CRITICAL'
+                  : undefined,
           );
           if (!map) continue;
           sprite = new THREE.Sprite(
@@ -1896,7 +2073,9 @@ export function createWorldRenderer(
             ? 0.5 + (t / FLOATER_POP_END) * (FLOATER_POP - 0.5)
             : Math.max(1, FLOATER_POP - (t - FLOATER_POP_END) * 2.5);
         // golpe com destaque aparece maior que golpe comum
-        const size = pop * (floater.headshot || floater.overkill ? 1.5 : 1);
+        const size =
+          pop *
+          (floater.headshot || floater.overkill || floater.critical ? 1.5 : 1);
         sprite.scale.set(FLOATER_SIZE[0] * size, FLOATER_SIZE[1] * size, 1);
         sprite.position.set(
           floater.pos.x,
@@ -2022,9 +2201,33 @@ export function createWorldRenderer(
                   )
             : 1,
         );
-        view.alarm.visible = !listening;
+        view.alarm.visible =
+          !listening &&
+          (enemy.state === 'suspicious' || enemy.state === 'alert');
+        // furia: contorno do corpo vira vermelho (uma vez) e a marca de raiva
+        // pulsa sobre a cabeca enquanto ele viver
+        const furious = enemy.enraged && !dead;
+        if (furious !== view.enraged) {
+          view.enraged = furious;
+          view.character.root.traverse((child) => {
+            if (!(child instanceof THREE.Mesh)) return;
+            if (furious && child.material === kit.outline) {
+              child.material = mat.rageOutline;
+            } else if (!furious && child.material === mat.rageOutline) {
+              child.material = kit.outline;
+            }
+          });
+        }
+        say(view, dead ? null : chatter(world, enemy, time), time);
+        view.rage.visible = furious;
+        view.rage.scale.setScalar(
+          RAGE_MARK_SIZE * (1 + Math.sin(time * 9 + enemy.id) * 0.22),
+        );
         view.marker.visible =
-          listening || enemy.state === 'suspicious' || enemy.state === 'alert';
+          furious ||
+          listening ||
+          enemy.state === 'suspicious' ||
+          enemy.state === 'alert';
         view.marker.position.y =
           1.7 +
           Math.sin(time * 14 + enemy.id) * (view.marker.visible ? 0.04 : 0);
@@ -2100,6 +2303,7 @@ export function createWorldRenderer(
       for (const particle of particles) scene.remove(particle.mesh);
       particles.length = 0;
       for (const texture of floaterTextures.values()) texture.dispose();
+      for (const texture of bubbleTextures.values()) texture.dispose();
       kit.dispose();
       for (const papers of wallpapers.values()) {
         for (const { material, texture } of [papers.wall, papers.floor]) {

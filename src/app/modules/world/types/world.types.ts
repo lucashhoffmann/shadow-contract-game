@@ -97,6 +97,11 @@ export type Enemy = {
   launch: number;
   // segundos ate o ninja poder arremessar outra shuriken
   throwCooldown: number;
+  // o salto em curso e esquiva de bala (de lado), nao bote para cima do
+  // player: nao corrige o rumo nem golpeia ao pousar
+  evading: boolean;
+  // viu um colega morto: fica mais esperto pelo resto da vida (enemy.system)
+  enraged: boolean;
   // 0..1: quanto ja ouviu do player; cheio, vai investigar
   hearing: number;
   // onde ouviu o player; null = nada a investigar
@@ -123,6 +128,9 @@ export type Projectile = {
   by?: number;
   // estrela arremessada por ninja: so muda o modelo
   shuriken?: boolean;
+  // tiro ou shuriken de inimigo que saiu critico: `damage` ja vem
+  // multiplicado
+  critical?: boolean;
   // bala do player que saiu como headshot: `damage` ja vem multiplicado
   headshot?: boolean;
 };
@@ -281,6 +289,8 @@ export type Floater = {
   headshot?: boolean;
   // execucao furtiva: agachado e pelas costas
   overkill?: boolean;
+  // golpe critico do inimigo contra o player
+  critical?: boolean;
   // segundos desde que apareceu; some em FLOATER_TIME
   age: number;
 };

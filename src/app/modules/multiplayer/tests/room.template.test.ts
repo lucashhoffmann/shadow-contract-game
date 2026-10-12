@@ -13,6 +13,7 @@ import {
 } from '@/app/modules/multiplayer/templates/room.template';
 import {
   MULTI_ENEMIES_PER_PLAYER,
+  ROOM_ENEMY_MAX,
   ROOM_H,
   ROOM_SIZES,
   ROOM_W,
@@ -109,7 +110,7 @@ describe('sala do multiplayer', () => {
     expect(MULTI_ENEMIES_PER_PLAYER).toBeGreaterThan(0);
     expect(count(2)).toBeGreaterThan(1);
     expect(count(4)).toBeGreaterThan(count(2));
-    expect(count(4)).toBeLessThanOrEqual(8);
+    expect(count(4)).toBeLessThanOrEqual(ROOM_ENEMY_MAX);
   });
 
   it('inimigo do multi nasce mais esperto que o da mesma sala no solo', () => {

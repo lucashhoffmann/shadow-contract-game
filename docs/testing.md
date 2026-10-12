@@ -66,6 +66,9 @@ conhecida. Usar `createWorld(seed)` para testar geracao e integracao.
   deterministica, loja a cada `SHOP_EVERY` salas, no maximo 3 salas vivas
 - `player`: anda, nao atravessa parede, desliza na parede, diagonal nao e mais
   rapida
+- `enemy` (dificuldade): dano cresce com o nivel e acompanha a vida maxima
+  do alvo, alerta chama os colegas por perto, ninjas cercam, ninja desvia de
+  parte dos tiros
 - `enemy`: cone (angulo, alcance, parede), deteccao sobe e desce, ouve passo
   e salto por perto e vai investigar, terno
   dispara bala, ninja golpeia de perto, tiro recebido alerta

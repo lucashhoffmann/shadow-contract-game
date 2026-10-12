@@ -39,6 +39,32 @@ import {
   LAUNCH_TIME,
   HEARING_YELLOW,
   NINJA_DAMAGE,
+  NINJA_DODGE_CHANCE,
+  NINJA_DODGE_COST,
+  NINJA_DODGE_HOP,
+  PACK_ARRIVED,
+  NINJA_DODGE_MAX,
+  NINJA_DODGE_RANGE,
+  PACK_CALL_MAX,
+  PACK_CALL_PER_LEVEL,
+  PACK_CALL_RADIUS,
+  PACK_RING,
+  RAGE_DASH,
+  RAGE_DETECT,
+  RAGE_HEARING,
+  RAGE_PURSUIT,
+  RAGE_THRESHOLD,
+  RAGE_VIEW,
+  BULLET_RADIUS,
+  ENEMY_CRIT_CHANCE,
+  ENEMY_CRIT_FROM_LEVEL,
+  ENEMY_CRIT_MAX,
+  ENEMY_CRIT_MULT,
+  ENEMY_CRIT_PER_LEVEL,
+  ENEMY_DAMAGE_PER_LEVEL,
+  ENEMY_DAMAGE_SHARE,
+  ENEMY_DAMAGE_SHARE_MAX,
+  ENEMY_DAMAGE_SHARE_PER_LEVEL,
   NINJA_DASH_TURN,
   NINJA_LUNGE_STRIKE,
   NINJA_REACH,
@@ -138,6 +164,8 @@ export function createEnemy(
     searchTimer: 0,
     launch: 0,
     throwCooldown: 0,
+    evading: false,
+    enraged: false,
   };
 }
 
@@ -249,6 +277,179 @@ function investigate(world: World, enemy: Enemy, heard: Vec2, dt: number) {
   navigate(world, enemy, heard, ENEMY_KINDS[enemy.kind].patrolSpeed, dt);
 }
 
+// nivel (contrato) que o inimigo vale; o multiplayer adianta (threatBoost)
+function levelOf(world: World, enemy: Enemy): number {
+  return Math.max(
+    1,
+    Math.ceil((enemy.roomIndex + threatBoost(world)) / SHOP_EVERY),
+  );
+}
+
+// Dano de um ataque de dano base `base` contra o jogador em foco: cresce com
+// o nivel e nunca cai abaixo de uma fatia da vida maxima do alvo.
+export function enemyDamage(world: World, enemy: Enemy, base: number): number {
+  const level = levelOf(world, enemy);
+  const share = Math.min(
+    ENEMY_DAMAGE_SHARE_MAX,
+    ENEMY_DAMAGE_SHARE + ENEMY_DAMAGE_SHARE_PER_LEVEL * (level - 1),
+  );
+  return Math.round(
+    Math.max(
+      base * (1 + ENEMY_DAMAGE_PER_LEVEL * (level - 1)),
+      // a fatia e do golpe de ninja; ataques mais fracos levam a proporcao
+      world.player.maxHp * share * (base / NINJA_DAMAGE),
+    ),
+  );
+}
+
+// Sorteia o ataque de dano base `base`: dano do nivel e, a partir de
+// ENEMY_CRIT_FROM_LEVEL, a chance de sair critico. Antes desse nivel nao
+// sorteia nada, para o comeco do jogo seguir igual.
+export function enemyStrike(
+  world: World,
+  enemy: Enemy,
+  base: number,
+): { damage: number; critical: boolean } {
+  const damage = enemyDamage(world, enemy, base);
+  const level = levelOf(world, enemy);
+  if (level < ENEMY_CRIT_FROM_LEVEL) return { damage, critical: false };
+  const chance = Math.min(
+    ENEMY_CRIT_MAX,
+    ENEMY_CRIT_CHANCE + ENEMY_CRIT_PER_LEVEL * (level - ENEMY_CRIT_FROM_LEVEL),
+  );
+  if (nextRandom(world) >= chance) return { damage, critical: false };
+  return { damage: Math.round(damage * ENEMY_CRIT_MULT), critical: true };
+}
+
+// Viu um colega morto: entra em furia. Fica mais esperto ate morrer e, se
+// ainda nao sabe do player, vai conferir o corpo.
+function witness(world: World, enemy: Enemy): void {
+  if (enemy.enraged) return;
+  const corpse = world.enemies.find(
+    (other) => other.state === 'dead' && canSee(world, enemy, other.pos),
+  );
+  if (!corpse) return;
+  enemy.enraged = true;
+  // copia: o perfil de inteligencia e compartilhado pelo nivel inteiro
+  enemy.intelligence = {
+    ...enemy.intelligence,
+    hearing: enemy.intelligence.hearing * RAGE_HEARING,
+    hearingThreshold: enemy.intelligence.hearingThreshold * RAGE_THRESHOLD,
+    pursuit: enemy.intelligence.pursuit * RAGE_PURSUIT,
+    dash: enemy.intelligence.dash * RAGE_DASH,
+  };
+  enemy.viewRange += RAGE_VIEW;
+  enemy.detectTime *= RAGE_DETECT;
+  if (enemy.state === 'alert') return;
+  enemy.heard = { ...corpse.pos };
+  enemy.searchTimer = SEARCH_TIME * enemy.intelligence.hearing;
+  enemy.route = [];
+  enemy.repathTimer = 0;
+}
+
+// Quem entrou em alerta chama os colegas por perto: entram em alerta no
+// passo seguinte e chamam tambem.
+function rally(world: World, caller: Enemy): void {
+  const radius = Math.min(
+    PACK_CALL_MAX,
+    PACK_CALL_RADIUS + PACK_CALL_PER_LEVEL * (levelOf(world, caller) - 1),
+  );
+  for (const ally of world.enemies) {
+    if (ally.state === 'dead' || ally.state === 'alert') continue;
+    if (distance(ally.pos, caller.pos) <= radius) ally.detection = 1;
+  }
+}
+
+// Para onde o ninja corre atras do alvo. Sozinho: direto. Em bando: cada um
+// tem um lado do alvo, repartido por igual em volta dele a partir de onde
+// esta o mais antigo do bando; corre para o ponto do aro desse lado e, ja do
+// lado certo, parte direto para o golpe. A reparticao e pela ordem de id, que
+// nao muda: se fosse por quem esta mais perto, trocariam de lado a cada passo.
+function packTarget(world: World, enemy: Enemy): Vec2 {
+  const target = world.player.pos;
+  const pack = world.enemies.filter(
+    (ally) =>
+      ally.state === 'alert' &&
+      !ENEMY_KINDS[ally.kind].ranged &&
+      nearestPlayer(world, ally.pos) === world.player,
+  );
+  if (pack.length < 2) return target;
+  const side =
+    angleTo(target, pack[0].pos) +
+    (pack.indexOf(enemy) * Math.PI * 2) / pack.length;
+  if (Math.abs(angleDiff(side, angleTo(target, enemy.pos))) < PACK_ARRIVED) {
+    return target;
+  }
+  const spot = {
+    x: target.x + Math.cos(side) * PACK_RING,
+    y: target.y + Math.sin(side) * PACK_RING,
+  };
+  // ponto do aro dentro de parede ou caixa: vai direto
+  return circleHitsWall(world, spot.x, spot.y, ENEMY_RADIUS) ? target : spot;
+}
+
+// caminho reto de `length` a partir do inimigo, livre de parede e caixa
+function leapClear(world: World, enemy: Enemy, angle: number, length: number) {
+  const sealed = doorsSealed(world);
+  for (let d = ENEMY_RADIUS; d <= length; d += ENEMY_RADIUS) {
+    if (
+      circleHitsWall(
+        world,
+        enemy.pos.x + Math.cos(angle) * d,
+        enemy.pos.y + Math.sin(angle) * d,
+        ENEMY_RADIUS,
+        sealed,
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Esquiva: se ha bala do player vindo na direcao do ninja, salta de lado.
+// Devolve true se saltou. A sorte e fixa por par bala/ninja: a mesma bala
+// nao e sorteada de novo a cada passo.
+function dodge(world: World, enemy: Enemy): boolean {
+  if (enemy.dashEvery === 0) return false;
+  if (enemy.dashCooldown > enemy.dashEvery * (1 - NINJA_DODGE_COST)) {
+    return false;
+  }
+  const chance = Math.min(
+    NINJA_DODGE_MAX,
+    NINJA_DODGE_CHANCE * enemy.intelligence.dash ** 2,
+  );
+  for (const bullet of world.projectiles) {
+    if (bullet.owner !== 'player') continue;
+    const speed = Math.hypot(bullet.vel.x, bullet.vel.y);
+    if (speed === 0) continue;
+    const [ux, uy] = [bullet.vel.x / speed, bullet.vel.y / speed];
+    const [rx, ry] = [enemy.pos.x - bullet.pos.x, enemy.pos.y - bullet.pos.y];
+    // quanto falta ate ele ao longo do tiro, e por quanto passaria de lado
+    const along = rx * ux + ry * uy;
+    const side = rx * uy - ry * ux;
+    if (along <= 0 || along > NINJA_DODGE_RANGE) continue;
+    if (Math.abs(side) > ENEMY_RADIUS + BULLET_RADIUS + 0.2) continue;
+    if (((bullet.id * 31 + enemy.id * 17) % 100) / 100 >= chance) continue;
+    // para o lado em que ja esta em relacao ao tiro; bloqueado, o outro.
+    // Salto curto: so o bastante para sair da linha
+    const heading = Math.atan2(uy, ux);
+    const away = side >= 0 ? -1 : 1;
+    const angle = [away, -away]
+      .map((turn) => heading + (turn * Math.PI) / 2)
+      .find((candidate) => leapClear(world, enemy, candidate, NINJA_DODGE_HOP));
+    if (angle === undefined) return false;
+    enemy.facing = angle;
+    enemy.dash = NINJA_DODGE_HOP / (DASH_SPEED * enemy.intelligence.dash);
+    enemy.evading = true;
+    enemy.dashCooldown = enemy.dashEvery * NINJA_DODGE_COST;
+    enemy.route = [];
+    enemy.repathTimer = 0;
+    return true;
+  }
+  return false;
+}
+
 function enterAlert(enemy: Enemy): void {
   enemy.state = 'alert';
   enemy.hearing = 0;
@@ -283,7 +484,7 @@ function alert(world: World, enemy: Enemy, dt: number): void {
   const gap = distance(enemy.pos, player.pos);
   if (enemy.dash > 0) {
     // bote do ninja acompanha o player que tenta sair da frente
-    if (!stats.ranged) {
+    if (!stats.ranged && !enemy.evading) {
       const turn = angleDiff(angleTo(enemy.pos, player.pos), enemy.facing);
       enemy.facing += clamp(turn, -NINJA_DASH_TURN * dt, NINJA_DASH_TURN * dt);
     }
@@ -299,15 +500,22 @@ function alert(world: World, enemy: Enemy, dt: number): void {
       doorsSealed(world),
     );
     // ninja pousa ao alcancar o player, em vez de passar por ele
-    if (!stats.ranged && distance(enemy.pos, player.pos) <= reach) {
+    if (
+      !stats.ranged &&
+      !enemy.evading &&
+      distance(enemy.pos, player.pos) <= reach
+    ) {
       enemy.dash = 0;
       // pousou colado: o golpe vem logo, sem esperar a recarga inteira
       enemy.fireCooldown = Math.min(enemy.fireCooldown, NINJA_LUNGE_STRIKE);
     }
     return;
   }
+  enemy.evading = false;
   enemy.dashCooldown = Math.max(0, enemy.dashCooldown - dt);
   enemy.throwCooldown = Math.max(0, enemy.throwCooldown - dt);
+  // ninja desvia de tiro com um salto de lado
+  if (!stats.ranged && dodge(world, enemy)) return;
   // ninja de nivel alto arremessa shuriken de longe e segue se aproximando
   if (
     !stats.ranged &&
@@ -318,17 +526,21 @@ function alert(world: World, enemy: Enemy, dt: number): void {
     gap <= SHURIKEN_RANGE
   ) {
     enemy.facing = angleTo(enemy.pos, player.pos);
-    spawnProjectile(
-      world,
-      'enemy',
-      enemy.pos,
-      enemy.facing,
-      SHURIKEN_SPEED,
-      SHURIKEN_DAMAGE,
-      SHURIKEN_RANGE,
-      'pistol',
-      enemy.id,
-    ).shuriken = true;
+    const star = enemyStrike(world, enemy, SHURIKEN_DAMAGE);
+    Object.assign(
+      spawnProjectile(
+        world,
+        'enemy',
+        enemy.pos,
+        enemy.facing,
+        SHURIKEN_SPEED,
+        star.damage,
+        SHURIKEN_RANGE,
+        'pistol',
+        enemy.id,
+      ),
+      { shuriken: true, ...(star.critical && { critical: true }) },
+    );
     enemy.throwCooldown = SHURIKEN_INTERVAL;
     enemy.attack = SLASH_TIME;
   }
@@ -385,7 +597,8 @@ function alert(world: World, enemy: Enemy, dt: number): void {
     navigate(
       world,
       enemy,
-      player.pos,
+      // ninja em bando cerca; terno e ninja sozinho vao direto
+      stats.ranged ? player.pos : packTarget(world, enemy),
       stats.chaseSpeed * enemy.intelligence.pursuit,
       dt,
     );
@@ -395,20 +608,26 @@ function alert(world: World, enemy: Enemy, dt: number): void {
   enemy.fireCooldown -= dt;
   if (enemy.fireCooldown > 0) return;
   enemy.fireCooldown = FIRE_INTERVAL;
+  const strike = enemyStrike(
+    world,
+    enemy,
+    stats.ranged ? ENEMY_BULLET_DAMAGE : NINJA_DAMAGE,
+  );
   if (stats.ranged) {
-    spawnProjectile(
+    const bullet = spawnProjectile(
       world,
       'enemy',
       enemy.pos,
       enemy.facing,
       ENEMY_BULLET_SPEED,
-      ENEMY_BULLET_DAMAGE,
+      strike.damage,
       FIRE_RANGE,
       'pistol',
       enemy.id,
     );
+    if (strike.critical) bullet.critical = true;
   } else {
-    damagePlayer(world, NINJA_DAMAGE, enemy.pos);
+    damagePlayer(world, strike.damage, enemy.pos, strike.critical);
   }
   enemy.attack = SLASH_TIME;
 }
@@ -442,15 +661,20 @@ export function updateEnemies(world: World, dt: number): void {
     }
     // cada inimigo lida com o jogador vivo mais perto dele
     world.player = nearestPlayer(world, enemy.pos) ?? focus;
+    witness(world, enemy);
     enemy.attack = Math.max(0, enemy.attack - dt);
     // detection cheia vem de ver o player ou de levar tiro (damageEnemy)
-    if (enemy.state !== 'alert' && enemy.detection >= 1) enterAlert(enemy);
+    if (enemy.state !== 'alert' && enemy.detection >= 1) {
+      enterAlert(enemy);
+      rally(world, enemy);
+    }
     if (enemy.state === 'alert') {
       alert(world, enemy, dt);
       continue;
     }
     if (listen(world, enemy, dt)) {
       enterAlert(enemy);
+      rally(world, enemy);
       alert(world, enemy, dt);
       continue;
     }

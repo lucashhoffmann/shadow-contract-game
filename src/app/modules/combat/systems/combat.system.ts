@@ -94,7 +94,7 @@ function addFloater(
   amount: number,
   onPlayer = false,
   // destaque escrito sobre o numero
-  tag?: 'headshot' | 'overkill',
+  tag?: 'headshot' | 'overkill' | 'critical',
 ): void {
   if (
     amount === 0 &&
@@ -159,7 +159,13 @@ export function killEnemy(world: World, enemy: Enemy): void {
 
 // escudo absorve primeiro; o que sobra vai na vida
 // `from`: onde esta quem bateu; o numero do dano sobe ali
-export function damagePlayer(world: World, damage: number, from: Vec2): void {
+export function damagePlayer(
+  world: World,
+  damage: number,
+  from: Vec2,
+  // golpe critico do inimigo: so muda o aviso
+  critical = false,
+): void {
   const player = world.player;
   const absorbed = Math.min(player.shield, damage);
   player.shield -= absorbed;
@@ -170,7 +176,7 @@ export function damagePlayer(world: World, damage: number, from: Vec2): void {
   world.run.stats.damageBlocked += absorbed;
   world.run.stats.damageTaken += lost;
   // mostra o golpe inteiro, mesmo a parte que o escudo segurou
-  addFloater(world, from, damage, true);
+  addFloater(world, from, damage, true, critical ? 'critical' : undefined);
   world.run.events.push({
     at: world.run.seconds,
     ...eventText((t) => t.events.damageTaken(lost, absorbed)),
@@ -406,7 +412,12 @@ export function updateProjectiles(world: World, dt: number): void {
       );
       if (!struck) return true;
       world.player = struck;
-      damagePlayer(world, bullet.damage, shooterPos(world, bullet));
+      damagePlayer(
+        world,
+        bullet.damage,
+        shooterPos(world, bullet),
+        bullet.critical,
+      );
       return false;
     }
     const hit = world.enemies.find(

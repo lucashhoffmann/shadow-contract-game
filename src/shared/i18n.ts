@@ -132,6 +132,7 @@ const pt = {
     miss: 'Errou!',
     headshot: 'HEADSHOT',
     overkill: 'OVERKILL',
+    critical: 'CRITICO',
   },
   shop: {
     title: 'Escolha o equipamento',
@@ -463,6 +464,7 @@ const en: typeof pt = {
     miss: 'Miss!',
     headshot: 'HEADSHOT',
     overkill: 'OVERKILL',
+    critical: 'CRITICAL',
   },
   shop: {
     title: 'Choose your equipment',

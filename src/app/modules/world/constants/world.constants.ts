@@ -95,6 +95,61 @@ export const NINJA_FROM_ROOM = 2;
 export const NINJA_CHANCE = 0.4;
 export const NINJA_REACH = 0.9;
 export const NINJA_DAMAGE = 25;
+// Dano do inimigo cresce com o nivel (contrato): cada nivel alem do primeiro
+// soma ENEMY_DAMAGE_PER_LEVEL do dano base. E nunca fica irrelevante contra
+// quem empilhou vida: um golpe de ninja tira pelo menos ENEMY_DAMAGE_SHARE da
+// vida maxima do alvo, fatia que sobe por nivel ate o teto. Tiro e shuriken
+// valem a mesma regra, na proporcao do dano base deles.
+export const ENEMY_DAMAGE_PER_LEVEL = 0.12;
+export const ENEMY_DAMAGE_SHARE = 0.1;
+export const ENEMY_DAMAGE_SHARE_PER_LEVEL = 0.01;
+export const ENEMY_DAMAGE_SHARE_MAX = 0.4;
+// Critico do inimigo: a partir do nivel (contrato) ENEMY_CRIT_FROM_LEVEL,
+// cada golpe, tiro ou shuriken tem chance de sair critico e valer
+// ENEMY_CRIT_MULT vezes. A chance comeca em ENEMY_CRIT_CHANCE e sobe por
+// nivel, ate o teto.
+export const ENEMY_CRIT_FROM_LEVEL = 4;
+export const ENEMY_CRIT_CHANCE = 0.08;
+export const ENEMY_CRIT_PER_LEVEL = 0.01;
+export const ENEMY_CRIT_MAX = 0.3;
+export const ENEMY_CRIT_MULT = 1.8;
+// Furia: inimigo que ve um colega morto fica mais esperto ate morrer. Ouve
+// de mais longe e precisa de menos para alertar, persegue mais rapido e por
+// mais tempo, salta mais, enxerga mais longe e nota o player mais depressa.
+// E vai conferir o corpo.
+export const RAGE_HEARING = 1.35;
+export const RAGE_THRESHOLD = 0.75;
+export const RAGE_PURSUIT = 1.25;
+export const RAGE_DASH = 1.25;
+export const RAGE_VIEW = 1.5;
+export const RAGE_DETECT = 0.6;
+// Dupla: inimigos andam juntos desde a primeira sala. A primeira ronda de
+// toda sala nasce com um parceiro; as outras, com chance BUDDY_CHANCE. O
+// parceiro e do mesmo tipo e faz a mesma ronda, BUDDY_GAP ao lado. A sala
+// nunca passa de ROOM_ENEMY_MAX inimigos.
+export const BUDDY_CHANCE = 0.5;
+export const BUDDY_GAP = 0.8;
+export const ROOM_ENEMY_MAX = 12;
+// Bando. Quem entra em alerta chama os colegas vivos a ate PACK_CALL_RADIUS
+// (cresce por nivel, ate o teto); cada chamado chama tambem. Ninjas em alerta
+// cercam: cada um vai para um ponto diferente do aro de raio PACK_RING em
+// volta do alvo, e so de perto parte direto para o golpe.
+export const PACK_CALL_RADIUS = 3.5;
+export const PACK_CALL_PER_LEVEL = 0.4;
+export const PACK_CALL_MAX = 9;
+export const PACK_RING = 1.6;
+// ja esta no proprio lado do alvo (diferenca de angulo, rad): vai ao golpe
+export const PACK_ARRIVED = 0.5;
+// Esquiva do ninja: bala do player vindo na direcao dele, a menos de
+// NINJA_DODGE_RANGE, pode ser desviada com um salto de lado. A chance por
+// bala cresce com a inteligencia de salto do nivel, ate o teto. A esquiva
+// gasta parte da recarga do salto.
+export const NINJA_DODGE_RANGE = 4;
+export const NINJA_DODGE_CHANCE = 0.3;
+export const NINJA_DODGE_MAX = 0.8;
+export const NINJA_DODGE_COST = 0.6;
+// tamanho do salto de esquiva, em tiles: curto, so para sair da linha
+export const NINJA_DODGE_HOP = 1.8;
 // bote do ninja: so salta se o salto alcanca o player, corrige o rumo no ar
 // (rad/s) e, ao pousar colado, golpeia quase na hora
 export const NINJA_DASH_TURN = 2.5;
@@ -187,7 +242,7 @@ export const LOOT_SHIELD_CHANCE = 0.2;
 export const LOOT_DASH_CHANCE = 0.2;
 // ficha de revive: rara. Guarda ate REVIVE_MAX; ao morrer gasta uma e
 // renasce na entrada da sala com REVIVE_HP da vida maxima
-export const LOOT_REVIVE_CHANCE = 0.04;
+export const LOOT_REVIVE_CHANCE = 0.015;
 export const REVIVE_MAX = 3;
 export const REVIVE_HP = 0.5;
 // quantos saltos um item de salto repoe

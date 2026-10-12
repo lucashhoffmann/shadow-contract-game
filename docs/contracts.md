@@ -195,6 +195,45 @@ Estados:
   inimigo). `updateEnemies` anda o corpo `LAUNCH_DISTANCE` nesse tempo,
   freando ate parar; parede segura. Morte em mais de um golpe nao lanca. A
   engine anima o voo e o tombo por `enemy.launch`
+- dano: todo ataque de inimigo passa por `enemyDamage(world, enemy, base)`.
+  Cresce `ENEMY_DAMAGE_PER_LEVEL` do dano base por nivel alem do primeiro, e
+  nunca fica abaixo de uma fatia da vida maxima do alvo: `ENEMY_DAMAGE_SHARE`
+  mais `ENEMY_DAMAGE_SHARE_PER_LEVEL` por nivel, ate `ENEMY_DAMAGE_SHARE_MAX`
+  (para o golpe de ninja; tiro e shuriken, na proporcao do dano base). No
+  nivel 1 contra a vida inicial, vale o dano base
+- critico: a partir do nivel `ENEMY_CRIT_FROM_LEVEL`, cada golpe, tiro ou
+  shuriken sorteia (`enemyStrike`) a chance de valer `ENEMY_CRIT_MULT` vezes:
+  `ENEMY_CRIT_CHANCE` mais `ENEMY_CRIT_PER_LEVEL` por nivel, ate
+  `ENEMY_CRIT_MAX`. Antes desse nivel nao sorteia nada. O tiro leva
+  `Projectile.critical` ate acertar; o aviso sai com `Floater.critical`, que a
+  engine escreve como "CRITICO" sobre o numero, como o headshot
+- duplas: em `spawnRoom`, a primeira ronda de toda sala nasce com um parceiro
+  e as outras com chance `BUDDY_CHANCE`. O parceiro e do mesmo tipo e faz a
+  mesma ronda deslocada `BUDDY_GAP` para um lado livre (`buddyPatrol`); sem
+  lado livre, a ronda fica sozinha. A sala nunca passa de `ROOM_ENEMY_MAX`
+- conversa: so visual, na engine. Dois inimigos em `patrol`, sem furia, a
+  menos de `TALK_RANGE` um do outro se revezam com um balao de fala sobre a
+  cabeca (`chatter`, em `world.renderer.ts`)
+- furia (`enraged`): inimigo vivo que ve um colega morto (`canSee` no corpo)
+  fica mais esperto ate morrer (`witness`): `intelligence` propria (copia;
+  o perfil do nivel nao muda) com escuta, perseguicao e salto multiplicados
+  por `RAGE_HEARING`, `RAGE_PURSUIT` e `RAGE_DASH` e limiar de escuta por
+  `RAGE_THRESHOLD`; `viewRange` soma `RAGE_VIEW` e `detectTime` cai para
+  `RAGE_DETECT`. Fora de alerta, `heard` vira o corpo e ele vai conferir. A
+  engine troca o contorno do corpo por um vermelho que pulsa e mostra a marca
+  de raiva flutuando sobre a cabeca
+- bando: ao entrar em alerta o inimigo chama (`rally`) os colegas vivos a ate
+  `PACK_CALL_RADIUS` mais `PACK_CALL_PER_LEVEL` por nivel (teto
+  `PACK_CALL_MAX`), que alertam no passo seguinte e chamam tambem. Ninjas em
+  alerta cercam (`packTarget`): cada um tem um lado do alvo, repartido por
+  igual pela ordem de id, corre para o ponto do aro de raio `PACK_RING` desse
+  lado e, a menos de `PACK_ARRIVED` rad dele, parte para o golpe. Ninja
+  sozinho e terno vao direto
+- esquiva: ninja em alerta com o salto ao menos `NINJA_DODGE_COST` recarregado
+  desvia de bala do player que vem nele a ate `NINJA_DODGE_RANGE`: salto de
+  `NINJA_DODGE_HOP` tiles de lado (`evading`), sem corrigir o rumo nem golpear
+  ao pousar. Chance por bala `NINJA_DODGE_CHANCE` vezes o quadrado da
+  inteligencia de salto, ate `NINJA_DODGE_MAX`; fixa por par bala/ninja
 - shuriken: `ninja` de nivel (contrato) `SHURIKEN_FROM_LEVEL` em diante, em
   `alert` com linha de visao e entre `SHURIKEN_MIN_GAP` e `SHURIKEN_RANGE` do
   player, arremessa um `Projectile` com `shuriken: true` a cada
@@ -389,6 +428,9 @@ type Floater = {
   amount: number;
   age: number;
   onPlayer?: boolean;
+  headshot?: boolean;
+  overkill?: boolean;
+  critical?: boolean; // golpe critico do inimigo
 };
 ```
 
