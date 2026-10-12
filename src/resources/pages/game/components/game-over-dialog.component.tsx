@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/resources/components/ui/dialog';
+import { ShareRecord } from '@/resources/pages/game/components/share-record/share-record.component';
 
 type GameOverDialogProps = {
   open: boolean;
@@ -52,8 +53,8 @@ export function GameOverDialog({
       >
         <DialogHeader className='items-center gap-3'>
           <DialogTitle className='text-outline flex flex-col text-5xl leading-none tracking-wide uppercase sm:text-6xl'>
-            <span className='text-white'>Contrato</span>{' '}
-            <span className='text-[1.2em] text-[#ff2d55]'>falhou!</span>
+            <span className='text-white'>Voce</span>{' '}
+            <span className='text-[1.2em] text-[#ff2d55]'>morreu!</span>
           </DialogTitle>
           <Skull
             aria-hidden
@@ -80,6 +81,11 @@ export function GameOverDialog({
             />
             Jogar de novo
           </button>
+          <ShareRecord
+            best={best}
+            room={room}
+            kills={kills}
+          />
           <div className='flex gap-2 font-sans'>
             <Button
               variant='outline'

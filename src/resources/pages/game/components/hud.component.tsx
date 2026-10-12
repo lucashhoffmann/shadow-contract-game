@@ -1,4 +1,4 @@
-import { ChevronsRight } from 'lucide-react';
+import { ChevronsRight, Pause } from 'lucide-react';
 
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import {
@@ -86,6 +86,8 @@ type HudProps = {
   onSelectWeapon: (id: WeaponId | null) => void;
   // foto de cada arma, vinda da engine (data URL)
   previews: Record<WeaponId | 'sword', string>;
+  // botao de pausa no cabecalho (no toque nao ha tecla P); sem ele, some
+  onPause?: () => void;
 };
 
 // arma na mao: foto do modelo, nome e, se for de fogo, balas restantes.
@@ -177,7 +179,13 @@ function WeaponSlots({ hud, arsenal, previews, onSelectWeapon }: HudProps) {
   );
 }
 
-export function Hud({ hud, arsenal, previews, onSelectWeapon }: HudProps) {
+export function Hud({
+  hud,
+  arsenal,
+  previews,
+  onSelectWeapon,
+  onPause,
+}: HudProps) {
   // escudo soma na barra: ela passa a medir vida maxima + escudo, com a
   // parte do escudo em azul logo depois da vida
   const capacity = hud.maxHp + hud.shield;
@@ -226,9 +234,25 @@ export function Hud({ hud, arsenal, previews, onSelectWeapon }: HudProps) {
         />
       </div>
       <ContractBar room={hud.room} />
-      <div className='text-right font-black'>
-        <p>Sala {hud.room}</p>
-        <p className='text-green-400'>$ {hud.money}</p>
+      <div className='flex flex-col items-end gap-2 text-right font-black'>
+        <div>
+          <p>Sala {hud.room}</p>
+          <p className='text-green-400'>$ {hud.money}</p>
+        </div>
+        {onPause && (
+          <button
+            type='button'
+            aria-label='Pausar'
+            onClick={onPause}
+            className='pointer-events-auto flex size-11 cursor-pointer items-center justify-center rounded-xl border-4 border-white bg-[#3d4fd6] text-white shadow-[0_4px_0_#14141f] transition-transform active:translate-y-1 active:shadow-none'
+          >
+            <Pause
+              aria-hidden
+              className='size-5 fill-white'
+              strokeWidth={3}
+            />
+          </button>
+        )}
       </div>
     </header>
   );

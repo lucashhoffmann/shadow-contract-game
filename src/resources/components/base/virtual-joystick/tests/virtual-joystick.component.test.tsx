@@ -4,7 +4,12 @@ import { VirtualJoystick } from '@/resources/components/base/virtual-joystick/vi
 
 function setup() {
   const onMove = vi.fn();
-  render(<VirtualJoystick onMove={onMove} />);
+  render(
+    <VirtualJoystick
+      onMove={onMove}
+      onDash={vi.fn()}
+    />,
+  );
   const zone = screen.getByLabelText('Joystick');
   vi.spyOn(zone, 'getBoundingClientRect').mockReturnValue({
     left: 52,
@@ -18,9 +23,14 @@ function setup() {
 
 describe('VirtualJoystick', () => {
   it('mostra a dica em infinito ate o primeiro toque, e nao volta depois', () => {
-    render(<VirtualJoystick onMove={vi.fn()} />);
+    render(
+      <VirtualJoystick
+        onMove={vi.fn()}
+        onDash={vi.fn()}
+      />,
+    );
     const zone = screen.getByLabelText('Joystick');
-    const knob = zone.firstElementChild!;
+    const knob = zone.querySelector('[data-hint]')!;
     expect(knob).toHaveClass('joystick-hint');
     // na dica quem move e a animacao, nao o estilo
     expect(knob).not.toHaveAttribute('style');
@@ -32,10 +42,43 @@ describe('VirtualJoystick', () => {
     expect(knob).toHaveAttribute('style');
   });
 
-  it('fica centralizado na parte inferior da tela', () => {
-    const { zone } = setup();
-    expect(zone).toHaveClass('size-24');
-    expect(zone).toHaveStyle({ left: '50%', transform: 'translateX(-50%)' });
+  it('em repouso o disco fica no meio, embaixo', () => {
+    render(
+      <VirtualJoystick
+        onMove={vi.fn()}
+        onDash={vi.fn()}
+      />,
+    );
+    const disc = screen.getByLabelText('Joystick').firstElementChild!;
+    expect(disc).toHaveAttribute('data-active', 'false');
+    expect(disc).toHaveStyle({ left: '50%', transform: 'translateX(-50%)' });
+  });
+
+  it('a area de toque e a faixa de baixo da tela inteira', () => {
+    render(
+      <VirtualJoystick
+        onMove={vi.fn()}
+        onDash={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Joystick')).toHaveClass(
+      'inset-x-0',
+      'bottom-0',
+      'h-[45%]',
+    );
+  });
+
+  it('o disco nasce onde o dedo toca e volta ao repouso ao soltar', () => {
+    const { onMove, zone } = setup();
+    const disc = zone.firstElementChild!;
+    // toque em (100, 100) com a area comecando em (52, 52)
+    expect(disc).toHaveAttribute('data-active', 'true');
+    expect(disc).toHaveStyle({ left: '48px', top: '48px' });
+    // tocar nao anda: o ponto tocado vira o centro
+    expect(onMove).toHaveBeenLastCalledWith(0, 0);
+
+    fireEvent.pointerUp(zone, { pointerId: 1 });
+    expect(disc).toHaveAttribute('data-active', 'false');
   });
 
   it('arrastar para cima anda para frente, proporcional ao raio', () => {
@@ -44,11 +87,13 @@ describe('VirtualJoystick', () => {
     expect(onMove).toHaveBeenLastCalledWith(0, 0.5);
   });
 
-  it('tocar na borda ja aponta na direcao tocada', () => {
+  it('cada novo toque vira o centro, em qualquer ponto da area', () => {
     const { onMove, zone } = setup();
     fireEvent.pointerUp(zone, { pointerId: 1 });
-    fireEvent.pointerDown(zone, { pointerId: 2, clientX: 128, clientY: 100 });
-    expect(onMove).toHaveBeenLastCalledWith(1, 0);
+    fireEvent.pointerDown(zone, { pointerId: 2, clientX: 300, clientY: 70 });
+    expect(onMove).toHaveBeenLastCalledWith(0, 0);
+    fireEvent.pointerMove(zone, { pointerId: 2, clientX: 314, clientY: 70 });
+    expect(onMove).toHaveBeenLastCalledWith(0.5, 0);
   });
 
   it('limita o vetor ao raio', () => {
@@ -77,9 +122,48 @@ describe('VirtualJoystick', () => {
     expect(onMove).toHaveBeenLastCalledWith(0.5, 0);
   });
 
+  it('botao de salto avisa ao apertar e ao soltar, sem mexer no joystick', () => {
+    const onMove = vi.fn();
+    const onDash = vi.fn();
+    render(
+      <VirtualJoystick
+        onMove={onMove}
+        onDash={onDash}
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Saltar' });
+    const disc = screen.getByLabelText('Joystick').firstElementChild!;
+
+    fireEvent.pointerDown(button, { pointerId: 5, clientX: 10, clientY: 10 });
+    expect(onDash).toHaveBeenLastCalledWith(true);
+    // o toque ficou no botao: o disco nao saiu do repouso
+    expect(disc).toHaveAttribute('data-active', 'false');
+    expect(onMove).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(button, { pointerId: 5 });
+    expect(onDash).toHaveBeenLastCalledWith(false);
+  });
+
+  it('solta o salto se o controle sai da tela', () => {
+    const onDash = vi.fn();
+    const { unmount } = render(
+      <VirtualJoystick
+        onMove={vi.fn()}
+        onDash={onDash}
+      />,
+    );
+    unmount();
+    expect(onDash).toHaveBeenLastCalledWith(false);
+  });
+
   it('ignora movimento sem toque ativo', () => {
     const onMove = vi.fn();
-    render(<VirtualJoystick onMove={onMove} />);
+    render(
+      <VirtualJoystick
+        onMove={onMove}
+        onDash={vi.fn()}
+      />,
+    );
     fireEvent.pointerMove(screen.getByLabelText('Joystick'), {
       pointerId: 1,
       clientX: 50,
@@ -87,4 +171,33 @@ describe('VirtualJoystick', () => {
     });
     expect(onMove).not.toHaveBeenCalled();
   });
+});
+
+it('botao de agachar liga num toque, desliga no outro e solta ao sair', () => {
+  const onMove = vi.fn();
+  const onCrouch = vi.fn();
+  const { unmount } = render(
+    <VirtualJoystick
+      onMove={onMove}
+      onDash={vi.fn()}
+      onCrouch={onCrouch}
+    />,
+  );
+  const button = screen.getByRole('button', { name: 'Agachar' });
+  expect(button).toHaveAttribute('aria-pressed', 'false');
+
+  fireEvent.pointerDown(button, { pointerId: 7 });
+  fireEvent.pointerUp(button, { pointerId: 7 });
+  // soltar o dedo nao levanta: fica agachado
+  expect(onCrouch).toHaveBeenLastCalledWith(true);
+  expect(button).toHaveAttribute('aria-pressed', 'true');
+  expect(onMove).not.toHaveBeenCalled();
+
+  fireEvent.pointerDown(button, { pointerId: 8 });
+  expect(onCrouch).toHaveBeenLastCalledWith(false);
+  expect(button).toHaveAttribute('aria-pressed', 'false');
+
+  fireEvent.pointerDown(button, { pointerId: 9 });
+  unmount();
+  expect(onCrouch).toHaveBeenLastCalledWith(false);
 });

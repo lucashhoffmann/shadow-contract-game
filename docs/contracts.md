@@ -534,6 +534,8 @@ Fora do estado reativo:
 
 - `getWorld()`: engine le o `World` atual para desenhar
 - `setJoystickInput(x, y)` / `joystickInput`: joystick escreve, engine le
+- `setJoystickCrouch(on)`: botao de agachar do toque, liga/desliga; a engine
+  soma em `input.crouch` como se fosse o C seguro
 
 O store so chama `set` quando `hud`, `screen` ou `market` mudam, para a UI nao
 renderizar a 60 Hz.
@@ -553,6 +555,12 @@ function createGameEngine(canvas: HTMLCanvasElement): { dispose(): void };
 - teclas: WASD/setas movem, `P` chama `togglePause`, `Enter` chama `begin`,
   `F` pulsa `interact`, `B` pulsa `open` ou chama `closeShop`, `Q` chama
   `cycleWeapon`
+- em aparelho de toque (`pointer: coarse`) os icones de interacao mostram
+  uma mao tocando no lugar das letras F e B
+- toque ou clique a ate `PROMPT_TAP_RADIUS` px de um icone de interacao a
+  vista (`WorldRenderer.prompts()`) pulsa a acao dele: F da caixa ou da
+  facada, `interact`; B do bau, `open`. O toque e consumido: nao chega ao
+  joystick
 - nunca muta `World`
 - porta de correr na saida da sala inicial e de cada loja (entrada de cada
   nivel), nos tiles `isDoorTile` (`level/utils/grid.util.ts`)

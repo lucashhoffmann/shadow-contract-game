@@ -24,10 +24,21 @@ export function HomePage() {
 
   return (
     <main className='font-display relative flex min-h-full flex-col items-center justify-center gap-7 overflow-hidden bg-[radial-gradient(ellipse_at_50%_30%,#3a3f78_0%,#1f2033_55%,#12131f_100%)] p-6 text-center'>
-      {/* faixa de luz atras do titulo, como o cone de visao do jogo */}
+      {/* Spot no teto iluminando o titulo: refletor, facho que abre para
+          baixo e a poca de luz onde ele bate. O facho balanca de leve. */}
       <div
         aria-hidden
-        className='pointer-events-none absolute top-0 left-1/2 h-[70vh] w-[140vw] -translate-x-1/2 bg-[conic-gradient(from_150deg_at_50%_0%,transparent_0deg,rgb(255_255_255/0.07)_30deg,transparent_60deg)]'
+        className='spotlight pointer-events-none absolute top-0 left-1/2 h-[68vh] w-[min(150vw,60rem)] origin-top'
+      >
+        <div className='absolute inset-0 bg-gradient-to-b from-white/45 via-white/12 to-transparent blur-md [clip-path:polygon(47%_0,53%_0,100%_100%,0_100%)]' />
+        {/* miolo mais forte do facho */}
+        <div className='absolute inset-0 bg-gradient-to-b from-white/35 via-white/8 to-transparent blur-sm [clip-path:polygon(48.5%_0,51.5%_0,70%_100%,30%_100%)]' />
+        <div className='absolute top-0 left-1/2 h-5 w-16 -translate-x-1/2 rounded-b-xl border-x-4 border-b-4 border-[#14141f] bg-[#3a3d52]' />
+        <div className='absolute top-3 left-1/2 h-3 w-10 -translate-x-1/2 rounded-full bg-white shadow-[0_0_24px_10px_rgb(255_255_255/0.75)]' />
+      </div>
+      <div
+        aria-hidden
+        className='pointer-events-none absolute top-[22%] left-1/2 h-[46vh] w-[min(130vw,48rem)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgb(255_255_255/0.2)_0%,rgb(255_255_255/0.06)_45%,transparent_70%)]'
       />
       <h1 className='text-outline relative flex -rotate-3 flex-col text-6xl leading-none tracking-wide uppercase sm:text-7xl'>
         <span className='text-white'>Shadow</span>{' '}
@@ -103,6 +114,17 @@ export function HomePage() {
         WASD ou setas para andar. Chegue por tras para eliminar. Fique fora do
         cone de visao.
       </p>
+      <footer className='text-outline absolute inset-x-0 bottom-3 text-base tracking-wide text-white'>
+        Desenvolvido por{' '}
+        <a
+          href='https://github.com/lucashhoffmann/'
+          target='_blank'
+          rel='noopener noreferrer'
+          className='text-[#ff2d55] underline-offset-4 hover:underline'
+        >
+          Hoffmann
+        </a>
+      </footer>
     </main>
   );
 }

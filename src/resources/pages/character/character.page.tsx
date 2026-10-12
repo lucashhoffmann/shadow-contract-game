@@ -1,3 +1,5 @@
+import { ArrowLeft } from 'lucide-react';
+
 import { Button } from '@/resources/components/ui/button';
 import { WeaponPicker } from '@/resources/pages/character/components/weapon-picker.component';
 import { LookEditor } from '@/resources/pages/character/components/look-editor.component';
@@ -9,7 +11,9 @@ export function CharacterPage() {
 
   return (
     <main className='flex h-full flex-col md:flex-row'>
-      <div className='relative min-h-0 flex-1'>
+      {/* no celular o painel e mais alto que a tela: sem altura propria o
+          preview encolhia ate sumir. Fica fixo no topo e o painel rola */}
+      <div className='relative h-[38vh] shrink-0 md:h-auto md:min-h-0 md:flex-1'>
         <canvas
           ref={canvasRef}
           aria-label='Preview do personagem'
@@ -19,7 +23,7 @@ export function CharacterPage() {
           Arraste para girar
         </p>
       </div>
-      <div className='flex flex-col items-center gap-4 overflow-y-auto p-6 md:justify-center'>
+      <div className='flex min-h-0 flex-1 flex-col items-center gap-4 overflow-y-auto p-6 md:flex-none md:justify-center'>
         <LookEditor
           look={look}
           onChange={setLook}
@@ -29,11 +33,17 @@ export function CharacterPage() {
           previews={previews}
           onChange={setWeapon}
         />
+        {/* celular: preso no canto de cima, sobre o preview, sempre a mao
+            (o painel e longo e rola). Desktop: no fim do painel */}
         <Button
           size='lg'
-          className='w-full max-w-xs font-black uppercase'
+          className='fixed top-3 right-3 z-10 font-black uppercase shadow-lg md:static md:w-full md:max-w-xs md:shadow-xs'
           onClick={backToMenu}
         >
+          <ArrowLeft
+            aria-hidden
+            strokeWidth={3}
+          />
           Voltar
         </Button>
       </div>

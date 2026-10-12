@@ -68,7 +68,8 @@ export const DEFAULT_LOOK: PlayerLook = {
   cloth: '#ff8a3c',
   accent: '#1c1c28',
   skin: '#e8b796',
-  head: 1,
+  // inimigos usam 1: o player comeca so um pouco maior, para se destacar
+  head: 1.1,
   legs: 1,
   hands: 1,
   feet: 1,
@@ -199,6 +200,16 @@ export function getWorld(): World | null {
 export function setJoystickInput(moveX: number, moveY: number): void {
   joystickInput.moveX = moveX;
   joystickInput.moveY = moveY;
+}
+
+// botao de salto na tela de toque: vale como segurar o Espaco
+export function setJoystickDash(pressed: boolean): void {
+  joystickInput.dash = pressed;
+}
+
+// botao de agachar na tela de toque: liga/desliga, vale como segurar o C
+export function setJoystickCrouch(on: boolean): void {
+  joystickInput.crouch = on;
 }
 
 function readHud(w: World): Hud {

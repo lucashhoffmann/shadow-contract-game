@@ -562,7 +562,7 @@ describe('GamePage', () => {
 
     act(() => useGameStore.setState({ screen: 'gameover' }));
     expect(
-      screen.getByRole('heading', { name: 'Contrato falhou!' }),
+      screen.getByRole('heading', { name: 'Voce morreu!' }),
     ).toBeInTheDocument();
   });
 });
@@ -589,4 +589,16 @@ it('borda azul usa o mesmo pulso quando ha aviso de inatividade', () => {
   expect(screen.getByTestId('idle-vignette').style.background).toContain(
     '59, 130, 246',
   );
+});
+
+it('botao de pausa do cabecalho pausa o jogo e some fora da partida', async () => {
+  useGameStore.getState().startRun(1);
+  render(<GamePage />);
+  expect(screen.queryByRole('button', { name: 'Pausar' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Comecar' }));
+
+  await userEvent.click(screen.getByRole('button', { name: 'Pausar' }));
+  expect(useGameStore.getState().screen).toBe('paused');
+  expect(screen.getByText('Pausado')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Pausar' })).toBeNull();
 });

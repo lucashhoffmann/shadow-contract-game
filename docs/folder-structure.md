@@ -123,7 +123,8 @@ src/resources/pages
     │   ├── hud.component.tsx
     │   ├── legend-dialog.component.tsx  legenda inicial e tela de pausa
     │   ├── shop-dialog.component.tsx
-    │   └── game-over-dialog.component.tsx
+    │   ├── game-over-dialog.component.tsx
+    │   └── share-record                 cartao PNG do recorde e compartilhamento
     └── tests
 ```
 

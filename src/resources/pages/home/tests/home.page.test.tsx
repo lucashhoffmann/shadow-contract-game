@@ -13,6 +13,14 @@ beforeEach(() => {
 });
 
 describe('HomePage', () => {
+  it('rodape credita o autor com link para o GitHub', () => {
+    render(<HomePage />);
+    expect(screen.getByRole('link', { name: 'Hoffmann' })).toHaveAttribute(
+      'href',
+      'https://github.com/lucashhoffmann/',
+    );
+  });
+
   it('mostra o recorde salvo', () => {
     useGameStore.setState({ best: 9 });
     render(<HomePage />);

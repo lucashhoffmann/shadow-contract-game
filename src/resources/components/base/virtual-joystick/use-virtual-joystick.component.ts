@@ -3,13 +3,16 @@ import type { PointerEvent } from 'react';
 
 const RADIUS = 28;
 
-// joystick fixo: a origem e o centro do disco, inclusive se tocar na borda
+// joystick flutuante: nasce onde o dedo toca, em qualquer ponto da area de
+// toque; esse ponto e a origem ate soltar
 export function useVirtualJoystick(
   onMove: (moveX: number, moveY: number) => void,
 ) {
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   // dica de uso: o botao desenha um infinito ate o primeiro toque
   const [hint, setHint] = useState(true);
+  // onde o disco esta, relativo a area de toque; null = solto, em repouso
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
   const origin = useRef<{ x: number; y: number; pointerId: number } | null>(
     null,
   );
@@ -33,6 +36,7 @@ export function useVirtualJoystick(
   const release = (pointerId: number) => {
     if (origin.current?.pointerId !== pointerId) return;
     origin.current = null;
+    setAt(null);
     setKnob({ x: 0, y: 0 });
     onMove(0, 0);
   };
@@ -40,6 +44,7 @@ export function useVirtualJoystick(
   return {
     knob,
     hint,
+    at,
     handlers: {
       onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
         if (origin.current) return;
@@ -47,10 +52,11 @@ export function useVirtualJoystick(
         event.currentTarget.setPointerCapture?.(event.pointerId);
         const rect = event.currentTarget.getBoundingClientRect();
         origin.current = {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2,
+          x: event.clientX,
+          y: event.clientY,
           pointerId: event.pointerId,
         };
+        setAt({ x: event.clientX - rect.left, y: event.clientY - rect.top });
         update(event.clientX, event.clientY);
       },
       onPointerMove: (event: PointerEvent<HTMLDivElement>) => {

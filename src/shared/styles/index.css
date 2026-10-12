@@ -48,6 +48,22 @@
   }
 }
 
+/* spot da tela inicial: o facho balanca de leve em volta do refletor */
+@keyframes spotlight-sway {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(-2.5deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(2.5deg);
+  }
+}
+
+.spotlight {
+  transform: translateX(-50%);
+  animation: spotlight-sway 7s ease-in-out infinite;
+}
+
 /* dica do joystick: o botao percorre um infinito (lemniscata) em volta do
    centro, em laco, ate o primeiro toque */
 @keyframes joystick-hint {

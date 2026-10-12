@@ -1,4 +1,9 @@
-import { getWorld, setJoystickInput } from '@/app/store/game-store/game.store';
+import {
+  getWorld,
+  setJoystickCrouch,
+  setJoystickDash,
+  setJoystickInput,
+} from '@/app/store/game-store/game.store';
 import { VirtualJoystick } from '@/resources/components/base/virtual-joystick/virtual-joystick.component';
 import { DamageVignette } from '@/resources/pages/game/components/damage-vignette.component';
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
@@ -23,6 +28,7 @@ export function GamePage() {
     buy,
     closeShop,
     restart,
+    pause,
     backToMenu,
   } = useGamePage();
 
@@ -42,8 +48,15 @@ export function GamePage() {
         arsenal={arsenal}
         previews={previews}
         onSelectWeapon={selectWeapon}
+        onPause={screen === 'playing' ? pause : undefined}
       />
-      {screen === 'playing' && <VirtualJoystick onMove={setJoystickInput} />}
+      {screen === 'playing' && (
+        <VirtualJoystick
+          onMove={setJoystickInput}
+          onDash={setJoystickDash}
+          onCrouch={setJoystickCrouch}
+        />
+      )}
       <LegendDialog
         open={screen === 'intro' || screen === 'paused'}
         {...legend}

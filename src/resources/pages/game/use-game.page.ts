@@ -72,6 +72,7 @@ export function useGamePage() {
     buy,
     closeShop,
     restart,
+    pause: togglePause,
     backToMenu,
   };
 }

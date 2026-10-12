@@ -33,6 +33,10 @@ const SECTIONS: [title: string, entries: Entry[]][] = [
       ['F', 'quebrar a caixa ao alcance; com arma, facada no inimigo ao lado'],
       ['B', 'abrir e fechar o bau da loja, no fim do contrato'],
       ['Q', 'trocar entre espada e armas (ou clique na arma, no topo)'],
+      [
+        'Toque',
+        'no celular: icone de mao sobre o alvo; botao de setas para saltar',
+      ],
       ['P', 'pausar e ver esta legenda'],
     ],
   ],

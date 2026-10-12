@@ -237,6 +237,9 @@ type EnemyView = Jumper & {
 
 export type WorldRenderer = {
   sync: (world: World, time: number) => void;
+  // icones de interacao a vista agora, e o que cada um faz: F (caixa ou
+  // facada) pulsa `interact`, B (bau) pulsa `open`. A engine usa para o toque
+  prompts: () => { action: 'interact' | 'open'; object: THREE.Object3D }[];
   dispose: () => void;
 };
 
@@ -273,8 +276,36 @@ for (const y of [0.16, 0.6]) {
   );
 }
 
-// letra em relevo, centrada, com LETTER_SIZE de altura
-function letter(shape: THREE.Shape): THREE.BufferGeometry {
+// retangulo de cantos redondos, para montar o icone de toque
+function roundedRect(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): THREE.Shape {
+  return new THREE.Shape()
+    .absarc(x + w - r, y + h - r, r, 0, Math.PI / 2, false)
+    .absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI, false)
+    .absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false)
+    .absarc(x + w - r, y + r, r, Math.PI * 1.5, Math.PI * 2, false);
+}
+
+// Icone de toque (aparelho sem teclado): mao com o indicador para cima e um
+// arco de onda sobre a ponta do dedo. Mesma caixa de altura 1 das letras.
+const TAP_ICON = [
+  // indicador, palma e polegar
+  roundedRect(0.36, 0.34, 0.17, 0.46, 0.085),
+  roundedRect(0.24, 0, 0.5, 0.46, 0.13),
+  roundedRect(0.08, 0.12, 0.24, 0.15, 0.075),
+  // onda do toque
+  new THREE.Shape()
+    .absarc(0.445, 0.74, 0.3, Math.PI * 0.2, Math.PI * 0.8, false)
+    .absarc(0.445, 0.74, 0.23, Math.PI * 0.8, Math.PI * 0.2, true),
+];
+
+// letra ou icone em relevo, centrado, com LETTER_SIZE de altura
+function letter(shape: THREE.Shape | THREE.Shape[]): THREE.BufferGeometry {
   return new THREE.ExtrudeGeometry(shape, {
     depth: 0.14,
     bevelEnabled: false,
@@ -576,6 +607,7 @@ export function createWorldRenderer(
     keyTop: keySlab(0.42, 0.09, 0.08),
     letterF: letter(LETTER_F),
     letterB: letter(LETTER_B),
+    tapIcon: letter(TAP_ICON),
     box: new THREE.BoxGeometry(1, 1, 1),
     // clarao do tiro: lingua de fogo com a base na boca do cano, para +x
     flashTongue: new THREE.ConeGeometry(0.42, 1.6, 6)
@@ -1513,16 +1545,37 @@ export function createWorldRenderer(
     );
   }
   // F sobre a caixa ao alcance
-  const prompt = buildPrompt('interactionPrompt', geo.letterF);
+  // Sem teclado (aparelho de toque) a letra nao diz nada: no lugar dela vai
+  // o icone de toque, ja que ali a interacao e tocar em cima do icone.
+  const touch =
+    typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const glyphF = touch ? geo.tapIcon : geo.letterF;
+  const glyphB = touch ? geo.tapIcon : geo.letterB;
+  const prompt = buildPrompt('interactionPrompt', glyphF);
   // B sobre o bau ao alcance
-  const chestPrompt = buildPrompt('chestPrompt', geo.letterB);
+  const chestPrompt = buildPrompt('chestPrompt', glyphB);
   scene.add(chestPrompt);
-  const knifePrompt = buildPrompt('knifePrompt', geo.letterF);
+  const knifePrompt = buildPrompt('knifePrompt', glyphF);
   knifePrompt.visible = false;
   scene.add(knifePrompt);
   let lastTime = 0;
 
   return {
+    prompts() {
+      const visible: ReturnType<WorldRenderer['prompts']> = [];
+      // o F da caixa mora dentro do grupo dela: sem pai, nao esta em cena
+      if (prompt.visible && prompt.parent) {
+        visible.push({ action: 'interact', object: prompt });
+      }
+      if (knifePrompt.visible) {
+        visible.push({ action: 'interact', object: knifePrompt });
+      }
+      if (chestPrompt.visible) {
+        visible.push({ action: 'open', object: chestPrompt });
+      }
+      return visible;
+    },
+
     sync(world, time) {
       const dt = lastTime ? Math.min(0.1, time - lastTime) : 0;
       lastTime = time;

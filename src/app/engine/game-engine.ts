@@ -22,6 +22,9 @@ const CAMERA_FOV = 45;
 const PUNCH_TIME = 0.35;
 const PUNCH_ZOOM = 3.5;
 const PUNCH_BLUR = 3;
+// raio, em px na tela, em que o toque conta como em cima do icone de
+// interacao; folgado, para caber um dedo
+const PROMPT_TAP_RADIUS = 44;
 // blur de velocidade no dash do player: cresce e some junto com o salto
 const DASH_BLUR = 2.2;
 const CAMERA_FOLLOW_RATE = 14;
@@ -73,6 +76,28 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       else if (getWorld()?.status === 'playing') input.open = true;
     }
   };
+  // Toque ou clique em cima do icone flutuante (F, B) faz o que a tecla
+  // faria: no celular e o unico jeito de quebrar caixa, esfaquear e abrir bau.
+  const spot = new THREE.Vector3();
+  const onPointerDown = (event: PointerEvent) => {
+    if (getWorld()?.status !== 'playing') return;
+    const rect = canvas.getBoundingClientRect();
+    for (const { action, object } of view.prompts()) {
+      // posicao do icone na tela
+      object.getWorldPosition(spot).project(camera);
+      const x = rect.left + ((spot.x + 1) / 2) * rect.width;
+      const y = rect.top + ((1 - spot.y) / 2) * rect.height;
+      if (
+        Math.hypot(event.clientX - x, event.clientY - y) > PROMPT_TAP_RADIUS
+      ) {
+        continue;
+      }
+      input[action] = true;
+      // o toque e do icone: nao comeca o joystick que esta por baixo
+      event.stopPropagation();
+      return;
+    }
+  };
   const onKeyUp = (event: KeyboardEvent) => keys.delete(event.code);
   const onBlur = () => {
     keys.clear();
@@ -90,6 +115,8 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
 
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
+  // captura: chega antes do joystick, que cobre a parte de baixo da tela
+  window.addEventListener('pointerdown', onPointerDown, true);
   window.addEventListener('blur', onBlur);
   window.addEventListener('resize', resize);
   resize();
@@ -116,7 +143,10 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       joystickInput.moveY;
     input.dash = keys.has('Space') || joystickInput.dash;
     input.crouch =
-      keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyC');
+      keys.has('ControlLeft') ||
+      keys.has('ControlRight') ||
+      keys.has('KeyC') ||
+      !!joystickInput.crouch;
 
     // passo fixo: a simulacao nao depende do fps
     const tick = useGameStore.getState().tick;
@@ -163,6 +193,7 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       cancelAnimationFrame(frameId);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('blur', onBlur);
       window.removeEventListener('resize', resize);
       canvas.style.filter = '';
