@@ -17,7 +17,7 @@ type VirtualJoystickProps = {
 
 // Controle para telas de toque. A faixa de baixo da tela inteira e a area de
 // toque: o disco nasce onde o dedo encosta e some de la ao soltar, voltando
-// para o repouso, no meio embaixo. Meio transparente, para nao tampar o
+// para o repouso, no canto esquerdo embaixo (os botoes ficam no direito). Meio transparente, para nao tampar o
 // jogo. Ate o primeiro toque o botao passeia em forma de infinito, mostrando
 // que e para arrastar.
 export function VirtualJoystick({
@@ -50,9 +50,10 @@ export function VirtualJoystick({
           at
             ? { left: at.x, top: at.y, transform: 'translate(-50%, -50%)' }
             : {
-                left: '50%',
-                bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
-                transform: 'translateX(-50%)',
+                // repouso no canto esquerdo: no meio ficava em cima do
+                // agachar em tela estreita
+                left: 'max(1.25rem, env(safe-area-inset-left))',
+                bottom: 'max(1.25rem, env(safe-area-inset-bottom))',
               }
         }
       >

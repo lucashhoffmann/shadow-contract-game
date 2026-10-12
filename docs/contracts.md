@@ -98,7 +98,7 @@ type InputState = {
 
 `moveY = 1` anda para frente. Teclado e joystick somam no mesmo objeto; a
 simulacao normaliza se o vetor passar de 1.
-Em tela de toque ou janela estreita, o joystick aparece no centro inferior durante o
+Em tela de toque ou janela estreita, o joystick aparece no canto inferior esquerdo durante o
 jogo; tocar e arrastar no disco move o personagem, soltar zera o movimento.
 `interact` e um pulso da tecla F. Sem inimigo nem caixa ao alcance, o player
 golpeia de espada no ar (`player.slash`, so animacao, sem recarga). Senao: quebra a caixa intacta mais proxima dentro de

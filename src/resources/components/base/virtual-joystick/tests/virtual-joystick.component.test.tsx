@@ -42,7 +42,7 @@ describe('VirtualJoystick', () => {
     expect(knob).toHaveAttribute('style');
   });
 
-  it('em repouso o disco fica no meio, embaixo', () => {
+  it('em repouso o disco fica no canto esquerdo, embaixo', () => {
     render(
       <VirtualJoystick
         onMove={vi.fn()}
@@ -51,7 +51,9 @@ describe('VirtualJoystick', () => {
     );
     const disc = screen.getByLabelText('Joystick').firstElementChild!;
     expect(disc).toHaveAttribute('data-active', 'false');
-    expect(disc).toHaveStyle({ left: '50%', transform: 'translateX(-50%)' });
+    // longe dos botoes, que ficam no canto direito
+    expect((disc as HTMLElement).style.left).not.toBe('50%');
+    expect((disc as HTMLElement).style.transform).toBe('');
   });
 
   it('a area de toque e a faixa de baixo da tela inteira', () => {
