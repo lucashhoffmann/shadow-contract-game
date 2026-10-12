@@ -507,6 +507,36 @@ describe('coracao e escudo', () => {
     expect(world.pickups).toHaveLength(1);
   });
 
+  it('invencivel nao perde vida nem escudo; o item renova sem encurtar', () => {
+    const world = createArenaWorld();
+    world.player.shield = 15;
+    world.pickups.push(
+      {
+        id: 90,
+        kind: 'invincibility',
+        roomIndex: 0,
+        pos: { ...world.player.pos },
+        value: 6,
+      },
+      {
+        id: 91,
+        kind: 'invincibility',
+        roomIndex: 0,
+        pos: { ...world.player.pos },
+        value: 4,
+      },
+    );
+    collectPickups(world);
+    expect(world.pickups).toHaveLength(0);
+    expect(world.player).toMatchObject({ invincible: 6, invincibleTotal: 6 });
+    damagePlayer(world, 50, world.player.pos);
+    expect(world.player).toMatchObject({ shield: 15, hp: PLAYER_MAX_HP });
+    expect(world.floaters).toMatchObject([{ amount: 0, blocked: true }]);
+    world.player.invincible = 0;
+    damagePlayer(world, 50, world.player.pos);
+    expect(world.player.hp).toBe(PLAYER_MAX_HP - 35);
+  });
+
   it('escudo absorve o dano antes da vida', () => {
     const world = createArenaWorld();
     world.player.shield = 15;

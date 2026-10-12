@@ -1,6 +1,7 @@
-import { Banknote, Shield } from 'lucide-react';
+import { Banknote, ChevronsRight, Shield } from 'lucide-react';
 
 import { SHOP_ITEMS } from '@/app/modules/shop/constants/shop.constants';
+import { DASH_MAX } from '@/app/modules/world/constants/world.constants';
 import { refillPrice } from '@/app/modules/shop/systems/shop.system';
 import type {
   ItemDef,
@@ -26,6 +27,9 @@ type ShopDialogProps = {
   market: Market;
   // armas de fogo que o player ja tem: viram recarga, mais barata
   arsenal: { id: WeaponId; ammo: number }[];
+  // saltos guardados: o item de salto repoe o que falta (sem informar,
+  // conta como cheios)
+  dashes?: number;
   // foto de cada arma, vinda da engine (data URL)
   previews: Record<WeaponId | 'sword' | 'ammo', string>;
   onBuy: (id: ItemId) => void;
@@ -38,6 +42,7 @@ const CARD_COLOR: Record<ItemId, string> = {
   silenced: 'bg-violet-500',
   shotgun: 'bg-orange-500',
   armor: 'bg-emerald-500',
+  dash: 'bg-cyan-600',
 };
 
 function describeItem(item: ItemDef): string {
@@ -65,7 +70,9 @@ type ItemCardProps = {
   affordable: boolean;
   // balas que a recarga repoe; undefined = item novo, nao recarga
   refill?: number;
-  // colete nao tem modelo: fica sem foto e leva o icone de escudo
+  // texto do cartao quando nao e o padrao do item (saltos que faltam)
+  note?: string;
+  // colete e saltos nao tem modelo: ficam sem foto e levam um icone
   preview?: string;
   onBuy: () => void;
 };
@@ -76,6 +83,7 @@ function ItemCard({
   price,
   affordable,
   refill,
+  note,
   preview,
   onBuy,
 }: ItemCardProps) {
@@ -105,6 +113,12 @@ function ItemCard({
               alt=''
               className='w-full scale-125 -rotate-12 object-contain drop-shadow-lg'
             />
+          ) : item.kind === 'dash' ? (
+            <ChevronsRight
+              aria-hidden
+              className='size-2/3'
+              strokeWidth={3}
+            />
           ) : (
             <Shield
               aria-hidden
@@ -114,11 +128,13 @@ function ItemCard({
           )}
         </span>
         <span className='text-[11px] font-bold opacity-90'>
-          {refill === undefined
-            ? describeItem(item)
-            : refill > 0
-              ? t.shop.refill(refill)
-              : t.shop.fullAmmo}
+          {note !== undefined
+            ? note
+            : refill === undefined
+              ? describeItem(item)
+              : refill > 0
+                ? t.shop.refill(refill)
+                : t.shop.fullAmmo}
         </span>
       </span>
       <span className='flex items-center gap-1.5 rounded-xl border-4 border-white bg-green-500 px-3 text-base font-black text-white shadow-md group-disabled:bg-slate-500 group-disabled:text-white/70 sm:py-0.5 sm:text-lg'>
@@ -144,6 +160,7 @@ export function ShopDialog({
   money,
   market,
   arsenal,
+  dashes = DASH_MAX,
   previews,
   onBuy,
   onClose,
@@ -173,10 +190,12 @@ export function ShopDialog({
           </DialogDescription>
         </DialogHeader>
         {/* touch-pan-y: o body trava gestos; aqui o arrasto vertical rola */}
-        <div className='grid min-h-0 touch-pan-y grid-cols-2 gap-x-3 gap-y-2 overflow-y-auto overscroll-contain p-1 sm:grid-cols-4 sm:gap-3'>
+        <div className='grid min-h-0 touch-pan-y grid-cols-2 gap-x-3 gap-y-2 overflow-y-auto overscroll-contain p-1 sm:grid-cols-5 sm:gap-3'>
           {SHOP_ITEMS.map((item) => {
             const owned = arsenal.find((weapon) => weapon.id === item.id);
             const refill = owned && item.ammo - owned.ammo;
+            // saltos: vende so o que falta; cheios, fica apagado
+            const missing = item.kind === 'dash' ? DASH_MAX - dashes : null;
             const price = owned
               ? refillPrice(market.prices[item.id])
               : market.prices[item.id];
@@ -186,12 +205,19 @@ export function ShopDialog({
                 item={item}
                 price={price}
                 refill={refill}
-                affordable={money >= price && refill !== 0}
+                note={
+                  missing === null
+                    ? undefined
+                    : missing > 0
+                      ? t.shop.dashRefill(missing)
+                      : t.shop.fullDashes
+                }
+                affordable={money >= price && refill !== 0 && missing !== 0}
                 // recarga mostra a municao, nao a arma
                 preview={
-                  item.id === 'armor'
+                  item.kind !== 'weapon'
                     ? undefined
-                    : previews[owned ? 'ammo' : item.id]
+                    : previews[owned ? 'ammo' : (item.id as WeaponId)]
                 }
                 onBuy={() => onBuy(item.id)}
               />

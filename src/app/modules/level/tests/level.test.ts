@@ -1,5 +1,6 @@
 import { createEnemy } from '@/app/modules/enemy/systems/enemy.system';
 import {
+  goldenChestChance,
   spawnRoom,
   updateRooms,
 } from '@/app/modules/level/systems/level.system';
@@ -23,13 +24,20 @@ import { findPath } from '@/app/modules/level/utils/pathfinding.util';
 import {
   AMMO_LOOT_MAX,
   AMMO_LOOT_MIN,
+  GOLDEN_CHEST_MAX,
+  GOLDEN_CHEST_MIN,
   HEADSHOT_FROM_LEVEL,
   HEADSHOT_LOOT_MAX,
   HEADSHOT_LOOT_MIN,
   HEART_MAX,
+  BUDDY_CHANCE,
   BUDDY_GAP,
   HEART_MIN,
   IDLE_WARNING_DELAY,
+  INVINCIBILITY_MAX,
+  INVINCIBILITY_MIN,
+  INVISIBILITY_MAX,
+  INVISIBILITY_MIN,
   PLAYER_MAX_HP,
   ROOM_ENEMY_MAX,
   ROOM_H,
@@ -42,6 +50,7 @@ import {
   createEmptyWorld,
   createWorld,
 } from '@/app/modules/world/systems/world.system';
+import type { Enemy } from '@/app/modules/world/types/world.types';
 import { createArenaWorld } from '@/test/world.fixture';
 
 const ALL_TEMPLATES = [START_TEMPLATE, SHOP_TEMPLATE, ...COMBAT_TEMPLATES];
@@ -152,20 +161,64 @@ describe('geracao de salas', () => {
     expect(world.enemies.length - early).toBeGreaterThan(early);
   });
 
-  it('desde a primeira sala os inimigos vem em dupla, lado a lado', () => {
-    for (const template of COMBAT_TEMPLATES) {
-      const world = createEmptyWorld(1);
-      spawnRoom(world, 1, template);
-      const [leader, buddy] = world.enemies;
-      expect(world.enemies).toHaveLength(2);
-      expect(buddy.kind).toBe(leader.kind);
-      // mesma ronda, deslocada: nascem perto e andam juntos
-      expect(buddy.patrol).toHaveLength(leader.patrol.length);
-      expect(
-        Math.hypot(buddy.pos.x - leader.pos.x, buddy.pos.y - leader.pos.y),
-      ).toBeCloseTo(BUDDY_GAP);
-      expect(hasLineOfSight(world, leader.pos, buddy.pos)).toBe(true);
+  // salas de combate de varias seeds: lider e parceiro de cada ronda
+  function pairs(room: number) {
+    const found: { leader: Enemy; buddy: Enemy }[] = [];
+    let rooms = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      for (const template of COMBAT_TEMPLATES) {
+        const world = createEmptyWorld(seed);
+        spawnRoom(world, room, template);
+        rooms++;
+        for (let i = 0; i + 1 < world.enemies.length; i++) {
+          const [leader, buddy] = [world.enemies[i], world.enemies[i + 1]];
+          // parceiro nasce logo depois do lider, do mesmo tipo
+          if (buddy.id === leader.id + 1 && buddy.kind === leader.kind) {
+            found.push({ leader, buddy });
+          }
+        }
+      }
     }
+    return { found, rooms };
+  }
+
+  it('dupla aparece desde a primeira sala, mas so de vez em quando', () => {
+    let alone = 0;
+    let paired = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      for (const template of COMBAT_TEMPLATES) {
+        const world = createEmptyWorld(seed);
+        spawnRoom(world, 1, template);
+        if (world.enemies.length === 1) alone++;
+        else paired++;
+        expect(world.enemies.length).toBeLessThanOrEqual(2);
+      }
+    }
+    expect(paired).toBeGreaterThan(0);
+    expect(paired / (alone + paired)).toBeLessThan(0.4);
+    expect(BUDDY_CHANCE).toBeLessThan(0.5);
+  });
+
+  it('duplas variam: juntas, em sentidos opostos ou em rondas diferentes', () => {
+    const { found } = pairs(1);
+    const gap = ({ leader, buddy }: (typeof found)[number]) =>
+      Math.hypot(buddy.pos.x - leader.pos.x, buddy.pos.y - leader.pos.y);
+    const together = found.filter(
+      (pair) => Math.abs(gap(pair) - BUDDY_GAP) < 0.01,
+    );
+    const apart = found.filter((pair) => gap(pair) > 1.5);
+    expect(together.length).toBeGreaterThan(0);
+    expect(apart.length).toBeGreaterThan(0);
+    // juntas dao uma volta maior que o vai e volta de dois pontos
+    expect(together.some(({ leader }) => leader.patrol.length > 2)).toBe(true);
+    // sentido contrario: comeca na outra ponta da mesma ronda
+    expect(
+      apart.some(
+        ({ leader, buddy }) =>
+          buddy.pos.x === leader.patrol.at(-1)!.x &&
+          buddy.pos.y === leader.patrol.at(-1)!.y,
+      ),
+    ).toBe(true);
   });
 
   it('a sala nunca passa de ROOM_ENEMY_MAX inimigos', () => {
@@ -435,5 +488,69 @@ describe('item de mira em caixa', () => {
     const values = loot(from, true);
     expect(Math.min(...values)).toBe(HEADSHOT_LOOT_MIN);
     expect(Math.max(...values)).toBe(HEADSHOT_LOOT_MAX);
+  });
+});
+
+describe('bau dourado', () => {
+  it('chance vai de GOLDEN_CHEST_MIN a GOLDEN_CHEST_MAX, subindo por sala e contrato', () => {
+    expect(goldenChestChance(1)).toBe(GOLDEN_CHEST_MIN);
+    expect(goldenChestChance(2)).toBeGreaterThan(goldenChestChance(1));
+    expect(goldenChestChance(SHOP_EVERY + 1)).toBeGreaterThan(
+      goldenChestChance(1),
+    );
+    expect(goldenChestChance(500)).toBe(GOLDEN_CHEST_MAX);
+  });
+
+  it('nasce em sala de combate na frequencia da chance, no maximo um por sala', () => {
+    const world = createEmptyWorld(7);
+    const rooms = 2000;
+    for (let i = 0; i < rooms; i++) spawnRoom(world, 1, COMBAT_TEMPLATES[0]);
+    const golden = world.props.filter((prop) => prop.golden).length;
+    expect(golden / rooms).toBeGreaterThan(GOLDEN_CHEST_MIN - 0.02);
+    expect(golden / rooms).toBeLessThan(GOLDEN_CHEST_MIN + 0.02);
+    spawnRoom(world, 0, START_TEMPLATE);
+    spawnRoom(world, SHOP_EVERY, SHOP_TEMPLATE);
+    expect(
+      world.props.some((prop) => prop.golden && prop.roomIndex !== 1),
+    ).toBe(false);
+  });
+
+  it('solta um dos quatro premios: vida e escudo cheios, tempo sorteado', () => {
+    const full = { heart: PLAYER_MAX_HP, shield: PLAYER_MAX_HP * SHIELD_MAX };
+    const seen = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      const world = createArenaWorld();
+      world.rngState = i + 1;
+      breakProp(world, {
+        id: i,
+        roomIndex: 0,
+        pos: { x: 5.5, y: 5.5 },
+        broken: false,
+        golden: true,
+      });
+      for (const pickup of world.pickups) {
+        if (pickup.kind === 'invisibility') {
+          expect(pickup.value).toBeGreaterThanOrEqual(INVISIBILITY_MIN);
+          expect(pickup.value).toBeLessThanOrEqual(INVISIBILITY_MAX);
+        } else if (pickup.kind === 'invincibility') {
+          expect(pickup.value).toBeGreaterThanOrEqual(INVINCIBILITY_MIN);
+          expect(pickup.value).toBeLessThanOrEqual(INVINCIBILITY_MAX);
+        } else {
+          expect(pickup.value).toBe(full[pickup.kind as keyof typeof full]);
+        }
+      }
+      seen.add(
+        world.pickups
+          .map((pickup) => pickup.kind)
+          .sort()
+          .join('+'),
+      );
+    }
+    expect([...seen].sort()).toEqual([
+      'heart+invisibility',
+      'heart+shield',
+      'invincibility',
+      'shield',
+    ]);
   });
 });

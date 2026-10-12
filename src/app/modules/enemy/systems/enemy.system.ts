@@ -468,8 +468,11 @@ function enterAlert(enemy: Enemy): void {
 function alert(world: World, enemy: Enemy, dt: number): void {
   const player = world.player;
   const stats = ENEMY_KINDS[enemy.kind];
-  const los = hasLineOfSight(world, enemy.pos, player.pos);
-  const audible = distance(enemy.pos, player.pos) < hearingRange(world, enemy);
+  // alvo invisivel: perde o rastro e fica parado ate o alerta acabar
+  const hidden = player.invisible > 0;
+  const los = !hidden && hasLineOfSight(world, enemy.pos, player.pos);
+  const audible =
+    !hidden && distance(enemy.pos, player.pos) < hearingRange(world, enemy);
   enemy.alertTimer =
     los || audible
       ? ALERT_DURATION * enemy.intelligence.pursuit
@@ -511,6 +514,7 @@ function alert(world: World, enemy: Enemy, dt: number): void {
     }
     return;
   }
+  if (hidden) return;
   enemy.evading = false;
   enemy.dashCooldown = Math.max(0, enemy.dashCooldown - dt);
   enemy.throwCooldown = Math.max(0, enemy.throwCooldown - dt);
@@ -672,13 +676,15 @@ export function updateEnemies(world: World, dt: number): void {
       alert(world, enemy, dt);
       continue;
     }
-    if (listen(world, enemy, dt)) {
+    // player invisivel nao e ouvido nem visto
+    const hidden = world.player.invisible > 0;
+    if (!hidden && listen(world, enemy, dt)) {
       enterAlert(enemy);
       rally(world, enemy);
       alert(world, enemy, dt);
       continue;
     }
-    if (canSee(world, enemy, world.player.pos)) {
+    if (!hidden && canSee(world, enemy, world.player.pos)) {
       enemy.detection = Math.min(1, enemy.detection + dt / enemy.detectTime);
       enemy.facing = angleTo(enemy.pos, world.player.pos);
       enemy.state = 'suspicious';

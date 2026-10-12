@@ -10,6 +10,10 @@ import {
   DOOR_RANGE,
   HEART_MIN,
   IDLE_WARNING_DELAY,
+  INVINCIBILITY_MAX,
+  INVINCIBILITY_MIN,
+  INVISIBILITY_MAX,
+  INVISIBILITY_MIN,
   LOOT_HEART_CHANCE,
   LOOT_AMMO_CHANCE,
   LOOT_DASH_CHANCE,
@@ -309,11 +313,55 @@ export function dropLoot(world: World, at: LootSpot): void {
   }
 }
 
+// Premio do bau dourado, um de quatro com a mesma chance: invisibilidade +
+// vida cheia, escudo cheio, vida cheia + escudo cheio, ou invencibilidade.
+// "Cheio" e pela maior vida maxima do grupo; o teto de quem coleta corta o
+// excesso. Invisibilidade e invencibilidade duram um tempo sorteado.
+function dropGolden(world: World, at: LootSpot): void {
+  const maxHp = Math.max(...world.players.map((player) => player.maxHp));
+  const heart = { kind: 'heart', value: maxHp } as const;
+  const shield = {
+    kind: 'shield',
+    value: Math.round(maxHp * SHIELD_MAX),
+  } as const;
+  // decimos de segundo, de `min` a `max`
+  const seconds = (min: number, max: number) =>
+    Math.round((min + (max - min) * nextRandom(world)) * 10) / 10;
+  const sets: (() => { kind: PickupKind; value: number }[])[] = [
+    () => [
+      {
+        kind: 'invisibility',
+        value: seconds(INVISIBILITY_MIN, INVISIBILITY_MAX),
+      },
+      heart,
+    ],
+    () => [shield],
+    () => [heart, shield],
+    () => [
+      {
+        kind: 'invincibility',
+        value: seconds(INVINCIBILITY_MIN, INVINCIBILITY_MAX),
+      },
+    ],
+  ];
+  const prizes = sets[Math.floor(nextRandom(world) * sets.length)]();
+  prizes.forEach((prize, i) => {
+    world.pickups.push({
+      id: world.nextId++,
+      ...prize,
+      roomIndex: at.roomIndex,
+      // lado a lado dentro do tile, para os dois aparecerem
+      pos: { x: at.pos.x + (i - (prizes.length - 1) / 2) * 0.4, y: at.pos.y },
+    });
+  });
+}
+
 // quebrar libera o tile: a sala guarda a propria copia de `tiles`
 export function breakProp(world: World, prop: Prop): void {
   if (prop.broken) return;
   prop.broken = true;
-  dropLoot(world, prop);
+  if (prop.golden) dropGolden(world, prop);
+  else dropLoot(world, prop);
   const tx = Math.floor(prop.pos.x);
   const ty = Math.floor(prop.pos.y);
   const room = roomAt(world, ty);

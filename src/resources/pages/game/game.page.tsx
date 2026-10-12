@@ -102,6 +102,7 @@ export function GamePage() {
         money={hud.money}
         market={market}
         arsenal={arsenal}
+        dashes={hud.dashes}
         previews={previews}
         onBuy={buy}
         onClose={closeShop}

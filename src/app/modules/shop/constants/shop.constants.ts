@@ -52,6 +52,18 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     spread: 0,
     bonusHp: 50,
   },
+  // repoe os saltos ate DASH_MAX; com eles cheios, nao vende
+  dash: {
+    id: 'dash',
+    kind: 'dash',
+    price: 120,
+    damage: 0,
+    range: 0,
+    ammo: 0,
+    pellets: 0,
+    spread: 0,
+    bonusHp: 0,
+  },
 };
 
 export const SHOP_ITEMS: ItemDef[] = Object.values(ITEMS);

@@ -94,7 +94,7 @@ function addFloater(
   amount: number,
   onPlayer = false,
   // destaque escrito sobre o numero
-  tag?: 'headshot' | 'overkill' | 'critical',
+  tag?: 'headshot' | 'overkill' | 'critical' | 'blocked',
 ): void {
   if (
     amount === 0 &&
@@ -167,6 +167,11 @@ export function damagePlayer(
   critical = false,
 ): void {
   const player = world.player;
+  // invencivel: o golpe nao entra nem gasta escudo; so sobe o aviso
+  if (player.invincible > 0) {
+    addFloater(world, from, 0, true, 'blocked');
+    return;
+  }
   const absorbed = Math.min(player.shield, damage);
   player.shield -= absorbed;
   const lost = Math.min(Math.max(0, player.hp), damage - absorbed);
@@ -475,6 +480,20 @@ export function collectPickups(world: World): void {
       world.run.events.push({
         at: world.run.seconds,
         ...eventText((t) => t.events.aim(Math.round(player.headshot * 100))),
+      });
+      return false;
+    }
+    // invisibilidade e invencibilidade: renova o tempo, nunca encurta o que
+    // ja tem
+    if (pickup.kind === 'invisibility' || pickup.kind === 'invincibility') {
+      const stat = pickup.kind === 'invisibility' ? 'invisible' : 'invincible';
+      if (pickup.value > player[stat]) {
+        player[stat] = pickup.value;
+        player[`${stat}Total`] = pickup.value;
+      }
+      world.run.events.push({
+        at: world.run.seconds,
+        ...eventText((t) => t.events[stat](Math.round(pickup.value))),
       });
       return false;
     }

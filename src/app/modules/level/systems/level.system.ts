@@ -22,6 +22,10 @@ import {
   BUDDY_CHANCE,
   BUDDY_GAP,
   ENEMY_RADIUS,
+  GOLDEN_CHEST_MAX,
+  GOLDEN_CHEST_MIN,
+  GOLDEN_CHEST_PER_CONTRACT,
+  GOLDEN_CHEST_PER_ROOM,
   NINJA_CHANCE,
   NINJA_FROM_ROOM,
   ROOM_ENEMY_MAX,
@@ -84,6 +88,17 @@ function buddyPatrol(world: World, patrol: Vec2[]): Vec2[] | null {
   return null;
 }
 
+// chance de a sala `index` ter bau dourado: cresce pela posicao da sala no
+// contrato e pelo contrato, de GOLDEN_CHEST_MIN a GOLDEN_CHEST_MAX
+export function goldenChestChance(index: number): number {
+  return Math.min(
+    GOLDEN_CHEST_MAX,
+    GOLDEN_CHEST_MIN +
+      ((index - 1) % SHOP_EVERY) * GOLDEN_CHEST_PER_ROOM +
+      Math.floor((index - 1) / SHOP_EVERY) * GOLDEN_CHEST_PER_CONTRACT,
+  );
+}
+
 export function spawnRoom(
   world: World,
   index: number,
@@ -117,23 +132,46 @@ export function spawnRoom(
       (1 + Math.floor(threat / ROOMS_PER_EXTRA_ENEMY)) * enemyMultiplier(world),
     ),
   );
+  const route = (i: number) =>
+    template.enemies[i].path.map(([col, row]) => tileCenter(index, col, row));
+  // rondas do template que sobraram: viram o caminho extra das duplas
+  const spare = template.enemies
+    .slice(enemyCount)
+    .map((_, i) => route(enemyCount + i));
   let spawned = 0;
   for (let i = 0; i < enemyCount && spawned < ROOM_ENEMY_MAX; i++) {
-    const patrol = template.enemies[i].path.map(([col, row]) =>
-      tileCenter(index, col, row),
-    );
+    const patrol = route(i);
     const kind =
       threat >= NINJA_FROM_ROOM && nextRandom(world) < NINJA_CHANCE
         ? 'ninja'
         : 'suit';
-    world.enemies.push(createEnemy(world, index, patrol, kind));
+    const leader = createEnemy(world, index, patrol, kind);
+    world.enemies.push(leader);
     spawned++;
-    // parceiro: a primeira ronda sempre vem em dupla
     if (spawned >= ROOM_ENEMY_MAX) break;
-    if (i > 0 && nextRandom(world) >= BUDDY_CHANCE) continue;
-    const beside = buddyPatrol(world, patrol);
-    if (!beside) continue;
-    world.enemies.push(createEnemy(world, index, beside, kind));
+    if (nextRandom(world) >= BUDDY_CHANCE) continue;
+    // Parceiro. Cada dupla se comporta de um jeito, por sorteio:
+    const style = nextRandom(world);
+    let path: Vec2[] | null = null;
+    if (style < 1 / 3) {
+      // juntos, lado a lado, dando uma volta maior: a ronda emendada numa
+      // das que sobraram (o lider passa a fazer a mesma volta)
+      const tour = spare.length ? [...patrol, ...spare[0]] : patrol;
+      path = buddyPatrol(world, tour);
+      if (path && spare.length) {
+        spare.shift();
+        leader.patrol = tour;
+      } else if (!path) {
+        path = buddyPatrol(world, patrol);
+      }
+    } else if (style < 2 / 3 && spare.length) {
+      // separados: o parceiro cuida de outra ronda da sala
+      path = spare.shift()!;
+    }
+    // sentido contrario na mesma ronda: os dois se cruzam no meio. Tambem e
+    // o que sobra quando nao cabe lado a lado ou nao ha outra ronda
+    path ??= [...patrol].reverse();
+    world.enemies.push(createEnemy(world, index, path, kind));
     spawned++;
   }
 
@@ -157,6 +195,13 @@ export function spawnRoom(
       });
     }
   });
+
+  // bau dourado: uma das caixas da sala de combate, as vezes
+  if (template.kind !== 'combat') return;
+  if (nextRandom(world) >= goldenChestChance(index)) return;
+  const crates = world.props.filter((prop) => prop.roomIndex === index);
+  const crate = crates[Math.floor(nextRandom(world) * crates.length)];
+  if (crate) crate.golden = true;
 }
 
 // mantem vivas so as salas ao redor do player; o resto vira parede

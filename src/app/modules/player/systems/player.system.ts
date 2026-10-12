@@ -23,6 +23,8 @@ const DEAD_ZONE = 0.01;
 export function movePlayer(world: World, input: InputState, dt: number): void {
   const player = world.player;
   player.adrenaline = Math.max(0, player.adrenaline - dt);
+  player.invisible = Math.max(0, player.invisible - dt);
+  player.invincible = Math.max(0, player.invincible - dt);
   player.dashCooldown = Math.max(0, player.dashCooldown - dt);
   // salto levanta: so vale agachar com os pes no chao
   player.crouching = false;

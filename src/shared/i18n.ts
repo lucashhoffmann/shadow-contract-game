@@ -94,6 +94,8 @@ const pt = {
     dashes: (count: number, max: number) => `Saltos: ${count} de ${max}`,
     bullets: (count: number, max: number) => `Balas: ${count} de ${max}`,
     revives: (count: number) => `Fichas de revive: ${count}`,
+    invisible: 'Invisibilidade',
+    invincible: 'Invencibilidade',
     room: (number: number) => `Sala ${number}`,
     paused: 'Pausado',
     howToPlay: 'Como jogar',
@@ -130,6 +132,7 @@ const pt = {
       `${count} pontos de vida recuperados durante a partida.`,
     noRecovery: 'Nenhuma vida recuperada durante a partida.',
     miss: 'Errou!',
+    impenetrable: 'Impenetrável uau',
     headshot: 'HEADSHOT',
     overkill: 'OVERKILL',
     critical: 'CRITICO',
@@ -143,12 +146,15 @@ const pt = {
       `${shots} tiros${pellets > 1 ? `, ${pellets} balas` : ''}`,
     refill: (count: number) => `Recarga: +${count} balas`,
     fullAmmo: 'Municao cheia',
+    dashRefill: (count: number) => `+${count} saltos`,
+    fullDashes: 'Saltos cheios',
     owned: 'voce ja tem',
     items: {
       pistol: 'Pistola',
       silenced: 'Pistola silenciada',
       shotgun: 'Escopeta',
       armor: 'Colete',
+      dash: 'Saltos',
     },
   },
   share: {
@@ -191,6 +197,10 @@ const pt = {
     aim: (chance: number) => `Mira melhorada: headshot em ${chance}%.`,
     ammo: (item: string, amount: number) =>
       `Coletou municao de ${item}: +${amount}.`,
+    invisible: (seconds: number) =>
+      `Invisível por ${seconds}s: inimigos não veem nem ouvem.`,
+    invincible: (seconds: number) =>
+      `Invencível por ${seconds}s: nenhum dano entra.`,
     recoveredHealth: 'Recuperou vida',
     collectedShield: 'Coletou escudo',
     recoveredDashes: 'Recuperou saltos',
@@ -302,6 +312,10 @@ const pt = {
           [
             'Caixa',
             'cobre de bala e quebra com tiro ou briga; pode soltar vida ou escudo',
+          ],
+          [
+            'Bau dourado',
+            'raro, mais comum a cada sala e contrato. Solta invisibilidade com vida cheia, escudo cheio, vida e escudo cheios, ou invencibilidade. As barras no topo mostram o tempo que falta',
           ],
           ['Coracao', 'recupera vida. Escudo: absorve dano antes da vida'],
           [
@@ -427,6 +441,8 @@ const en: typeof pt = {
     dashes: (count, max) => `Dashes: ${count} of ${max}`,
     bullets: (count, max) => `Bullets: ${count} of ${max}`,
     revives: (count) => `Revive tokens: ${count}`,
+    invisible: 'Invisibility',
+    invincible: 'Invincibility',
     room: (number) => `Room ${number}`,
     paused: 'Paused',
     howToPlay: 'How to play',
@@ -462,6 +478,7 @@ const en: typeof pt = {
     recovered: (count) => `${count} health restored during this run.`,
     noRecovery: 'No health restored during this run.',
     miss: 'Miss!',
+    impenetrable: 'Impenetrable wow',
     headshot: 'HEADSHOT',
     overkill: 'OVERKILL',
     critical: 'CRITICAL',
@@ -475,12 +492,15 @@ const en: typeof pt = {
       `${shots} shots${pellets > 1 ? `, ${pellets} pellets` : ''}`,
     refill: (count) => `Reload: +${count} bullets`,
     fullAmmo: 'Ammo full',
+    dashRefill: (count) => `+${count} dashes`,
+    fullDashes: 'Dashes full',
     owned: 'already owned',
     items: {
       pistol: 'Pistol',
       silenced: 'Silenced pistol',
       shotgun: 'Shotgun',
       armor: 'Armor',
+      dash: 'Dashes',
     },
   },
   share: {
@@ -517,6 +537,9 @@ const en: typeof pt = {
     reviveCollected: (count, max) => `Revive tokens: ${count} of ${max}.`,
     aim: (chance) => `Aim improved: headshot chance ${chance}%.`,
     ammo: (item, amount) => `Collected ${item} ammo: +${amount}.`,
+    invisible: (seconds) =>
+      `Invisible for ${seconds}s: enemies cannot see or hear you.`,
+    invincible: (seconds) => `Invincible for ${seconds}s: no damage gets in.`,
     recoveredHealth: 'Restored health',
     collectedShield: 'Collected shield',
     recoveredDashes: 'Restored dashes',
@@ -611,6 +634,10 @@ const en: typeof pt = {
           ['Suit', 'shoots from afar, survives 2 shots. Dodge red bullets'],
           ['Ninja', 'runs and strikes up close, survives 2 hits'],
           ['Crate', 'blocks bullets and breaks; may drop health or shield'],
+          [
+            'Golden chest',
+            'rare, more common each room and contract. Drops invisibility with full health, full shield, full health and shield, or invincibility. Bars at the top show the time left',
+          ],
           ['Heart', 'restores health. Shield absorbs damage first'],
           ['Cross', 'revive token: respawn at the room entrance. Hold up to 3'],
         ],

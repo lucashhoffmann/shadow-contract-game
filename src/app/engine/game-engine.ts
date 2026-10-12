@@ -20,6 +20,8 @@ const CAMERA_BACK = 7;
 const MAX_FRAME_TIME = 0.1;
 const CAMERA_FOV = 45;
 // soco de camera ao matar e ao levar dano: zoom curto com blur que se desfaz
+// por quanto tempo (ms) o clique que vem de um toque em icone e ignorado
+const PROMPT_CLICK_GUARD = 600;
 const PUNCH_TIME = 0.35;
 const PUNCH_ZOOM = 3.5;
 const PUNCH_BLUR = 3;
@@ -91,6 +93,22 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   // Toque ou clique em cima do icone flutuante (F, B) faz o que a tecla
   // faria: no celular e o unico jeito de quebrar caixa, esfaquear e abrir bau.
   const spot = new THREE.Vector3();
+  // O toque num icone abre a loja (ou outro dialogo) antes de o dedo subir.
+  // No celular o clique desse mesmo toque cairia no que apareceu embaixo do
+  // dedo: comprava sozinho o cartao da loja que nascesse ali. Engole esse
+  // unico clique.
+  const swallowClick = () => {
+    const swallow = (click: MouseEvent) => {
+      click.stopPropagation();
+      click.preventDefault();
+    };
+    window.addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(
+      () => window.removeEventListener('click', swallow, { capture: true }),
+      PROMPT_CLICK_GUARD,
+    );
+  };
+
   const onPointerDown = (event: PointerEvent) => {
     if (getWorld()?.status !== 'playing') return;
     const rect = canvas.getBoundingClientRect();
@@ -107,6 +125,7 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       input[action] = true;
       // o toque e do icone: nao comeca o joystick que esta por baixo
       event.stopPropagation();
+      swallowClick();
       return;
     }
   };

@@ -17,6 +17,37 @@ const SEGMENT_STYLE = {
 };
 
 // um contrato = SHOP_EVERY salas; o ultimo segmento e a loja
+// tempo que falta de um efeito (0 a 1); some quando acaba
+function EffectBar({
+  label,
+  left,
+  color,
+}: {
+  label: string;
+  left: number;
+  color: string;
+}) {
+  if (left <= 0) return null;
+  return (
+    <div className='flex items-center gap-2'>
+      <div
+        role='progressbar'
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(left * 100)}
+        className='h-2 w-28 overflow-hidden rounded-full bg-black/50 sm:w-40'
+      >
+        <div
+          className={`h-full ${color} transition-[width] duration-200 ease-linear`}
+          style={{ width: `${left * 100}%` }}
+        />
+      </div>
+      <p className='text-xs font-black'>{label}</p>
+    </div>
+  );
+}
+
 function ContractBar({ room }: { room: number }) {
   const t = useTexts();
   const contract = Math.max(0, Math.floor((room - 1) / SHOP_EVERY)) + 1;
@@ -230,6 +261,16 @@ export function Hud({
             </p>
           )}
         </div>
+        <EffectBar
+          label={t.game.invisible}
+          left={hud.invisible}
+          color='bg-cyan-300'
+        />
+        <EffectBar
+          label={t.game.invincible}
+          left={hud.invincible}
+          color='bg-amber-400'
+        />
         <DashPips dashes={hud.dashes} />
         {hud.revives > 0 && (
           <div

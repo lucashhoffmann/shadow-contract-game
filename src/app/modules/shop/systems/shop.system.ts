@@ -7,7 +7,10 @@ import {
   PRICE_STEP,
   PRICE_VOLATILITY,
 } from '@/app/modules/shop/constants/shop.constants';
-import { CHEST_RANGE } from '@/app/modules/world/constants/world.constants';
+import {
+  CHEST_RANGE,
+  DASH_MAX,
+} from '@/app/modules/world/constants/world.constants';
 import type {
   ItemDef,
   ItemId,
@@ -31,6 +34,8 @@ function priceAll(price: (item: ItemDef) => number): Record<ItemId, number> {
     silenced: price(ITEMS.silenced),
     shotgun: price(ITEMS.shotgun),
     armor: price(ITEMS.armor),
+    // por ultimo: nao muda o sorteio dos precos que ja existiam
+    dash: price(ITEMS.dash),
   };
 }
 
@@ -72,6 +77,8 @@ export function itemPrice(world: World, id: ItemId): number {
 }
 
 export function canBuy(world: World, id: ItemId): boolean {
+  // saltos cheios: nao ha o que repor
+  if (id === 'dash' && world.player.dashes >= DASH_MAX) return false;
   const owned = ownedWeapon(world, id);
   // arma cheia nao tem o que recarregar
   if (owned && owned.ammo >= ITEMS[owned.id].ammo) return false;
@@ -88,6 +95,8 @@ export function buyItem(world: World, id: ItemId): boolean {
     world.player.maxHp += ITEMS.armor.bonusHp;
     world.player.hp = world.player.maxHp;
     world.run.stats.healthRecovered += world.player.hp - previousHp;
+  } else if (id === 'dash') {
+    world.player.dashes = DASH_MAX;
   } else if (owned) {
     owned.ammo = ITEMS[id].ammo;
     world.player.weapon = owned;

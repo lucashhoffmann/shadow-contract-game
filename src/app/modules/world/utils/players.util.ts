@@ -19,11 +19,13 @@ export function alivePlayers(world: World): Player[] {
   return world.players.filter((player) => player.hp > 0);
 }
 
-// vivo mais perto de `pos`; undefined se todos morreram
+// vivo mais perto de `pos`; undefined se todos morreram. Invisivel so e
+// escolhido se nao sobrou ninguem a vista
 export function nearestPlayer(world: World, pos: Vec2): Player | undefined {
+  const alive = alivePlayers(world);
+  const seen = alive.filter((player) => player.invisible <= 0);
   let nearest: Player | undefined;
-  for (const player of world.players) {
-    if (player.hp <= 0) continue;
+  for (const player of seen.length ? seen : alive) {
     if (!nearest || distance(player.pos, pos) < distance(nearest.pos, pos)) {
       nearest = player;
     }

@@ -120,7 +120,8 @@ export function cleanInput(payload: unknown): InputState | null {
     ...(typeof raw.select === 'string' &&
       (raw.select === 'sword' ||
         raw.select === 'next' ||
-        (raw.select in ITEMS && raw.select !== 'armor')) && {
+        (raw.select in ITEMS &&
+          ITEMS[raw.select as ItemId].kind === 'weapon')) && {
         select: raw.select as InputState['select'],
       }),
   };

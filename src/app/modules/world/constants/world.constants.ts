@@ -123,11 +123,12 @@ export const RAGE_PURSUIT = 1.25;
 export const RAGE_DASH = 1.25;
 export const RAGE_VIEW = 1.5;
 export const RAGE_DETECT = 0.6;
-// Dupla: inimigos andam juntos desde a primeira sala. A primeira ronda de
-// toda sala nasce com um parceiro; as outras, com chance BUDDY_CHANCE. O
-// parceiro e do mesmo tipo e faz a mesma ronda, BUDDY_GAP ao lado. A sala
-// nunca passa de ROOM_ENEMY_MAX inimigos.
-export const BUDDY_CHANCE = 0.5;
+// Dupla: desde a primeira sala, cada ronda tem chance BUDDY_CHANCE de nascer
+// com um parceiro do mesmo tipo. O parceiro nao faz sempre a mesma coisa
+// (level.system sorteia): anda junto, BUDDY_GAP ao lado, numa volta maior
+// pela sala; faz a mesma ronda no sentido contrario, cruzando com o outro; ou
+// pega outra ronda da sala. A sala nunca passa de ROOM_ENEMY_MAX inimigos.
+export const BUDDY_CHANCE = 0.25;
 export const BUDDY_GAP = 0.8;
 export const ROOM_ENEMY_MAX = 12;
 // Bando. Quem entra em alerta chama os colegas vivos a ate PACK_CALL_RADIUS
@@ -268,6 +269,21 @@ export const HEART_MAX = 0.6;
 // escudo: cada um da de 10% a 30%; o total nunca passa de 30%
 export const SHIELD_MIN = 0.1;
 export const SHIELD_MAX = 0.3;
+
+// Bau dourado: uma caixa da sala de combate pode nascer dourada. A chance
+// comeca em GOLDEN_CHEST_MIN, sobe a cada sala dentro do contrato e a cada
+// contrato, ate GOLDEN_CHEST_MAX. Aberto, solta um de quatro premios
+// (dropGolden em grid.util): invisibilidade + vida cheia, escudo cheio, vida
+// cheia + escudo cheio, ou invencibilidade.
+export const GOLDEN_CHEST_MIN = 0.05;
+export const GOLDEN_CHEST_MAX = 0.15;
+export const GOLDEN_CHEST_PER_ROOM = 0.005;
+export const GOLDEN_CHEST_PER_CONTRACT = 0.02;
+// duracao sorteada de cada premio de tempo, em segundos
+export const INVISIBILITY_MIN = 5;
+export const INVISIBILITY_MAX = 12;
+export const INVINCIBILITY_MIN = 4;
+export const INVINCIBILITY_MAX = 8;
 
 // multiplayer: mais dificil que o solo, e mais quanto mais gente. Cada
 // jogador alem do primeiro multiplica os inimigos da sala e adianta a

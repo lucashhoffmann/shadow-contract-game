@@ -141,6 +141,8 @@ export type Prop = {
   roomIndex: number;
   pos: Vec2;
   broken: boolean;
+  // bau dourado: raro, solta premio proprio em vez da tabela das caixas
+  golden?: boolean;
 };
 
 // dinheiro, coracao (cura), escudo, salto ou municao; os quatro ultimos saem
@@ -154,7 +156,11 @@ export type PickupKind =
   // mira: soma pontos percentuais na chance de headshot
   | 'headshot'
   // ficha de revive (cruz): guardada na run, gasta ao morrer
-  | 'revive';
+  | 'revive'
+  // so saem do bau dourado. `value` segundos sem ser visto nem ouvido
+  | 'invisibility'
+  // `value` segundos sem levar dano
+  | 'invincibility';
 
 export type Pickup = {
   id: number;
@@ -169,11 +175,12 @@ export type Pickup = {
 // 'silenced' e a pistola com silenciador
 export type WeaponId = 'pistol' | 'silenced' | 'shotgun';
 
-export type ItemId = WeaponId | 'armor';
+// 'dash' repoe os saltos guardados
+export type ItemId = WeaponId | 'armor' | 'dash';
 
 export type ItemDef = {
   id: ItemId;
-  kind: 'weapon' | 'armor';
+  kind: 'weapon' | 'armor' | 'dash';
   price: number;
   // dano base de cada bala, antes do sorteio e da distancia
   damage: number;
@@ -219,6 +226,13 @@ export type Player = {
   shot: number;
   // segundos restantes do bonus de velocidade apos uma morte
   adrenaline: number;
+  // segundos restantes de invisibilidade: inimigo nao ve nem ouve
+  invisible: number;
+  // duracao cheia da invisibilidade em curso: o HUD mostra o que falta dela
+  invisibleTotal: number;
+  // segundos restantes de invencibilidade: nenhum dano entra
+  invincible: number;
+  invincibleTotal: number;
   // segundos restantes do salto no ar
   dash: number;
   // segundos ate poder saltar de novo
@@ -291,6 +305,8 @@ export type Floater = {
   overkill?: boolean;
   // golpe critico do inimigo contra o player
   critical?: boolean;
+  // golpe que bateu em player invencivel: `amount` 0, texto proprio
+  blocked?: boolean;
   // segundos desde que apareceu; some em FLOATER_TIME
   age: number;
 };

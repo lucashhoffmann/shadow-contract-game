@@ -207,10 +207,13 @@ Estados:
   `ENEMY_CRIT_MAX`. Antes desse nivel nao sorteia nada. O tiro leva
   `Projectile.critical` ate acertar; o aviso sai com `Floater.critical`, que a
   engine escreve como "CRITICO" sobre o numero, como o headshot
-- duplas: em `spawnRoom`, a primeira ronda de toda sala nasce com um parceiro
-  e as outras com chance `BUDDY_CHANCE`. O parceiro e do mesmo tipo e faz a
-  mesma ronda deslocada `BUDDY_GAP` para um lado livre (`buddyPatrol`); sem
-  lado livre, a ronda fica sozinha. A sala nunca passa de `ROOM_ENEMY_MAX`
+- duplas: em `spawnRoom`, cada ronda tem chance `BUDDY_CHANCE` de nascer com
+  um parceiro do mesmo tipo. O jeito da dupla e sorteado: (1) juntos, o
+  parceiro `BUDDY_GAP` ao lado (`buddyPatrol`), os dois numa volta maior que
+  emenda a ronda numa das que sobraram no template; (2) separados, o parceiro
+  numa ronda que sobrou; (3) mesma ronda no sentido contrario, que tambem e o
+  que vale quando nao cabe lado a lado ou nao sobrou ronda. A sala nunca passa
+  de `ROOM_ENEMY_MAX`
 - conversa: so visual, na engine. Dois inimigos em `patrol`, sem furia, a
   menos de `TALK_RANGE` um do outro se revezam com um balao de fala sobre a
   cabeca (`chatter`, em `world.renderer.ts`)
@@ -321,7 +324,13 @@ personagem.
 ## `Prop` (cenario destrutivel)
 
 ```ts
-type Prop = { id: number; roomIndex: number; pos: Vec2; broken: boolean };
+type Prop = {
+  id: number;
+  roomIndex: number;
+  pos: Vec2;
+  broken: boolean;
+  golden?: boolean;
+};
 ```
 
 - nasce de cada tile `o` do template; a sala guarda copia propria de `tiles`
@@ -341,12 +350,29 @@ type Prop = { id: number; roomIndex: number; pos: Vec2; broken: boolean };
   momento tambem vira caixa vazia. Um segundo sorteio
   define o valor. Item novo entra no fim da tabela, para nao mudar o que as
   faixas anteriores soltam
+- bau dourado (`golden`): em sala de combate, `spawnRoom` sorteia
+  `goldenChestChance(index)` e, se sair, marca uma das caixas da sala. A
+  chance vai de `GOLDEN_CHEST_MIN` (5%) a `GOLDEN_CHEST_MAX` (15%): soma
+  `GOLDEN_CHEST_PER_ROOM` por sala dentro do contrato e
+  `GOLDEN_CHEST_PER_CONTRACT` por contrato. Quebra como qualquer caixa, mas
+  em vez da tabela `LOOT` solta um de quatro premios, com a mesma chance
+  (`dropGolden`): `invisibility` + `heart` cheio, `shield` cheio, `heart`
+  cheio + `shield` cheio, ou `invincibility`. A engine desenha em ouro, com
+  aura
 
 ## `Pickup`
 
 ```ts
 type PickupKind =
-  'money' | 'heart' | 'shield' | 'dash' | 'ammo' | 'headshot' | 'revive';
+  | 'money'
+  | 'heart'
+  | 'shield'
+  | 'dash'
+  | 'ammo'
+  | 'headshot'
+  | 'revive'
+  | 'invisibility'
+  | 'invincibility';
 type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
 ```
 
@@ -372,6 +398,22 @@ type Pickup = { id; kind: PickupKind; roomIndex; pos: Vec2; value: number };
   o player volta em `run.checkpoint` (ponto em que entrou na sala atual) com
   `REVIVE_HP` da vida maxima, os inimigos vivos voltam a `patrol` e as balas
   inimigas somem. Sem ficha, `status` vira `dead`
+- `invisibility`: so sai do bau dourado. `value` e um tempo sorteado de
+  `INVISIBILITY_MIN` a `INVISIBILITY_MAX` segundos. Se for maior que o que
+  resta, vira `player.invisible` e `player.invisibleTotal`; `movePlayer`
+  desconta. Enquanto dura, inimigo nao ve nem ouve esse player: fora de
+  alerta ignora, em alerta fica parado ate `alertTimer` acabar; no
+  multiplayer `nearestPlayer` prefere quem esta a vista. Nao acaba ao atacar.
+  A engine desenha so a sombra do player
+- `invincibility`: so sai do bau dourado. `value` sorteado de
+  `INVINCIBILITY_MIN` a `INVINCIBILITY_MAX` segundos, guardado em
+  `player.invincible` e `player.invincibleTotal` do mesmo jeito. Enquanto
+  dura, `damagePlayer` nao tira vida nem escudo: so sobe um `Floater` com
+  `blocked` (a engine escreve "Impenetravel uau" no lugar do numero). A
+  engine poe uma aura dourada no player
+- o HUD mostra cada efeito como barra de progresso, sem numero:
+  `Hud.invisible` e `Hud.invincible` sao a fracao que falta (0 a 1, em
+  passos de 5%)
 - `heart` com vida cheia, `shield` com escudo no teto, `dash` com os saltos
   cheios e `ammo` sem arma ou com todas cheias ficam no chao
 - todo dano no player passa por `damagePlayer`: gasta `shield` antes de `hp`
@@ -540,6 +582,8 @@ hud: {
   hp;
   maxHp;
   shield;
+  invisible;
+  invincible;
   dashes; // saltos guardados, de 0 a DASH_MAX
   money;
   room;

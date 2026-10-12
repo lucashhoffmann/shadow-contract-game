@@ -39,6 +39,8 @@ const HUD: HudData = {
   hp: 50,
   maxHp: 100,
   shield: 0,
+  invisible: 0,
+  invincible: 0,
   dashes: 4,
   revives: 0,
   money: 250,

@@ -85,6 +85,10 @@ export type Hud = {
   hp: number;
   maxHp: number;
   shield: number;
+  // fracao (0 a 1) que falta da invisibilidade e da invencibilidade em
+  // curso, em passos de 5%; 0 = sem o efeito
+  invisible: number;
+  invincible: number;
   // saltos guardados, de 0 a DASH_MAX
   dashes: number;
   // fichas de revive guardadas, de 0 a REVIVE_MAX
@@ -263,6 +267,8 @@ const EMPTY_HUD: Hud = {
   hp: 0,
   maxHp: 0,
   shield: 0,
+  invisible: 0,
+  invincible: 0,
   dashes: 0,
   revives: 0,
   money: 0,
@@ -329,11 +335,18 @@ export function setJoystickCrouch(on: boolean): void {
   joystickInput.crouch = on;
 }
 
+// em passos de 5%: o HUD nao redesenha a cada frame
+function timeLeft(seconds: number, total: number): number {
+  return seconds > 0 ? Math.ceil((seconds / total) * 20) / 20 : 0;
+}
+
 function readHud(w: World): Hud {
   return {
     hp: Math.max(0, w.player.hp),
     maxHp: w.player.maxHp,
     shield: w.player.shield,
+    invisible: timeLeft(w.player.invisible, w.player.invisibleTotal),
+    invincible: timeLeft(w.player.invincible, w.player.invincibleTotal),
     dashes: w.player.dashes,
     revives: w.run.revives,
     money: w.player.money,

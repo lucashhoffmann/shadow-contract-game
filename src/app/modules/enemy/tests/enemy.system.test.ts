@@ -60,6 +60,24 @@ describe('canSee', () => {
 });
 
 describe('updateEnemies', () => {
+  it('nao ve nem ouve player invisivel, e em alerta perde o rastro', () => {
+    const world = createArenaWorld();
+    const enemy = addEnemy(world, 5.5, 5.5, -Math.PI / 2);
+    world.player.noise = NOISE_DASH;
+    world.player.invisible = 60;
+
+    run(world, DETECT_TIME * 3);
+    expect(enemy.state).toBe('patrol');
+    expect(enemy.detection).toBe(0);
+
+    enemy.detection = 1;
+    const hp = world.player.hp;
+    run(world, ALERT_DURATION * 3);
+    expect(enemy.state).toBe('patrol');
+    expect(world.player.hp).toBe(hp);
+    expect(world.projectiles).toHaveLength(0);
+  });
+
   it('fica suspeito ao ver o player e entra em alerta apos DETECT_TIME', () => {
     const world = createArenaWorld();
     const enemy = addEnemy(world, 5.5, 5.5, -Math.PI / 2);

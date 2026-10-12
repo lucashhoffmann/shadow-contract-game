@@ -453,7 +453,7 @@ function wallpaper(level: number): { wall: Paper; floor: Paper } {
 // gorda para baixo (o centro da marca), afinando ate as pontas. Extrudada com
 // chanfro, para ficar roliça.
 function rageCrescentGeometry(): THREE.BufferGeometry {
-  const [half, tip, belly, inner] = [0.17, 0.07, -0.19, -0.03];
+  const [half, tip, belly, inner] = [0.17, 0.07, -0.21, 0.01];
   const moon = new THREE.Shape();
   moon.moveTo(-half, tip);
   moon.quadraticCurveTo(0, belly, half, tip);
@@ -685,6 +685,8 @@ export function createWorldRenderer(
     shield: shieldGeometry(),
     dash: dashGeometry(),
     revive: reviveGeometry(),
+    invisibility: new THREE.OctahedronGeometry(0.2),
+    invincibility: new THREE.IcosahedronGeometry(0.2),
     headshot: crosshairGeometry(),
     // municao ao longo de +x, ponta na frente
     shuriken: shurikenGeometry(),
@@ -782,6 +784,17 @@ export function createWorldRenderer(
     }),
     revive: new THREE.MeshLambertMaterial({
       color: COLORS.model.c3fe08a,
+      flatShading: true,
+    }),
+    // cristal meio transparente
+    invisibility: new THREE.MeshLambertMaterial({
+      color: COLORS.model.c7df3ee,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.6,
+    }),
+    invincibility: new THREE.MeshLambertMaterial({
+      color: MONEY.color,
       flatShading: true,
     }),
     coin: new THREE.MeshLambertMaterial({
@@ -1028,9 +1041,14 @@ export function createWorldRenderer(
     onPlayer?: boolean,
     // destaque em cima do numero: 'HEADSHOT' ou 'OVERKILL'
     banner?: keyof typeof FLOATER_BANNER,
+    // golpe em player invencivel: texto proprio, em dourado
+    blocked?: boolean,
   ): THREE.Texture | null {
-    const text =
-      amount > 0 ? `${onPlayer ? '-' : '+'}${amount}` : getTexts().game.miss;
+    const text = blocked
+      ? getTexts().game.impenetrable
+      : amount > 0
+        ? `${onPlayer ? '-' : '+'}${amount}`
+        : getTexts().game.miss;
     const key = banner ? `${banner}${text}` : text;
     const cached = floaterTextures.get(key);
     if (cached) return cached;
@@ -1045,7 +1063,9 @@ export function createWorldRenderer(
     context.lineJoin = 'round';
     context.lineWidth = 12;
     context.strokeStyle = COLORS.ui.bloodOutline;
-    context.fillStyle = floaterColor(amount, onPlayer);
+    context.fillStyle = blocked
+      ? COLORS.ui.highlight
+      : floaterColor(amount, onPlayer);
     const [x, y] = [canvas.width / 2, canvas.height / 2 + 4];
     if (banner) {
       // duas linhas: o destaque em cima e o numero menor embaixo
@@ -1062,8 +1082,10 @@ export function createWorldRenderer(
       context.strokeText(title, x, y - 28);
       context.fillText(title, x, y - 28);
     } else {
-      context.strokeText(text, x, y);
-      context.fillText(text, x, y);
+      // texto comprido encolhe para caber no canvas
+      const width = canvas.width - 24;
+      context.strokeText(text, x, y, width);
+      context.fillText(text, x, y, width);
     }
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -1351,13 +1373,18 @@ export function createWorldRenderer(
     group.position.set(prop.pos.x, 0, -prop.pos.y);
     // sorteio fixo por id: o mesmo objeto tem sempre a mesma cara
     const pick = Math.abs(Math.sin(prop.id * 12.9898) * 43758.5453) % 1;
-    const variant = PROP_VARIANTS[Math.floor(pick * PROP_VARIANTS.length)];
-    const [main, trim] = {
-      crate: [mat.wood, mat.woodDark],
-      sideboard: [mat.cabinet, mat.cabinetDark],
-      barrel: [mat.barrel, mat.chestLock],
-      plant: [mat.pot, mat.leaf],
-    }[variant];
+    // bau dourado e sempre a caixa, em ouro, com a aura das moedas
+    const variant = prop.golden
+      ? 'crate'
+      : PROP_VARIANTS[Math.floor(pick * PROP_VARIANTS.length)];
+    const [main, trim] = prop.golden
+      ? [mat.coin, mat.chestLock]
+      : {
+          crate: [mat.wood, mat.woodDark],
+          sideboard: [mat.cabinet, mat.cabinetDark],
+          barrel: [mat.barrel, mat.chestLock],
+          plant: [mat.pot, mat.leaf],
+        }[variant];
     if (prop.broken) {
       // destrocos na cor do que quebrou
       DEBRIS.forEach(([x, z, turn], i) => {
@@ -1389,12 +1416,19 @@ export function createWorldRenderer(
       }
     };
     if (variant === 'crate') {
-      const crate = new THREE.Mesh(geo.crate, mat.wood);
+      const crate = new THREE.Mesh(geo.crate, main);
       crate.position.y = 0.31;
-      const lid = new THREE.Mesh(geo.plank, mat.woodDark);
+      const lid = new THREE.Mesh(geo.plank, trim);
       lid.scale.set(2.3, 1, 0.9);
       lid.position.y = 0.64;
       group.add(crate, lid);
+      if (prop.golden) {
+        group.name = 'goldenChest';
+        const aura = new THREE.Mesh(geo.aura, mat.aura);
+        aura.position.y = 0.35;
+        aura.scale.setScalar(1.5);
+        group.add(aura);
+      }
     } else if (variant === 'sideboard') {
       // aparador com tampo, pes e um vaso de planta em cima
       part(geo.box, mat.cabinet, [0.9, 0.46, 0.5], [0, 0.31, 0]);
@@ -1888,6 +1922,18 @@ export function createWorldRenderer(
       poseAttack(body, who.slash);
     }
     body.shadow.visible = !lost;
+    // invisivel: some o corpo, fica so a sombra no chao
+    body.lean.visible = lost || who.invisible <= 0;
+    // invencivel: aura dourada em volta do corpo, criada no primeiro uso
+    let glow = body.root.getObjectByName('invincibleAura');
+    if (!glow && who.invincible > 0) {
+      glow = new THREE.Mesh(geo.aura, mat.aura);
+      glow.name = 'invincibleAura';
+      glow.position.y = 0.6;
+      glow.scale.setScalar(1.7);
+      body.root.add(glow);
+    }
+    if (glow) glow.visible = !lost && who.invincible > 0;
     if (view.tag) {
       view.tag.position.set(
         body.root.position.x,
@@ -2053,6 +2099,7 @@ export function createWorldRenderer(
                 : floater.critical
                   ? 'CRITICAL'
                   : undefined,
+            floater.blocked,
           );
           if (!map) continue;
           sprite = new THREE.Sprite(
