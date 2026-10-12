@@ -12,8 +12,10 @@ export function CharacterPage() {
   return (
     <main className='flex h-full flex-col md:flex-row'>
       {/* no celular o painel e mais alto que a tela: sem altura propria o
-          preview encolhia ate sumir. Fica fixo no topo e o painel rola */}
-      <div className='relative h-[38vh] shrink-0 md:h-auto md:min-h-0 md:flex-1'>
+          preview encolhia ate sumir. Fica fixo no topo e o painel rola.
+          min-w-0: sem ele o canvas segura a largura antiga ao estreitar a
+          janela e empurra a tela para o lado */}
+      <div className='relative h-[38vh] min-w-0 shrink-0 md:h-auto md:min-h-0 md:flex-1'>
         <canvas
           ref={canvasRef}
           aria-label='Preview do personagem'
@@ -23,7 +25,7 @@ export function CharacterPage() {
           Arraste para girar
         </p>
       </div>
-      <div className='flex min-h-0 flex-1 flex-col items-center gap-4 overflow-y-auto p-6 md:flex-none md:justify-center'>
+      <div className='flex min-h-0 flex-1 flex-col items-center gap-4 overflow-y-auto p-6 md:flex-none md:[justify-content:safe_center]'>
         <LookEditor
           look={look}
           onChange={setLook}
@@ -34,10 +36,11 @@ export function CharacterPage() {
           onChange={setWeapon}
         />
         {/* celular: preso no canto de cima, sobre o preview, sempre a mao
-            (o painel e longo e rola). Desktop: no fim do painel */}
+            (o painel e longo e rola). Desktop: colado no pe do painel, visivel
+            mesmo quando o conteudo passa da altura da janela */}
         <Button
           size='lg'
-          className='fixed top-3 right-3 z-10 font-black uppercase shadow-lg md:static md:w-full md:max-w-xs md:shadow-xs'
+          className='fixed top-3 right-3 z-10 font-black uppercase shadow-lg md:sticky md:top-auto md:right-auto md:bottom-0 md:w-full md:max-w-xs md:shrink-0'
           onClick={backToMenu}
         >
           <ArrowLeft

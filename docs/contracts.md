@@ -631,3 +631,18 @@ function createCharacterPreview(canvas: HTMLCanvasElement): {
   (`renderers/weapon.renderer.ts`)
 - jogo e preview montam o personagem pelo mesmo `createCharacterKit`
   (`renderers/character.renderer.ts`), entao o preview e o que aparece na run
+
+## App instalavel (PWA)
+
+- `vite-plugin-pwa` (em `vite.config.ts`) gera `manifest.webmanifest` e o
+  service worker no build; icones em `public/` (`icon.png`, `icon-192.png`,
+  `icon-maskable.png`)
+- o service worker guarda os arquivos do jogo e as fontes do Google Fonts no
+  aparelho: depois da primeira visita o jogo abre sem internet
+- `src/resources/pwa.ts` registra o service worker e mantem a versao em dia:
+  procura versao nova ao abrir, ao voltar para o app e de hora em hora, e
+  aplica sozinho (recarregando) so com `screen === 'menu'`, para nao derrubar
+  uma partida
+- a tela inicial oferece a instalacao em aparelho de toque
+  (`home/components/install-app`): botao quando o navegador avisa
+  (`beforeinstallprompt`), instrucao manual no iPhone, nada se ja instalado
