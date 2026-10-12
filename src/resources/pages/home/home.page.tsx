@@ -141,9 +141,12 @@ export function HomePage() {
           aria-label={t.home.changeLanguage}
           onClick={() => setLanguage(language === 'pt-BR' ? 'en' : 'pt-BR')}
         >
-          <span aria-hidden className='text-2xl leading-none'>
+          <span
+            aria-hidden
+            className='text-2xl leading-none'
+          >
             {language === 'pt-BR' ? '🇧🇷' : '🇺🇸'}
-          </span>
+          </span>{' '}
           {t.home.language}: {t.home.languageName}
         </button>
       </div>
