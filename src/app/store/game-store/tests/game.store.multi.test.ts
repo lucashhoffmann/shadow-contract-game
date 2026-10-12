@@ -132,3 +132,57 @@ describe('game store no multiplayer', () => {
     expect(ROOM_W).toBe(11);
   });
 });
+
+describe('menu e placar da partida em rede', () => {
+  it('P abre e fecha o menu sem parar o jogo', () => {
+    store().startMulti(SEATS, link(true, 0), 1);
+    store().togglePause();
+    expect(store()).toMatchObject({ menu: true, screen: 'playing' });
+    const before = getWorld()!.run.seconds;
+    store().tick(IDLE, FIXED_DT);
+    expect(getWorld()!.run.seconds).toBeGreaterThan(before);
+    store().togglePause();
+    expect(store().menu).toBe(false);
+  });
+
+  it('host encerra a partida para todos; convidado nao consegue', () => {
+    const guest = link(false, 1);
+    store().startMulti(SEATS, guest);
+    store().endMatch();
+    expect(store().screen).toBe('playing');
+
+    store().backToMenu();
+    const net = link(true, 0);
+    store().startMulti(SEATS, net, 1);
+    store().togglePause();
+    const sent = net.sendState.mock.calls.length;
+    store().endMatch();
+    expect(store()).toMatchObject({ screen: 'gameover', menu: false });
+    // o fim vai na hora para os convidados
+    expect(net.sendState.mock.calls.length).toBe(sent + 1);
+    expect(net.sendState.mock.calls.at(-1)![0].status).toBe('dead');
+  });
+
+  it('placar acompanha kills, mortes e quem e voce', () => {
+    store().startMulti(SEATS, link(true, 0), 1);
+    expect(store().scores.map((s) => [s.name, s.you])).toEqual([
+      ['Host', true],
+      ['Ana', false],
+    ]);
+    const [, guest] = getWorld()!.players;
+    guest.kills = 3;
+    guest.deaths = 1;
+    guest.hp = 0;
+    store().tick(IDLE, FIXED_DT);
+    expect(store().scores[1]).toMatchObject({
+      kills: 3,
+      deaths: 1,
+      alive: false,
+    });
+
+    store().setScoreboard(true);
+    expect(store().scoreboard).toBe(true);
+    store().backToMenu();
+    expect(store()).toMatchObject({ scoreboard: false, online: false });
+  });
+});

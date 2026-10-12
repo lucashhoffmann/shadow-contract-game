@@ -24,7 +24,9 @@ export function renderWeaponPreviews(): Record<WeaponModelId, string> {
   renderer.setSize(WIDTH, HEIGHT, false);
 
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c555566, 1.6));
+  scene.add(
+    new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c555566, 1.6),
+  );
   const sun = new THREE.DirectionalLight(COLORS.model.cffffff, 1.6);
   sun.position.set(-2, 6, 5);
   scene.add(sun);

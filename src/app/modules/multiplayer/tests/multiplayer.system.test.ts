@@ -147,3 +147,37 @@ describe('stepMultiWorld', () => {
     expect(behind.pos.y).toBeCloseTo(ROOM_H + 1.5, 0);
   });
 });
+
+describe('placar', () => {
+  it('kill conta para quem matou; morte conta uma vez para quem morreu', () => {
+    const world = arena({ x: 8.5, y: 2.5 });
+    const enemy = addEnemy(world, 8.5, 4.5, Math.PI / 2);
+    enemy.hp = 1;
+    spawnProjectile(
+      world,
+      'player',
+      world.players[1].pos,
+      Math.PI / 2,
+      PLAYER_BULLET_SPEED,
+      50,
+      8,
+    ).by = 1;
+    for (let i = 0; i < 60; i++) updateProjectiles(world, FIXED_DT);
+    expect(world.players.map((p) => p.kills)).toEqual([0, 1]);
+
+    for (let i = 0; i < 2; i++) {
+      spawnProjectile(
+        world,
+        'enemy',
+        { x: 5.5, y: 4.5 },
+        -Math.PI / 2,
+        ENEMY_BULLET_SPEED,
+        PLAYER_MAX_HP,
+        8,
+      );
+      for (let step = 0; step < 60; step++) updateProjectiles(world, FIXED_DT);
+    }
+    // a segunda bala passa por um morto: nao conta de novo
+    expect(world.players.map((p) => p.deaths)).toEqual([1, 0]);
+  });
+});

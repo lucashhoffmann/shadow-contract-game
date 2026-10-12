@@ -12,6 +12,8 @@ import { useGameStore } from '@/app/store/game-store/game.store';
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
 import { Hud } from '@/resources/pages/game/components/hud.component';
 import { LegendDialog } from '@/resources/pages/game/components/legend-dialog.component';
+import { MatchMenu } from '@/resources/pages/game/components/match-menu.component';
+import { Scoreboard } from '@/resources/pages/game/components/scoreboard.component';
 import { ShopDialog } from '@/resources/pages/game/components/shop-dialog.component';
 import { GamePage } from '@/resources/pages/game/game.page';
 
@@ -625,4 +627,107 @@ it('HUD mostra uma cruz por ficha de revive guardada, e nada sem ficha', () => {
   expect(
     screen.getByRole('img', { name: 'Fichas de revive: 2' }).children,
   ).toHaveLength(2);
+});
+
+describe('partida em rede: placar e menu', () => {
+  const SCORES = [
+    {
+      id: 0,
+      name: 'Lucas',
+      color: '#ff8a3c',
+      kills: 2,
+      deaths: 1,
+      alive: true,
+      you: true,
+    },
+    {
+      id: 1,
+      name: 'Ana',
+      color: '#39d0ff',
+      kills: 5,
+      deaths: 0,
+      alive: false,
+      you: false,
+    },
+  ];
+
+  it('placar lista kills e mortes, quem matou mais em cima', () => {
+    const { rerender } = render(
+      <Scoreboard
+        open={false}
+        scores={SCORES}
+      />,
+    );
+    expect(screen.queryByRole('table')).toBeNull();
+    rerender(
+      <Scoreboard
+        open
+        scores={SCORES}
+      />,
+    );
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent('Ana');
+    expect(rows[0]).toHaveTextContent('5');
+    expect(rows[1]).toHaveTextContent('Lucas');
+    expect(rows[1]).toHaveAttribute('data-you', 'true');
+  });
+
+  it('menu: so o host ve Encerrar partida; todos podem sair', async () => {
+    const onEnd = vi.fn();
+    const onLeave = vi.fn();
+    const { rerender } = render(
+      <MatchMenu
+        open
+        host={false}
+        onResume={vi.fn()}
+        onEnd={onEnd}
+        onLeave={onLeave}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Encerrar partida' }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Sair da partida' }),
+    );
+    expect(onLeave).toHaveBeenCalled();
+
+    rerender(
+      <MatchMenu
+        open
+        host
+        onResume={vi.fn()}
+        onEnd={onEnd}
+        onLeave={onLeave}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Encerrar partida' }),
+    );
+    expect(onEnd).toHaveBeenCalled();
+  });
+
+  it('icone do placar no HUD so existe quando ha acao para ele', async () => {
+    const onScoreboard = vi.fn();
+    const { rerender } = render(
+      <Hud
+        previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
+        hud={HUD}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Ver placar' })).toBeNull();
+    rerender(
+      <Hud
+        previews={PREVIEWS}
+        arsenal={[]}
+        onSelectWeapon={vi.fn()}
+        hud={HUD}
+        onScoreboard={onScoreboard}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Ver placar' }));
+    expect(onScoreboard).toHaveBeenCalled();
+  });
 });

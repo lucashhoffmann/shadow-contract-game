@@ -44,7 +44,9 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.model.c1f2033);
-  scene.add(new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c444466, 1.8));
+  scene.add(
+    new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c444466, 1.8),
+  );
   const sun = new THREE.DirectionalLight(COLORS.model.cffffff, 1.4);
   sun.position.set(3, 10, 5);
   scene.add(sun);
@@ -64,6 +66,11 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       getWorld()?.status === 'playing'
     )
       event.preventDefault();
+    // Tab segurado mostra o placar; sem isto o foco sairia do jogo
+    if (event.code === 'Tab' && getWorld()) {
+      event.preventDefault();
+      useGameStore.getState().setScoreboard(true);
+    }
     if (event.repeat) return;
     if (event.code === 'KeyP') useGameStore.getState().togglePause();
     if (event.code === 'Enter') useGameStore.getState().begin();
@@ -99,9 +106,13 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
       return;
     }
   };
-  const onKeyUp = (event: KeyboardEvent) => keys.delete(event.code);
+  const onKeyUp = (event: KeyboardEvent) => {
+    keys.delete(event.code);
+    if (event.code === 'Tab') useGameStore.getState().setScoreboard(false);
+  };
   const onBlur = () => {
     keys.clear();
+    useGameStore.getState().setScoreboard(false);
     input.interact = false;
     input.open = false;
   };

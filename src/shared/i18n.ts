@@ -160,31 +160,48 @@ const pt = {
   },
   events: {
     contractStarted: 'Contrato iniciado.',
-    attackVariance: (min: number, max: number) => `Variação de ataque: ${min}% a ${max}% do dano base.`,
+    attackVariance: (min: number, max: number) =>
+      `Variação de ataque: ${min}% a ${max}% do dano base.`,
     idleEnemies: 'Inatividade: inimigos enviados.',
-    reviveUsed: (remaining: number) => `Ficha de revive usada: restam ${remaining}.`,
+    reviveUsed: (remaining: number) =>
+      `Ficha de revive usada: restam ${remaining}.`,
     contractEnded: (room: number) => `Contrato encerrado na sala ${room}.`,
     roomReached: (room: number) => `Sala ${room} alcancada.`,
-    enemyKilled: (ninja: boolean) => `${ninja ? 'Ninja' : 'Inimigo armado'} eliminado.`,
-    damageTaken: (lost: number, blocked: number) => lost
-      ? `Sofreu ${lost} de dano${blocked ? ` (${blocked} bloqueado pelo escudo)` : ''}.`
-      : `Escudo bloqueou ${blocked} de dano.`,
-    overkill: (damage: number) => `Overkill: execução agachado pelas costas, ${damage} de dano.`,
+    enemyKilled: (ninja: boolean) =>
+      `${ninja ? 'Ninja' : 'Inimigo armado'} eliminado.`,
+    damageTaken: (lost: number, blocked: number) =>
+      lost
+        ? `Sofreu ${lost} de dano${blocked ? ` (${blocked} bloqueado pelo escudo)` : ''}.`
+        : `Escudo bloqueou ${blocked} de dano.`,
+    overkill: (damage: number) =>
+      `Overkill: execução agachado pelas costas, ${damage} de dano.`,
     execution: (damage: number) => `Execução furtiva: ${damage} de dano.`,
-    hit: (source: string, damage: number) => `${source} acertou: ${damage} de dano.`,
-    missChance: (chance: number, peak: boolean) => `Chance de erro: ${chance}%${peak ? ' (pico)' : ''}.`,
+    hit: (source: string, damage: number) =>
+      `${source} acertou: ${damage} de dano.`,
+    missChance: (chance: number, peak: boolean) =>
+      `Chance de erro: ${chance}%${peak ? ' (pico)' : ''}.`,
     stabMissed: 'Facada errou.',
     shot: (item: string) => `Disparou ${item}.`,
     money: (amount: number) => `Coletou $${amount}.`,
-    reviveCollected: (count: number, max: number) => `Ficha de revive: ${count} de ${max}.`,
+    reviveCollected: (count: number, max: number) =>
+      `Ficha de revive: ${count} de ${max}.`,
     aim: (chance: number) => `Mira melhorada: headshot em ${chance}%.`,
-    ammo: (item: string, amount: number) => `Coletou municao de ${item}: +${amount}.`,
-    recoveredHealth: 'Recuperou vida', collectedShield: 'Coletou escudo',
+    ammo: (item: string, amount: number) =>
+      `Coletou municao de ${item}: +${amount}.`,
+    recoveredHealth: 'Recuperou vida',
+    collectedShield: 'Coletou escudo',
     recoveredDashes: 'Recuperou saltos',
     collected: (item: string, amount: number) => `${item}: +${amount}.`,
-    bought: (owned: boolean, item: string, price: number) => `${owned ? 'Recarregou' : 'Comprou'} ${item} por $${price}.`,
+    bought: (owned: boolean, item: string, price: number) =>
+      `${owned ? 'Recarregou' : 'Comprou'} ${item} por $${price}.`,
     shopVisited: (number: number) => `Loja ${number} visitada.`,
-    source: { stab: 'Facada', shot: 'Tiro', headshot: 'Headshot', execution: 'Execução', overkill: 'Overkill' },
+    source: {
+      stab: 'Facada',
+      shot: 'Tiro',
+      headshot: 'Headshot',
+      execution: 'Execução',
+      overkill: 'Overkill',
+    },
   },
   legend: {
     subtitle: 'Atravesse as salas sem ser visto.',
@@ -275,6 +292,21 @@ const pt = {
         ],
       },
     ],
+  },
+  match: {
+    title: 'Partida',
+    resume: 'Continuar',
+    end: 'Encerrar partida',
+    endNote: 'Encerra para todos e mostra o resultado.',
+    leave: 'Sair da partida',
+    scoreboard: 'Placar',
+    showScoreboard: 'Ver placar',
+    player: 'Jogador',
+    kills: 'Kills',
+    deaths: 'Mortes',
+    you: '(voce)',
+    dead: 'morto',
+    ended: 'O host encerrou a partida.',
   },
 };
 
@@ -433,31 +465,43 @@ const en: typeof pt = {
   },
   events: {
     contractStarted: 'Contract started.',
-    attackVariance: (min, max) => `Attack variation: ${min}% to ${max}% of base damage.`,
+    attackVariance: (min, max) =>
+      `Attack variation: ${min}% to ${max}% of base damage.`,
     idleEnemies: 'Idle warning: enemies sent.',
     reviveUsed: (remaining) => `Revive token used: ${remaining} left.`,
     contractEnded: (room) => `Contract ended in room ${room}.`,
     roomReached: (room) => `Reached room ${room}.`,
     enemyKilled: (ninja) => `${ninja ? 'Ninja' : 'Armed enemy'} eliminated.`,
-    damageTaken: (lost, blocked) => lost
-      ? `Took ${lost} damage${blocked ? ` (${blocked} blocked by shield)` : ''}.`
-      : `Shield blocked ${blocked} damage.`,
-    overkill: (damage) => `Overkill: crouching execution from behind, ${damage} damage.`,
+    damageTaken: (lost, blocked) =>
+      lost
+        ? `Took ${lost} damage${blocked ? ` (${blocked} blocked by shield)` : ''}.`
+        : `Shield blocked ${blocked} damage.`,
+    overkill: (damage) =>
+      `Overkill: crouching execution from behind, ${damage} damage.`,
     execution: (damage) => `Stealth execution: ${damage} damage.`,
     hit: (source, damage) => `${source} hit: ${damage} damage.`,
-    missChance: (chance, peak) => `Miss chance: ${chance}%${peak ? ' (peak)' : ''}.`,
+    missChance: (chance, peak) =>
+      `Miss chance: ${chance}%${peak ? ' (peak)' : ''}.`,
     stabMissed: 'Stab missed.',
     shot: (item) => `Fired ${item}.`,
     money: (amount) => `Collected $${amount}.`,
     reviveCollected: (count, max) => `Revive tokens: ${count} of ${max}.`,
     aim: (chance) => `Aim improved: headshot chance ${chance}%.`,
     ammo: (item, amount) => `Collected ${item} ammo: +${amount}.`,
-    recoveredHealth: 'Restored health', collectedShield: 'Collected shield',
+    recoveredHealth: 'Restored health',
+    collectedShield: 'Collected shield',
     recoveredDashes: 'Restored dashes',
     collected: (item, amount) => `${item}: +${amount}.`,
-    bought: (owned, item, price) => `${owned ? 'Reloaded' : 'Bought'} ${item} for $${price}.`,
+    bought: (owned, item, price) =>
+      `${owned ? 'Reloaded' : 'Bought'} ${item} for $${price}.`,
     shopVisited: (number) => `Visited shop ${number}.`,
-    source: { stab: 'Stab', shot: 'Shot', headshot: 'Headshot', execution: 'Execution', overkill: 'Overkill' },
+    source: {
+      stab: 'Stab',
+      shot: 'Shot',
+      headshot: 'Headshot',
+      execution: 'Execution',
+      overkill: 'Overkill',
+    },
   },
   legend: {
     subtitle: 'Cross the rooms without being seen.',
@@ -528,6 +572,21 @@ const en: typeof pt = {
       },
     ],
   },
+  match: {
+    title: 'Match',
+    resume: 'Resume',
+    end: 'End match',
+    endNote: 'Ends it for everyone and shows the result.',
+    leave: 'Leave match',
+    scoreboard: 'Scoreboard',
+    showScoreboard: 'Show scoreboard',
+    player: 'Player',
+    kills: 'Kills',
+    deaths: 'Deaths',
+    you: '(you)',
+    dead: 'dead',
+    ended: 'The host ended the match.',
+  },
 };
 
 type Language = 'pt-BR' | 'en';
@@ -545,15 +604,28 @@ export const useLanguage = create<{
         set({ language });
       },
     }),
-    { name: 'shadow-contract-language' },
+    {
+      name: 'shadow-contract-language',
+      merge: (saved, current) => ({
+        ...current,
+        language:
+          (saved as { language?: unknown })?.language === 'en' ? 'en' : 'pt-BR',
+      }),
+    },
   ),
 );
 
 export const getTexts = () => texts[useLanguage.getState().language];
 export const useTexts = () => texts[useLanguage((state) => state.language)];
 
+export function eventText(format: (words: typeof pt) => string) {
+  return { text: format(pt), en: format(en) };
+}
+
 export function translateSessionError(error: string): string {
-  const key = (Object.keys(pt.lobby.errors) as (keyof typeof pt.lobby.errors)[])
-    .find((candidate) => pt.lobby.errors[candidate] === error);
+  // shortcut: unknown server errors stay in their original language; add a protocol code with the next new error.
+  const key = (
+    Object.keys(pt.lobby.errors) as (keyof typeof pt.lobby.errors)[]
+  ).find((candidate) => pt.lobby.errors[candidate] === error);
   return key ? getTexts().lobby.errors[key] : error;
 }

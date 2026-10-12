@@ -8,7 +8,6 @@ const AMMO_MAX = 30;
 export const ITEMS: Record<ItemId, ItemDef> = {
   pistol: {
     id: 'pistol',
-    name: 'Pistola',
     kind: 'weapon',
     price: 200,
     damage: 30,
@@ -21,7 +20,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   // mesmos numeros da pistola; o tiro nao chama inimigos (combat.system)
   silenced: {
     id: 'silenced',
-    name: 'Pistola silenciada',
     kind: 'weapon',
     price: 260,
     damage: 30,
@@ -33,7 +31,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   },
   shotgun: {
     id: 'shotgun',
-    name: 'Escopeta',
     kind: 'weapon',
     price: 450,
     // chumbo fraco: so vale de perto, com varias balas acertando
@@ -46,7 +43,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   },
   armor: {
     id: 'armor',
-    name: 'Colete',
     kind: 'armor',
     price: 250,
     damage: 0,

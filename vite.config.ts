@@ -3,12 +3,18 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { COLORS } from './src/shared/colors.ts';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: 'game-theme-color',
+      transformIndexHtml: (html) =>
+        html.replace('__GAME_THEME_COLOR__', COLORS.ui.background),
+    },
     // App instalavel (PWA): manifesto e service worker gerados no build.
     // 'prompt': a versao nova fica esperando e quem aplica e src/resources/pwa.ts,
     // so com o jogador na tela inicial.
@@ -22,8 +28,8 @@ export default defineConfig({
         lang: 'pt-BR',
         start_url: '/',
         display: 'fullscreen',
-        background_color: '#1f2033',
-        theme_color: '#1f2033',
+        background_color: COLORS.ui.background,
+        theme_color: COLORS.ui.background,
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon.png', sizes: '512x512', type: 'image/png' },

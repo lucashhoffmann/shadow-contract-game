@@ -32,6 +32,7 @@ import {
   stepWorld,
   togglePause as toggleWorldPause,
 } from '@/app/modules/world/systems/world.system';
+import { eventText } from '@/shared/i18n';
 import type {
   AttackVariance,
   EnemyIntelligence,
@@ -83,6 +84,18 @@ export type Hud = {
   ammo: number;
   // chance de headshot das balas, em porcentagem inteira
   headshot: number;
+};
+
+// linha do placar: um jogador da partida
+export type Score = {
+  id: number;
+  name: string;
+  color: string | null;
+  kills: number;
+  deaths: number;
+  alive: boolean;
+  // e o jogador deste navegador
+  you: boolean;
 };
 
 // aparencia do player: so visual, nao entra no World
@@ -187,6 +200,18 @@ type GameStore = {
   look: PlayerLook;
   bloodColor: string;
   idleWarnings: number;
+  // placar da partida, um por jogador
+  scores: Score[];
+  // placar aberto (Tab segurado ou icone)
+  scoreboard: boolean;
+  // partida em rede e papel deste navegador nela
+  online: boolean;
+  host: boolean;
+  // menu da partida em rede aberto; o jogo continua por baixo
+  menu: boolean;
+  setScoreboard: (open: boolean) => void;
+  // host: acaba a partida para todos e mostra o resultado
+  endMatch: () => void;
   intelligence: Record<number, EnemyIntelligence>;
   attackVariance: AttackVariance | null;
   setLook: (patch: Partial<PlayerLook>) => void;
@@ -294,6 +319,8 @@ export const useGameStore = create<GameStore>()(
       // so chama set quando algo visivel mudou, para a UI nao renderizar a 60 Hz
       // assinatura do arsenal ja publicado: so copia de novo quando muda
       let arsenalKey = '';
+      // assinatura do placar ja publicado
+      let sentScores = '';
       const sync = () => {
         if (!world) return;
         const hud = readHud(world);
@@ -301,6 +328,9 @@ export const useGameStore = create<GameStore>()(
           .map((weapon) => `${weapon.id}:${weapon.ammo}`)
           .join();
         const screen = SCREEN_BY_STATUS[world.status];
+        const scoreKey = world.players
+          .map((p) => `${p.kills}/${p.deaths}/${p.hp > 0}`)
+          .join();
         const prev = get();
         const changed =
           screen !== prev.screen ||
@@ -309,10 +339,26 @@ export const useGameStore = create<GameStore>()(
           world.intelligence !== prev.intelligence ||
           world.run.attackVariance !== prev.attackVariance ||
           world.run.idleWarnings !== prev.idleWarnings ||
+          scoreKey !== sentScores ||
           (Object.keys(hud) as (keyof Hud)[]).some(
             (key) => hud[key] !== prev.hud[key],
           );
         if (!changed) return;
+        if (scoreKey !== sentScores) {
+          sentScores = scoreKey;
+          const you = world.player;
+          set({
+            scores: world.players.map((p) => ({
+              id: p.id,
+              name: p.name,
+              color: p.color,
+              kills: p.kills,
+              deaths: p.deaths,
+              alive: p.hp > 0,
+              you: p === you,
+            })),
+          });
+        }
         if (key !== arsenalKey) {
           arsenalKey = key;
           set({
@@ -326,6 +372,8 @@ export const useGameStore = create<GameStore>()(
           intelligence: world.intelligence,
           attackVariance: world.run.attackVariance,
           idleWarnings: world.run.idleWarnings,
+          // fim de partida fecha o menu
+          menu: screen === 'playing' && prev.menu,
           // recorde e do solo: sala de multiplayer nao conta
           best: multi ? prev.best : Math.max(prev.best, hud.room),
         });
@@ -346,6 +394,24 @@ export const useGameStore = create<GameStore>()(
         look: DEFAULT_LOOK,
         bloodColor: DEFAULT_BLOOD_COLOR,
         idleWarnings: 0,
+        scores: [],
+        scoreboard: false,
+        online: false,
+        host: false,
+        menu: false,
+        setScoreboard: (open) => {
+          if (open !== get().scoreboard) set({ scoreboard: open });
+        },
+        endMatch: () => {
+          if (!world || !multi?.host || world.status !== 'playing') return;
+          world.status = 'dead';
+          world.run.events.push({
+            at: world.run.seconds,
+            ...eventText((t) => t.match.ended),
+          });
+          publish();
+          sync();
+        },
         intelligence: {},
         attackVariance: null,
         // so antes da run: a engine le `look` uma vez, ao criar o renderer
@@ -371,6 +437,8 @@ export const useGameStore = create<GameStore>()(
             sentRooms: '',
             sentInput: '',
           };
+          sentScores = '';
+          set({ online: true, host: link.host, menu: false, scores: [] });
           setJoystickInput(0, 0);
           if (link.host) {
             world = createMultiWorld(seed, seats);
@@ -397,6 +465,8 @@ export const useGameStore = create<GameStore>()(
         startRun: (seed = Date.now()) => {
           multi?.leave();
           multi = null;
+          sentScores = '';
+          set({ online: false, host: false, menu: false });
           world = createWorld(seed, get().intelligence, get().attackVariance);
           world.status = 'intro';
           setJoystickInput(0, 0);
@@ -408,8 +478,12 @@ export const useGameStore = create<GameStore>()(
           sync();
         },
         togglePause: () => {
-          // multiplayer nao pausa: o jogo e de todos
-          if (!world || multi) return;
+          // multiplayer nao pausa, o jogo e de todos: abre o menu por cima
+          if (multi) {
+            if (get().screen === 'playing') set({ menu: !get().menu });
+            return;
+          }
+          if (!world) return;
           toggleWorldPause(world);
           sync();
         },
@@ -461,6 +535,8 @@ export const useGameStore = create<GameStore>()(
           multi?.leave();
           multi = null;
           world = null;
+          sentScores = '';
+          set({ online: false, host: false, menu: false, scoreboard: false });
           set({ screen: 'menu' });
         },
       };

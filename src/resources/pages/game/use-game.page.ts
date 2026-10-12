@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import { createGameEngine } from '@/app/engine/game-engine';
 import { renderWeaponPreviews } from '@/app/engine/weapon-preview';
 import { useGameStore } from '@/app/store/game-store/game.store';
-import { useSessionStore } from '@/app/store/session-store/session.store';
 import { useTexts } from '@/shared/i18n';
 
 export function useGamePage() {
@@ -23,8 +22,15 @@ export function useGamePage() {
   const togglePause = useGameStore((state) => state.togglePause);
   const backToMenu = useGameStore((state) => state.backToMenu);
   const openLobby = useGameStore((state) => state.openLobby);
-  // partida em rede: nao pausa, e jogar de novo volta para as sessoes
-  const online = useSessionStore((state) => state.status === 'playing');
+  // partida em rede: nao pausa (P abre o menu), e jogar de novo volta para
+  // as sessoes
+  const online = useGameStore((state) => state.online);
+  const host = useGameStore((state) => state.host);
+  const menu = useGameStore((state) => state.menu);
+  const endMatch = useGameStore((state) => state.endMatch);
+  const scores = useGameStore((state) => state.scores);
+  const scoreboard = useGameStore((state) => state.scoreboard);
+  const setScoreboard = useGameStore((state) => state.setScoreboard);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -82,7 +88,17 @@ export function useGamePage() {
     buy,
     closeShop,
     restart,
-    pause: online ? undefined : togglePause,
+    pause: togglePause,
+    online,
+    host,
+    menu,
+    endMatch,
+    // sair da partida em rede: volta para as sessoes
+    leaveMatch: restart,
+    scores,
+    scoreboard,
+    // icone do placar: liga e desliga (no teclado e o Tab segurado)
+    toggleScoreboard: () => setScoreboard(!scoreboard),
     backToMenu,
   };
 }

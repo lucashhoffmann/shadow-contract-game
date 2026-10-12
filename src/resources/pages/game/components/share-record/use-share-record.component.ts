@@ -56,12 +56,7 @@ function drawCard(
   line('CONTRACT', 660, 230, COLORS.ui.brandPink);
   line(getTexts().share.myRecord, 980, 96, COLORS.ui.highlight);
   line(getTexts().share.room(best), 1220, 330, COLORS.ui.white);
-  line(
-    getTexts().share.run(room, kills),
-    1470,
-    60,
-    COLORS.ui.cardText,
-  );
+  line(getTexts().share.run(room, kills), 1470, 60, COLORS.ui.cardText);
   line(getTexts().share.challenge, 1690, 84, COLORS.ui.success);
 }
 

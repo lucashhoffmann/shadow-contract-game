@@ -8,6 +8,8 @@ import { VirtualJoystick } from '@/resources/components/base/virtual-joystick/vi
 import { DamageVignette } from '@/resources/pages/game/components/damage-vignette.component';
 import { GameOverDialog } from '@/resources/pages/game/components/game-over-dialog.component';
 import { Hud } from '@/resources/pages/game/components/hud.component';
+import { MatchMenu } from '@/resources/pages/game/components/match-menu.component';
+import { Scoreboard } from '@/resources/pages/game/components/scoreboard.component';
 import { LegendDialog } from '@/resources/pages/game/components/legend-dialog.component';
 import { ShopDialog } from '@/resources/pages/game/components/shop-dialog.component';
 import { useGamePage } from '@/resources/pages/game/use-game.page';
@@ -29,6 +31,14 @@ export function GamePage() {
     closeShop,
     restart,
     pause,
+    online,
+    host,
+    menu,
+    endMatch,
+    leaveMatch,
+    scores,
+    scoreboard,
+    toggleScoreboard,
     backToMenu,
   } = useGamePage();
 
@@ -49,6 +59,20 @@ export function GamePage() {
         previews={previews}
         onSelectWeapon={selectWeapon}
         onPause={screen === 'playing' ? pause : undefined}
+        onScoreboard={
+          online && screen === 'playing' ? toggleScoreboard : undefined
+        }
+      />
+      <Scoreboard
+        open={scoreboard && screen === 'playing'}
+        scores={scores}
+      />
+      <MatchMenu
+        open={menu}
+        host={host}
+        onResume={pause}
+        onEnd={endMatch}
+        onLeave={leaveMatch}
       />
       {screen === 'playing' && (
         <VirtualJoystick

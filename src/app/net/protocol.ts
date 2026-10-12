@@ -8,7 +8,12 @@ import { COLORS } from '@/shared/colors';
 export const MAX_PLAYERS = 4;
 export const NAME_MAX = 16;
 // cor de cada jogador, pela ordem de entrada
-export const PLAYER_COLORS = [COLORS.ui.playerOrange, COLORS.ui.playerCyan, COLORS.ui.playerMint, COLORS.ui.playerPink];
+export const PLAYER_COLORS = [
+  COLORS.ui.playerOrange,
+  COLORS.ui.playerCyan,
+  COLORS.ui.playerMint,
+  COLORS.ui.playerPink,
+];
 
 export type PlayerInfo = {
   id: string;

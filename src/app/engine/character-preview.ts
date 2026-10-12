@@ -32,7 +32,9 @@ export function createCharacterPreview(
   // mesma luz e fundo do jogo, para a cor do preview ser a cor da run
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.model.c1f2033);
-  scene.add(new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c444466, 1.8));
+  scene.add(
+    new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c444466, 1.8),
+  );
   const sun = new THREE.DirectionalLight(COLORS.model.cffffff, 1.4);
   sun.position.set(3, 10, 5);
   scene.add(sun);

@@ -6,12 +6,14 @@ import {
   useGameStore,
 } from '@/app/store/game-store/game.store';
 import { HomePage } from '@/resources/pages/home/home.page';
+import { useLanguage } from '@/shared/i18n';
 
 // servidor de salas: cada teste diz se esta no ar
 const { pingServer } = vi.hoisted(() => ({ pingServer: vi.fn() }));
 vi.mock('@/app/net/session.client', () => ({ pingServer }));
 
 beforeEach(() => {
+  useLanguage.getState().setLanguage('pt-BR');
   pingServer.mockResolvedValue(false);
   useGameStore.getState().backToMenu();
   useGameStore.setState({ best: 0, bloodColor: DEFAULT_BLOOD_COLOR });
@@ -55,6 +57,20 @@ describe('HomePage', () => {
       target: { value: '#22aa44' },
     });
     expect(useGameStore.getState().bloodColor).toBe('#22aa44');
+  });
+
+  it('troca o idioma e atualiza os textos da tela', async () => {
+    render(<HomePage />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Configurações' }),
+    );
+    await userEvent.selectOptions(screen.getByLabelText('Idioma'), 'en');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(
+      screen.getByRole('button', { name: 'Customize character' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Best: room 0')).toBeInTheDocument();
+    expect(useLanguage.getState().language).toBe('en');
   });
 });
 

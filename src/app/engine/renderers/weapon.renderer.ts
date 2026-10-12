@@ -218,7 +218,12 @@ function pistol({ paint, add }: Kit, silenced: boolean): void {
   add(rod(0.16, 0.12), black, PISTOL_MUZZLE_X + 0.1, PISTOL_BORE_Y);
   add(rod(0.145, 1.3), tube, PISTOL_MUZZLE_X + 0.1, PISTOL_BORE_Y);
   add(rod(0.16, 0.06), black, PISTOL_MUZZLE_X + 1.36, PISTOL_BORE_Y);
-  add(rod(0.06, 0.01), paint(COLORS.model.c050506), PISTOL_MUZZLE_X + 1.42, PISTOL_BORE_Y);
+  add(
+    rod(0.06, 0.01),
+    paint(COLORS.model.c050506),
+    PISTOL_MUZZLE_X + 1.42,
+    PISTOL_BORE_Y,
+  );
 }
 
 // escopeta de dois canos lado a lado, serrada
@@ -237,7 +242,13 @@ function shotgun({ paint, add }: Kit): void {
   for (const side of [1, -1]) {
     const z = side * BARREL_Z;
     add(rod(BARREL_R, length), barrel, barrelX, barrelY, z);
-    add(rod(0.085, 0.01), paint(COLORS.model.c050506), barrelX + length, barrelY, z);
+    add(
+      rod(0.085, 0.01),
+      paint(COLORS.model.c050506),
+      barrelX + length,
+      barrelY,
+      z,
+    );
     // caes
     add(
       plate(

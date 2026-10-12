@@ -16,6 +16,8 @@ export const COLORS = {
     destructive: '#ef4444',
     foreground: '#f4f4fb',
     headshot: '#ff9a1f',
+    homeDeep: '#12131f',
+    homeGlow: '#3a3f78',
     highlight: '#ffd21f',
     hudPanel: '#1b1d3a',
     info: '#3b82f6',
@@ -60,7 +62,6 @@ export const COLORS = {
     c444466: 0x444466,
     c464a50: 0x464a50,
     c4a4f6a: 0x4a4f6a,
-    c51f15e: 0x51f15e,
     c555566: 0x555566,
     c594f2c: 0x594f2c,
     c5a3d34: 0x5a3d34,
@@ -104,9 +105,3 @@ export const COLORS = {
     cffffff: 0xffffff,
   },
 } as const;
-
-export function applyColors(): void {
-  for (const [name, color] of Object.entries(COLORS.ui)) {
-    document.documentElement.style.setProperty(`--game-${name}`, color);
-  }
-}

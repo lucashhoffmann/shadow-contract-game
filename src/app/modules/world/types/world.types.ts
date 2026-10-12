@@ -151,7 +151,6 @@ export type ItemId = WeaponId | 'armor';
 
 export type ItemDef = {
   id: ItemId;
-  name: string;
   kind: 'weapon' | 'armor';
   price: number;
   // dano base de cada bala, antes do sorteio e da distancia
@@ -178,6 +177,9 @@ export type Player = {
   color: string | null;
   // carteira: cada jogador pega e gasta o proprio dinheiro
   money: number;
+  // placar: inimigos que matou e vezes que morreu nesta partida
+  kills: number;
+  deaths: number;
   pos: Vec2;
   facing: number;
   hp: number;
@@ -239,7 +241,7 @@ export type Run = {
     damageBlocked: number;
     healthRecovered: number;
   };
-  events: { at: number; text: string }[];
+  events: { at: number; text: string; en?: string }[];
 };
 
 // solo: um jogador, regras de `stepWorld`. multi: ate 4, `stepMultiWorld`

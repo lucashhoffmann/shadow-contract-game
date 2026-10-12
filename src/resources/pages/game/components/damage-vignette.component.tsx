@@ -13,8 +13,9 @@ export function DamageVignette({ hits, color = 'red' }: DamageVignetteProps) {
       data-testid={color === 'blue' ? 'idle-vignette' : 'damage-vignette'}
       className='animate-damage pointer-events-none absolute inset-0 opacity-0'
       style={{
-        background: `radial-gradient(ellipse at center, transparent 50%, ${color === 'blue' ? 'rgb(59 130 246 / 0.65)' : 'rgb(239 68 68 / 0.65)'} 100%)`,
+        background: `radial-gradient(ellipse at center, transparent 50%, color-mix(in srgb, ${color === 'blue' ? COLORS.ui.info : COLORS.ui.destructive} 65%, transparent) 100%)`,
       }}
     />
   );
 }
+import { COLORS } from '@/shared/colors';

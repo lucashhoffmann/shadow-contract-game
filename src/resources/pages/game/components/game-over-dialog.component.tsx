@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/resources/components/ui/dialog';
 import { ShareRecord } from '@/resources/pages/game/components/share-record/share-record.component';
-import { useTexts } from '@/shared/i18n';
+import { useLanguage, useTexts } from '@/shared/i18n';
 
 type GameOverDialogProps = {
   open: boolean;
@@ -34,6 +34,7 @@ export function GameOverDialog({
   onMenu,
 }: GameOverDialogProps) {
   const t = useTexts();
+  const language = useLanguage((state) => state.language);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const attempts = run?.stats.meleeAttempts ?? 0;
   const hits = run?.stats.meleeHits ?? 0;
@@ -56,7 +57,9 @@ export function GameOverDialog({
         <DialogHeader className='items-center gap-3'>
           <DialogTitle className='text-outline flex flex-col text-5xl leading-none tracking-wide uppercase sm:text-6xl'>
             <span className='text-white'>{t.game.you}</span>{' '}
-            <span className='text-[1.2em] text-[var(--game-brandPink)]'>{t.game.died}</span>
+            <span className='text-[1.2em] text-[var(--game-brandPink)]'>
+              {t.game.died}
+            </span>
           </DialogTitle>
           <Skull
             aria-hidden
@@ -121,19 +124,31 @@ export function GameOverDialog({
             {run && (
               <>
                 <div className='grid grid-cols-2 gap-2 text-sm sm:grid-cols-3'>
-                  <p>{t.game.time}: {time(run.seconds)}</p>
-                  <p>{t.common.room}: {run.roomIndex}</p>
-                  <p>{t.game.kills}: {run.kills}</p>
+                  <p>
+                    {t.game.time}: {time(run.seconds)}
+                  </p>
+                  <p>
+                    {t.common.room}: {run.roomIndex}
+                  </p>
+                  <p>
+                    {t.game.kills}: {run.kills}
+                  </p>
                   <p>{`${t.game.attackStrength}: ${Math.round(run.attackVariance.min * 100)}%–${Math.round(run.attackVariance.max * 100)}%`}</p>
-                  <p>{t.game.damageDealt}: {run.stats.damageDealt}</p>
-                  <p>{t.game.stabs}: {attempts}</p>
+                  <p>
+                    {t.game.damageDealt}: {run.stats.damageDealt}
+                  </p>
+                  <p>
+                    {t.game.stabs}: {attempts}
+                  </p>
                   <p>
                     {t.game.hits}: {hits} ({rate(hits, attempts)})
                   </p>
                   <p>
                     {t.game.misses}: {misses} ({rate(misses, attempts)})
                   </p>
-                  <p>{t.game.projectiles}: {projectilesFired}</p>
+                  <p>
+                    {t.game.projectiles}: {projectilesFired}
+                  </p>
                   <p>
                     {t.game.shotHits}: {projectilesHit} (
                     {rate(projectilesHit, projectilesFired)})
@@ -142,11 +157,21 @@ export function GameOverDialog({
                     {t.game.shotMisses}: {projectileMisses} (
                     {rate(projectileMisses, projectilesFired)})
                   </p>
-                  <p>{t.game.healthRecovered}: {run.stats.healthRecovered}</p>
-                  <p>{t.game.damageTaken}: {run.stats.damageTaken}</p>
-                  <p>{t.game.damageBlocked}: {run.stats.damageBlocked}</p>
-                  <p>{t.game.moneyCollected}: ${run.earned}</p>
-                  <p>{t.game.shopsVisited}: {run.shops}</p>
+                  <p>
+                    {t.game.healthRecovered}: {run.stats.healthRecovered}
+                  </p>
+                  <p>
+                    {t.game.damageTaken}: {run.stats.damageTaken}
+                  </p>
+                  <p>
+                    {t.game.damageBlocked}: {run.stats.damageBlocked}
+                  </p>
+                  <p>
+                    {t.game.moneyCollected}: ${run.earned}
+                  </p>
+                  <p>
+                    {t.game.shopsVisited}: {run.shops}
+                  </p>
                 </div>
                 <section className='space-y-1 text-sm'>
                   <h3 className='font-semibold'>{t.game.insights}</h3>
@@ -171,7 +196,9 @@ export function GameOverDialog({
                         <span className='text-muted-foreground'>
                           {time(event.at)}
                         </span>{' '}
-                        {event.text}
+                        {language === 'en'
+                          ? (event.en ?? event.text)
+                          : event.text}
                       </li>
                     ))}
                   </ol>
@@ -179,7 +206,9 @@ export function GameOverDialog({
               </>
             )}
             <DialogFooter>
-              <Button onClick={() => setAnalysisOpen(false)}>{t.common.back}</Button>
+              <Button onClick={() => setAnalysisOpen(false)}>
+                {t.common.back}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

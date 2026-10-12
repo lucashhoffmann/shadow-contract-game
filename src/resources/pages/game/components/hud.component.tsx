@@ -1,4 +1,4 @@
-import { ChevronsRight, Cross, Pause } from 'lucide-react';
+import { ChevronsRight, Cross, ListOrdered, Pause } from 'lucide-react';
 
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import {
@@ -91,6 +91,8 @@ type HudProps = {
   previews: Record<WeaponId | 'sword', string>;
   // botao de pausa no cabecalho (no toque nao ha tecla P); sem ele, some
   onPause?: () => void;
+  // botao do placar (no toque nao ha Tab); sem ele, some
+  onScoreboard?: () => void;
 };
 
 // arma na mao: foto do modelo, nome e, se for de fogo, balas restantes.
@@ -190,6 +192,7 @@ export function Hud({
   previews,
   onSelectWeapon,
   onPause,
+  onScoreboard,
 }: HudProps) {
   const t = useTexts();
   // escudo soma na barra: ela passa a medir vida maxima + escudo, com a
@@ -261,6 +264,20 @@ export function Hud({
           <p>{t.game.room(hud.room)}</p>
           <p className='text-green-400'>$ {hud.money}</p>
         </div>
+        {onScoreboard && (
+          <button
+            type='button'
+            aria-label={t.match.showScoreboard}
+            onClick={onScoreboard}
+            className='pointer-events-auto flex size-11 cursor-pointer items-center justify-center rounded-xl border-4 border-white bg-[var(--game-secondary)] text-white shadow-[0_4px_0_var(--game-ink)] transition-transform active:translate-y-1 active:shadow-none'
+          >
+            <ListOrdered
+              aria-hidden
+              className='size-5'
+              strokeWidth={3}
+            />
+          </button>
+        )}
         {onPause && (
           <button
             type='button'

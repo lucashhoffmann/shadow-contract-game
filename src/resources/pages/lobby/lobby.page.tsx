@@ -35,7 +35,7 @@ export function LobbyPage() {
   } = useLobbyPage();
 
   return (
-    <main className='font-display relative flex min-h-full flex-col items-center gap-5 overflow-y-auto bg-[radial-gradient(ellipse_at_50%_30%,#3a3f78_0%,#1f2033_55%,#12131f_100%)] p-6 pt-16 text-center'>
+    <main className='game-menu-background font-display relative flex min-h-full flex-col items-center gap-5 overflow-y-auto p-6 pt-16 text-center'>
       <button
         type='button'
         className={`${CHUNKY} absolute top-3 left-3 bg-[var(--game-secondary)] text-base`}
@@ -91,7 +91,9 @@ export function LobbyPage() {
         {status === 'lobby' && (
           <>
             <section className={PANEL}>
-              <h2 className='text-xl text-[var(--game-highlight)] uppercase'>{t.lobby.createSession}</h2>
+              <h2 className='text-xl text-[var(--game-highlight)] uppercase'>
+                {t.lobby.createSession}
+              </h2>
               <div className='grid grid-cols-2 gap-3'>
                 <button
                   type='button'
@@ -226,9 +228,7 @@ export function LobbyPage() {
             </ul>
             <p className='font-sans text-sm text-white/70'>
               {t.lobby.playerCount(session.players.length, MAX_PLAYERS)}{' '}
-              {you?.host
-                ? t.lobby.hostHint
-                : t.lobby.guestHint}
+              {you?.host ? t.lobby.hostHint : t.lobby.guestHint}
             </p>
             <div className='grid grid-cols-2 gap-3'>
               <button

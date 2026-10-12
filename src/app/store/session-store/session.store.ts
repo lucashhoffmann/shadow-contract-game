@@ -47,7 +47,8 @@ export const useSessionStore = create<SessionStore>()(
   persist(
     (set, get) => {
       const entered = (result: Joined | { ok: false; error: string }) => {
-        if (!result.ok) return set({ error: translateSessionError(result.error) });
+        if (!result.ok)
+          return set({ error: translateSessionError(result.error) });
         set({
           status: 'room',
           session: result.session,

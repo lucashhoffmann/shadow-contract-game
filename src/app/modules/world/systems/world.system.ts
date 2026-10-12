@@ -1,4 +1,3 @@
-import { COLORS } from '@/shared/colors';
 import {
   collectPickups,
   meleeTarget,
@@ -6,7 +5,7 @@ import {
   updateFloaters,
   updateProjectiles,
 } from '@/app/modules/combat/systems/combat.system';
-import { getTexts } from '@/shared/i18n';
+import { eventText } from '@/shared/i18n';
 import {
   createEnemy,
   updateEnemies,
@@ -71,6 +70,8 @@ export function createPlayer(
     name,
     color,
     money: 0,
+    kills: 0,
+    deaths: 0,
     pos: startPoint(),
     facing: Math.PI / 2,
     hp: PLAYER_MAX_HP,
@@ -99,7 +100,7 @@ export function createEmptyWorld(
   mode: WorldMode = 'solo',
 ): World {
   setRoomSize(mode);
-  const attackRng = { rngState: seed ^ COLORS.model.c51f15e };
+  const attackRng = { rngState: seed ^ 0x51f15e };
   const attackVariance = savedAttackVariance ?? {
     // minimo nunca abaixo do dano base: dois golpes sempre matam
     min: (100 + Math.floor(nextRandom(attackRng) * 11)) / 100,
@@ -144,10 +145,15 @@ export function createEmptyWorld(
         healthRecovered: 0,
       },
       events: [
-        { at: 0, text: getTexts().events.contractStarted },
+        { at: 0, ...eventText((t) => t.events.contractStarted) },
         {
           at: 0,
-          text: getTexts().events.attackVariance(Math.round(attackVariance.min * 100), Math.round(attackVariance.max * 100)),
+          ...eventText((t) =>
+            t.events.attackVariance(
+              Math.round(attackVariance.min * 100),
+              Math.round(attackVariance.max * 100),
+            ),
+          ),
         },
       ],
     },
@@ -228,7 +234,10 @@ function updateIdlePressure(world: World, before: Vec2): void {
     return;
   run.lastIdleWarningAt = run.seconds;
   run.idleWarnings++;
-  run.events.push({ at: run.seconds, text: getTexts().events.idleEnemies });
+  run.events.push({
+    at: run.seconds,
+    ...eventText((t) => t.events.idleEnemies),
+  });
   sendIdleEnemy(world);
 }
 
@@ -253,7 +262,7 @@ function revive(world: World): void {
   world.projectiles = world.projectiles.filter((p) => p.owner === 'player');
   run.events.push({
     at: run.seconds,
-    text: getTexts().events.reviveUsed(run.revives),
+    ...eventText((t) => t.events.reviveUsed(run.revives)),
   });
 }
 
@@ -290,7 +299,7 @@ export function stepWorld(world: World, input: InputState, dt: number): void {
     world.status = 'dead';
     world.run.events.push({
       at: world.run.seconds,
-      text: getTexts().events.contractEnded(world.run.roomIndex),
+      ...eventText((t) => t.events.contractEnded(world.run.roomIndex)),
     });
   }
 }

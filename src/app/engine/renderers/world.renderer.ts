@@ -1,4 +1,5 @@
 import { COLORS } from '@/shared/colors';
+import { getTexts } from '@/shared/i18n';
 import * as THREE from 'three';
 
 import {
@@ -125,7 +126,10 @@ const FLOATER_RISE = 0.8;
 const FLOATER_POP = 1.45;
 const FLOATER_POP_END = 0.18;
 // destaques escritos sobre o numero, e a cor de cada um
-const FLOATER_BANNER = { HEADSHOT: COLORS.ui.headshot, OVERKILL: COLORS.ui.overkill };
+const FLOATER_BANNER = {
+  HEADSHOT: COLORS.ui.headshot,
+  OVERKILL: COLORS.ui.overkill,
+};
 // cor pelo tamanho do golpe: forte em vermelho, medio em amarelo, fraco em
 // verde; erro em claro, para nao parecer acerto
 const FLOATER_STRONG = 30;
@@ -756,7 +760,10 @@ export function createWorldRenderer(
     cabinetDark: lambert(COLORS.model.ca94f33),
     barrel: lambert(COLORS.model.c8b2f3a),
     pot: lambert(COLORS.model.c9c4a2a),
-    leaf: new THREE.MeshLambertMaterial({ color: COLORS.model.c3f9a4a, flatShading: true }),
+    leaf: new THREE.MeshLambertMaterial({
+      color: COLORS.model.c3f9a4a,
+      flatShading: true,
+    }),
     prompt: lambert(COLORS.model.cffe066),
     promptSide: lambert(COLORS.model.cd9931f),
     promptBorder: flat(COLORS.model.c1b1d3a),
@@ -971,7 +978,8 @@ export function createWorldRenderer(
     // destaque em cima do numero: 'HEADSHOT' ou 'OVERKILL'
     banner?: keyof typeof FLOATER_BANNER,
   ): THREE.Texture | null {
-    const text = amount > 0 ? `${onPlayer ? '-' : '+'}${amount}` : 'Errou!';
+    const text =
+      amount > 0 ? `${onPlayer ? '-' : '+'}${amount}` : getTexts().game.miss;
     const key = banner ? `${banner}${text}` : text;
     const cached = floaterTextures.get(key);
     if (cached) return cached;
@@ -995,8 +1003,12 @@ export function createWorldRenderer(
       context.fillText(text, x, y + 30);
       context.font = FLOATER_FONT.replace(/^\d+/, '46');
       context.fillStyle = FLOATER_BANNER[banner];
-      context.strokeText(banner, x, y - 28);
-      context.fillText(banner, x, y - 28);
+      const title =
+        banner === 'HEADSHOT'
+          ? getTexts().game.headshot
+          : getTexts().game.overkill;
+      context.strokeText(title, x, y - 28);
+      context.fillText(title, x, y - 28);
     } else {
       context.strokeText(text, x, y);
       context.fillText(text, x, y);
@@ -1640,7 +1652,9 @@ export function createWorldRenderer(
       flash,
       lastGun: null,
       kit: own,
-      tag: player.name ? nameTag(player.name, player.color ?? COLORS.ui.white) : null,
+      tag: player.name
+        ? nameTag(player.name, player.color ?? COLORS.ui.white)
+        : null,
     };
   }
 

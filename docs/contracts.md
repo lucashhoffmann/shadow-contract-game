@@ -736,6 +736,13 @@ link, seed?)`, `receiveInput(index, payload)`, `receiveState(snapshot)`.
   `tick` simula (solo ou host) ou so envia input (convidado). No multi nao ha
   legenda inicial nem pausa, e a sala nao conta para `best`. `backToMenu` e
   `startRun` chamam `link.leave()`
+- placar e menu: `Player` tem `kills` (quem estava em foco quando o inimigo
+  morreu) e `deaths` (cada vez que `hp` cruza zero). O store publica
+  `scores` (um por jogador, com `you` e `alive`), `scoreboard` (aberto pelo
+  Tab segurado ou pelo icone do HUD) e, em rede, `online`, `host` e `menu`.
+  `togglePause` em rede nao pausa: abre e fecha `menu` por cima do jogo.
+  `endMatch()` so vale para o host: poe `status: 'dead'` e manda o estado na
+  hora, levando todos para a tela de resultado
 - `session.store`: `status` (`idle`, `connecting`, `lobby`, `room`,
   `playing`), `name` (persistido), `sessions`, `session`, `you`, `error`;
   `connect`, `create(publica)`, `join(codigo)`, `start`, `leave`,

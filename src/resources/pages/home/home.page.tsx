@@ -31,7 +31,7 @@ export function HomePage() {
   const setBloodColor = useGameStore((state) => state.setBloodColor);
 
   return (
-    <main className='font-display relative flex min-h-full flex-col items-center justify-center gap-7 overflow-hidden bg-[radial-gradient(ellipse_at_50%_30%,#3a3f78_0%,#1f2033_55%,#12131f_100%)] p-6 text-center'>
+    <main className='game-menu-background font-display relative flex min-h-full flex-col items-center justify-center gap-7 overflow-hidden p-6 text-center'>
       {/* Spot no teto iluminando o titulo: refletor, facho que abre para
           baixo e a poca de luz onde ele bate. O facho balanca bem e a lampada
           falha de vez em quando (spotlight-light, em index.css). */}
@@ -51,7 +51,9 @@ export function HomePage() {
       />
       <h1 className='text-outline relative flex -rotate-3 flex-col text-6xl leading-none tracking-wide uppercase sm:text-7xl'>
         <span className='text-white'>Shadow</span>{' '}
-        <span className='text-[1.15em] text-[var(--game-brandPink)]'>Contract</span>
+        <span className='text-[1.15em] text-[var(--game-brandPink)]'>
+          Contract
+        </span>
       </h1>
       <p className='text-outline relative flex items-center gap-2 rounded-full bg-black/35 px-4 py-1 text-lg text-[var(--game-highlight)]'>
         <Trophy
