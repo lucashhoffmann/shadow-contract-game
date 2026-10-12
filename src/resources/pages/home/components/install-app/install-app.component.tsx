@@ -1,9 +1,11 @@
 import { Download, Share } from 'lucide-react';
 
 import { useInstallApp } from '@/resources/pages/home/components/install-app/use-install-app.component';
+import { useTexts } from '@/shared/i18n';
 
 // Oferece instalar o jogo como app. So em aparelho de toque.
 export function InstallApp() {
+  const t = useTexts();
   const { mode, install } = useInstallApp();
 
   if (mode === 'prompt') {
@@ -18,7 +20,7 @@ export function InstallApp() {
           className='size-5'
           strokeWidth={3}
         />
-        Instalar app
+        {t.home.install}
       </button>
     );
   }
@@ -29,8 +31,7 @@ export function InstallApp() {
           aria-hidden
           className='size-5 shrink-0'
         />
-        Para instalar o app: toque em Compartilhar e depois em &quot;Adicionar a
-        Tela de Inicio&quot;.
+        {t.home.iosInstall}
       </p>
     );
   }

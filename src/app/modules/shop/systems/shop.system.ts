@@ -17,6 +17,7 @@ import type {
   World,
 } from '@/app/modules/world/types/world.types';
 import { distance } from '@/shared/utils/math.util';
+import { getTexts } from '@/shared/i18n';
 import { nextRandom } from '@/shared/utils/rng.util';
 
 function roundPrice(value: number): number {
@@ -98,7 +99,7 @@ export function buyItem(world: World, id: ItemId): boolean {
   }
   world.run.events.push({
     at: world.run.seconds,
-    text: `${owned ? 'Recarregou' : 'Comprou'} ${ITEMS[id].name} por $${price}.`,
+    text: getTexts().events.bought(!!owned, getTexts().shop.items[id], price),
   });
   // objeto novo a cada mudanca: o store compara por referencia
   world.market = {
@@ -130,7 +131,7 @@ export function openChest(world: World): void {
     world.run.shops++;
     world.run.events.push({
       at: world.run.seconds,
-      text: `Loja ${world.run.shops} visitada.`,
+      text: getTexts().events.shopVisited(world.run.shops),
     });
   }
   world.status = 'shop';

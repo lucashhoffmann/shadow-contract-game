@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/resources/components/ui/dialog';
 import { ShareRecord } from '@/resources/pages/game/components/share-record/share-record.component';
+import { useTexts } from '@/shared/i18n';
 
 type GameOverDialogProps = {
   open: boolean;
@@ -32,6 +33,7 @@ export function GameOverDialog({
   onRestart,
   onMenu,
 }: GameOverDialogProps) {
+  const t = useTexts();
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const attempts = run?.stats.meleeAttempts ?? 0;
   const hits = run?.stats.meleeHits ?? 0;
@@ -53,8 +55,8 @@ export function GameOverDialog({
       >
         <DialogHeader className='items-center gap-3'>
           <DialogTitle className='text-outline flex flex-col text-5xl leading-none tracking-wide uppercase sm:text-6xl'>
-            <span className='text-white'>Voce</span>{' '}
-            <span className='text-[1.2em] text-[#ff2d55]'>morreu!</span>
+            <span className='text-white'>{t.game.you}</span>{' '}
+            <span className='text-[1.2em] text-[#ff2d55]'>{t.game.died}</span>
           </DialogTitle>
           <Skull
             aria-hidden
@@ -62,7 +64,7 @@ export function GameOverDialog({
             strokeWidth={1.5}
           />
           <DialogDescription className='text-outline text-lg text-white'>
-            Sala {room}, {kills} eliminados. Recorde: sala {best}.
+            {t.game.gameOver(room, kills, best)}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className='flex-col items-center gap-3 sm:flex-col sm:justify-center'>
@@ -79,7 +81,7 @@ export function GameOverDialog({
               className='size-6'
               strokeWidth={3.5}
             />
-            Jogar de novo
+            {t.game.restart}
           </button>
           <ShareRecord
             best={best}
@@ -94,14 +96,14 @@ export function GameOverDialog({
                 onMenu();
               }}
             >
-              Menu
+              {t.common.menu}
             </Button>
             <Button
               variant='secondary'
               disabled={!run}
               onClick={() => setAnalysisOpen(true)}
             >
-              Ver análise do jogo
+              {t.game.analysis}
             </Button>
           </div>
         </DialogFooter>
@@ -111,58 +113,58 @@ export function GameOverDialog({
         >
           <DialogContent className='max-h-[85vh] overflow-y-auto font-sans sm:max-w-2xl'>
             <DialogHeader>
-              <DialogTitle>Análise do jogo</DialogTitle>
+              <DialogTitle>{t.game.analysisTitle}</DialogTitle>
               <DialogDescription>
-                Resumo e registro da partida encerrada.
+                {t.game.analysisDescription}
               </DialogDescription>
             </DialogHeader>
             {run && (
               <>
                 <div className='grid grid-cols-2 gap-2 text-sm sm:grid-cols-3'>
-                  <p>Tempo: {time(run.seconds)}</p>
-                  <p>Sala: {run.roomIndex}</p>
-                  <p>Eliminações: {run.kills}</p>
-                  <p>{`Força do ataque: ${Math.round(run.attackVariance.min * 100)}%–${Math.round(run.attackVariance.max * 100)}%`}</p>
-                  <p>Dano causado: {run.stats.damageDealt}</p>
-                  <p>Facadas: {attempts}</p>
+                  <p>{t.game.time}: {time(run.seconds)}</p>
+                  <p>{t.common.room}: {run.roomIndex}</p>
+                  <p>{t.game.kills}: {run.kills}</p>
+                  <p>{`${t.game.attackStrength}: ${Math.round(run.attackVariance.min * 100)}%–${Math.round(run.attackVariance.max * 100)}%`}</p>
+                  <p>{t.game.damageDealt}: {run.stats.damageDealt}</p>
+                  <p>{t.game.stabs}: {attempts}</p>
                   <p>
-                    Acertos: {hits} ({rate(hits, attempts)})
+                    {t.game.hits}: {hits} ({rate(hits, attempts)})
                   </p>
                   <p>
-                    Erros: {misses} ({rate(misses, attempts)})
+                    {t.game.misses}: {misses} ({rate(misses, attempts)})
                   </p>
-                  <p>Projéteis: {projectilesFired}</p>
+                  <p>{t.game.projectiles}: {projectilesFired}</p>
                   <p>
-                    Acertos de tiro: {projectilesHit} (
+                    {t.game.shotHits}: {projectilesHit} (
                     {rate(projectilesHit, projectilesFired)})
                   </p>
                   <p>
-                    Erros de tiro: {projectileMisses} (
+                    {t.game.shotMisses}: {projectileMisses} (
                     {rate(projectileMisses, projectilesFired)})
                   </p>
-                  <p>Vida recuperada: {run.stats.healthRecovered}</p>
-                  <p>Dano sofrido: {run.stats.damageTaken}</p>
-                  <p>Dano bloqueado: {run.stats.damageBlocked}</p>
-                  <p>Dinheiro coletado: ${run.earned}</p>
-                  <p>Lojas visitadas: {run.shops}</p>
+                  <p>{t.game.healthRecovered}: {run.stats.healthRecovered}</p>
+                  <p>{t.game.damageTaken}: {run.stats.damageTaken}</p>
+                  <p>{t.game.damageBlocked}: {run.stats.damageBlocked}</p>
+                  <p>{t.game.moneyCollected}: ${run.earned}</p>
+                  <p>{t.game.shopsVisited}: {run.shops}</p>
                 </div>
                 <section className='space-y-1 text-sm'>
-                  <h3 className='font-semibold'>Insights</h3>
+                  <h3 className='font-semibold'>{t.game.insights}</h3>
                   <p>
                     {attempts
                       ? misses
-                        ? `${misses} facada${misses > 1 ? 's' : ''} errada${misses > 1 ? 's' : ''} alertaram os alvos.`
-                        : 'Todas as facadas acertaram.'
-                      : 'Nenhuma facada nesta partida.'}
+                        ? t.game.missedStabs(misses)
+                        : t.game.allStabsHit
+                      : t.game.noStabs}
                   </p>
                   <p>
                     {run.stats.healthRecovered
-                      ? `${run.stats.healthRecovered} pontos de vida recuperados durante a partida.`
-                      : 'Nenhuma vida recuperada durante a partida.'}
+                      ? t.game.recovered(run.stats.healthRecovered)
+                      : t.game.noRecovery}
                   </p>
                 </section>
                 <section className='space-y-2 text-sm'>
-                  <h3 className='font-semibold'>Registro da partida</h3>
+                  <h3 className='font-semibold'>{t.game.log}</h3>
                   <ol className='max-h-56 space-y-1 overflow-y-auto rounded-md border p-3'>
                     {run.events.map((event, index) => (
                       <li key={index}>
@@ -177,7 +179,7 @@ export function GameOverDialog({
               </>
             )}
             <DialogFooter>
-              <Button onClick={() => setAnalysisOpen(false)}>Voltar</Button>
+              <Button onClick={() => setAnalysisOpen(false)}>{t.common.back}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

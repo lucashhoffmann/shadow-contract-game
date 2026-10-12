@@ -28,6 +28,7 @@ import type {
   World,
 } from '@/app/modules/world/types/world.types';
 import { nextRandom } from '@/shared/utils/rng.util';
+import { getTexts } from '@/shared/i18n';
 
 // cada modo tem as proprias salas, no tamanho dele
 const TEMPLATES = {
@@ -118,7 +119,7 @@ export function updateRooms(world: World): void {
     world.run.checkpoint = { ...world.player.pos };
     world.run.events.push({
       at: world.run.seconds,
-      text: `Sala ${current} alcancada.`,
+      text: getTexts().events.roomReached(current),
     });
   }
   world.run.roomIndex = Math.max(world.run.roomIndex, current);

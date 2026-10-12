@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getTexts, useLanguage } from '@/shared/i18n';
 
 // Cartao do recorde para story: PNG em pe, 1080x1920, com o nome do jogo e
 // o recorde na fonte dos titulos (--font-display).
@@ -52,15 +53,15 @@ function drawCard(
 
   line('SHADOW', 430, 230, '#ffffff');
   line('CONTRACT', 660, 230, '#ff2d55');
-  line('MEU RECORDE', 980, 96, '#ffd21f');
-  line(`SALA ${best}`, 1220, 330, '#ffffff');
+  line(getTexts().share.myRecord, 980, 96, '#ffd21f');
+  line(getTexts().share.room(best), 1220, 330, '#ffffff');
   line(
-    `Nesta partida: sala ${room}, ${kills} eliminado${kills === 1 ? '' : 's'}`,
+    getTexts().share.run(room, kills),
     1470,
     60,
     '#d8d9ee',
   );
-  line('Consegue passar?', 1690, 84, '#2fd15a');
+  line(getTexts().share.challenge, 1690, 84, '#2fd15a');
 }
 
 // desenha o cartao e devolve o PNG; null se o navegador nao tem canvas 2D
@@ -77,6 +78,7 @@ export async function renderRecordCard(card: RecordCard): Promise<Blob | null> {
 }
 
 export function useShareRecord({ best, room, kills }: RecordCard) {
+  const language = useLanguage((state) => state.language);
   const [busy, setBusy] = useState(false);
   // O cartao e desenhado ao abrir a tela, nao no toque: o navegador so abre
   // a folha de compartilhamento logo em seguida a um gesto, e esperar a
@@ -89,7 +91,7 @@ export function useShareRecord({ best, room, kills }: RecordCard) {
         blob &&
         new File([blob], 'shadow-contract-recorde.png', { type: 'image/png' }),
     );
-  }, [best, room, kills]);
+  }, [best, room, kills, language]);
 
   const share = async () => {
     if (busy) return;
@@ -103,7 +105,7 @@ export function useShareRecord({ best, room, kills }: RecordCard) {
         await navigator.share({
           files: [file],
           title: 'Shadow Contract',
-          text: `Cheguei na sala ${best} no Shadow Contract!`,
+          text: getTexts().share.message(best),
         });
         return;
       }

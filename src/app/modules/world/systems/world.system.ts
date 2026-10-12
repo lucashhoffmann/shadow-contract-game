@@ -5,6 +5,7 @@ import {
   updateFloaters,
   updateProjectiles,
 } from '@/app/modules/combat/systems/combat.system';
+import { getTexts } from '@/shared/i18n';
 import {
   createEnemy,
   updateEnemies,
@@ -142,10 +143,10 @@ export function createEmptyWorld(
         healthRecovered: 0,
       },
       events: [
-        { at: 0, text: 'Contrato iniciado.' },
+        { at: 0, text: getTexts().events.contractStarted },
         {
           at: 0,
-          text: `Variação de ataque: ${Math.round(attackVariance.min * 100)}% a ${Math.round(attackVariance.max * 100)}% do dano base.`,
+          text: getTexts().events.attackVariance(Math.round(attackVariance.min * 100), Math.round(attackVariance.max * 100)),
         },
       ],
     },
@@ -226,7 +227,7 @@ function updateIdlePressure(world: World, before: Vec2): void {
     return;
   run.lastIdleWarningAt = run.seconds;
   run.idleWarnings++;
-  run.events.push({ at: run.seconds, text: 'Inatividade: inimigos enviados.' });
+  run.events.push({ at: run.seconds, text: getTexts().events.idleEnemies });
   sendIdleEnemy(world);
 }
 
@@ -251,7 +252,7 @@ function revive(world: World): void {
   world.projectiles = world.projectiles.filter((p) => p.owner === 'player');
   run.events.push({
     at: run.seconds,
-    text: `Ficha de revive usada: restam ${run.revives}.`,
+    text: getTexts().events.reviveUsed(run.revives),
   });
 }
 
@@ -288,7 +289,7 @@ export function stepWorld(world: World, input: InputState, dt: number): void {
     world.status = 'dead';
     world.run.events.push({
       at: world.run.seconds,
-      text: `Contrato encerrado na sala ${world.run.roomIndex}.`,
+      text: getTexts().events.contractEnded(world.run.roomIndex),
     });
   }
 }

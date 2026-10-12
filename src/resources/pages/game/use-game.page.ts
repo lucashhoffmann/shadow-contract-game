@@ -4,8 +4,10 @@ import { createGameEngine } from '@/app/engine/game-engine';
 import { renderWeaponPreviews } from '@/app/engine/weapon-preview';
 import { useGameStore } from '@/app/store/game-store/game.store';
 import { useSessionStore } from '@/app/store/session-store/session.store';
+import { useTexts } from '@/shared/i18n';
 
 export function useGamePage() {
+  const t = useTexts();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const screen = useGameStore((state) => state.screen);
   const hud = useGameStore((state) => state.hud);
@@ -52,15 +54,15 @@ export function useGamePage() {
   const legend =
     screen === 'paused'
       ? {
-          title: 'Pausado',
-          actionLabel: 'Continuar',
+          title: t.game.paused,
+          actionLabel: t.common.continue,
           onAction: togglePause,
           onMenu: backToMenu,
           onRestart: restart,
         }
       : {
-          title: 'Como jogar',
-          actionLabel: 'Comecar',
+          title: t.game.howToPlay,
+          actionLabel: t.common.start,
           onAction: begin,
           onMenu: backToMenu,
         };

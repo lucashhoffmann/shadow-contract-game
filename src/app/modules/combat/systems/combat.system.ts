@@ -8,6 +8,7 @@ import {
   tileAt,
 } from '@/app/modules/level/utils/grid.util';
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
+import { getTexts } from '@/shared/i18n';
 import {
   ADRENALINE_TIME,
   ATTACK_COOLDOWN,
@@ -125,7 +126,7 @@ export function killEnemy(world: World, enemy: Enemy): void {
   world.run.kills++;
   world.run.events.push({
     at: world.run.seconds,
-    text: `${enemy.kind === 'ninja' ? 'Ninja' : 'Inimigo armado'} eliminado.`,
+    text: getTexts().events.enemyKilled(enemy.kind === 'ninja'),
   });
   world.player.adrenaline = ADRENALINE_TIME;
   breakPropsNear(world, enemy.pos, PROP_BREAK_RADIUS);
@@ -168,9 +169,7 @@ export function damagePlayer(world: World, damage: number, from: Vec2): void {
   addFloater(world, from, damage, true);
   world.run.events.push({
     at: world.run.seconds,
-    text: lost
-      ? `Sofreu ${lost} de dano${absorbed ? ` (${absorbed} bloqueado pelo escudo)` : ''}.`
-      : `Escudo bloqueou ${absorbed} de dano.`,
+    text: getTexts().events.damageTaken(lost, absorbed),
   });
 }
 
@@ -202,10 +201,10 @@ export function damageEnemy(
     at: world.run.seconds,
     text:
       source === 'Overkill'
-        ? `Overkill: execução agachado pelas costas, ${dealt} de dano.`
+        ? getTexts().events.overkill(dealt)
         : source === 'Execução'
-          ? `Execução furtiva: ${dealt} de dano.`
-          : `${source} acertou: ${dealt} de dano.`,
+          ? getTexts().events.execution(dealt)
+          : getTexts().events.hit(getTexts().events.source[source === 'Facada' ? 'stab' : source === 'Tiro' ? 'shot' : 'headshot'], dealt),
   });
   enemy.hp -= damage;
   if (enemy.hp > 0) {
@@ -286,7 +285,7 @@ export function updateCombat(world: World, dt: number, knife = false): void {
     world.run.nextMeleeChanceAt = world.run.seconds + MELEE_MISS_INTERVAL;
     world.run.events.push({
       at: world.run.seconds,
-      text: `Chance de erro: ${Math.round(world.run.meleeMissChance * 100)}%${peak ? ' (pico)' : ''}.`,
+      text: getTexts().events.missChance(Math.round(world.run.meleeMissChance * 100), peak),
     });
   }
   const player = world.player;
@@ -307,7 +306,7 @@ export function updateCombat(world: World, dt: number, knife = false): void {
     if (nextRandom(world) < world.run.meleeMissChance) {
       struck.detection = 1;
       addFloater(world, struck.pos, 0);
-      world.run.events.push({ at: world.run.seconds, text: 'Facada errou.' });
+      world.run.events.push({ at: world.run.seconds, text: getTexts().events.stabMissed });
       return;
     }
     world.run.stats.meleeHits++;
@@ -357,7 +356,7 @@ export function updateCombat(world: World, dt: number, knife = false): void {
   world.run.stats.projectilesFired += item.pellets;
   world.run.events.push({
     at: world.run.seconds,
-    text: `Disparou ${item.name}.`,
+    text: getTexts().events.shot(getTexts().shop.items[item.id]),
   });
   player.attackCooldown = ATTACK_COOLDOWN;
   player.shot = SHOT_TIME;
@@ -429,7 +428,7 @@ export function collectPickups(world: World): void {
       world.run.earned += pickup.value;
       world.run.events.push({
         at: world.run.seconds,
-        text: `Coletou $${pickup.value}.`,
+        text: getTexts().events.money(pickup.value),
       });
       return false;
     }
@@ -439,7 +438,7 @@ export function collectPickups(world: World): void {
       world.run.revives += pickup.value;
       world.run.events.push({
         at: world.run.seconds,
-        text: `Ficha de revive: ${world.run.revives} de ${REVIVE_MAX}.`,
+        text: getTexts().events.reviveCollected(world.run.revives, REVIVE_MAX),
       });
       return false;
     }
@@ -452,7 +451,7 @@ export function collectPickups(world: World): void {
       );
       world.run.events.push({
         at: world.run.seconds,
-        text: `Mira melhorada: headshot em ${Math.round(player.headshot * 100)}%.`,
+        text: getTexts().events.aim(Math.round(player.headshot * 100)),
       });
       return false;
     }
@@ -470,20 +469,20 @@ export function collectPickups(world: World): void {
       weapon.ammo += gained;
       world.run.events.push({
         at: world.run.seconds,
-        text: `Coletou municao de ${ITEMS[weapon.id].name}: +${gained}.`,
+        text: getTexts().events.ammo(getTexts().shop.items[weapon.id], gained),
       });
       return false;
     }
     // coracao, escudo e salto ficam no chao enquanto nao servem para nada
     const { stat, cap, text } = (
       {
-        heart: { stat: 'hp', cap: player.maxHp, text: 'Recuperou vida' },
+        heart: { stat: 'hp', cap: player.maxHp, text: getTexts().events.recoveredHealth },
         shield: {
           stat: 'shield',
           cap: Math.round(player.maxHp * SHIELD_MAX),
-          text: 'Coletou escudo',
+          text: getTexts().events.collectedShield,
         },
-        dash: { stat: 'dashes', cap: DASH_MAX, text: 'Recuperou saltos' },
+        dash: { stat: 'dashes', cap: DASH_MAX, text: getTexts().events.recoveredDashes },
       } as const
     )[pickup.kind];
     if (player[stat] >= cap) return true;
@@ -492,7 +491,7 @@ export function collectPickups(world: World): void {
     if (pickup.kind === 'heart') world.run.stats.healthRecovered += gained;
     world.run.events.push({
       at: world.run.seconds,
-      text: `${text}: +${gained}.`,
+      text: getTexts().events.collected(text, gained),
     });
     return false;
   });

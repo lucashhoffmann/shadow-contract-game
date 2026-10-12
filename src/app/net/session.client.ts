@@ -17,3 +17,17 @@ export function serverUrl(): string {
 export function connectSession(url = serverUrl()): SessionSocket {
   return io(url, { transports: ['websocket'] });
 }
+
+// Health check: o servidor de salas esta no ar? Sem resposta em PING_TIMEOUT
+// ms, conta como fora.
+const PING_TIMEOUT = 3000;
+export async function pingServer(url = serverUrl()): Promise<boolean> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(PING_TIMEOUT),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

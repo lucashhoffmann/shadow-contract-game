@@ -2,6 +2,7 @@ import { ArrowLeft, Crown, Lock, Play, Users } from 'lucide-react';
 
 import { MAX_PLAYERS, NAME_MAX } from '@/app/net/protocol';
 import { useLobbyPage } from '@/resources/pages/lobby/use-lobby.page';
+import { useTexts } from '@/shared/i18n';
 
 // botao gordo de jogo, igual ao da home
 const CHUNKY =
@@ -14,6 +15,7 @@ const FIELD =
 // Sala de espera do multiplayer, em tres passos: nome, listagem de sessoes e
 // sessao (quem entrou e o codigo de convite).
 export function LobbyPage() {
+  const t = useTexts();
   const {
     status,
     name,
@@ -44,10 +46,10 @@ export function LobbyPage() {
           className='size-5'
           strokeWidth={3}
         />
-        Menu
+        {t.common.menu}
       </button>
       <h1 className='text-outline text-5xl leading-none tracking-wide text-white uppercase'>
-        Multiplayer
+        {t.home.multiplayer}
       </h1>
       {error && (
         <p
@@ -67,7 +69,7 @@ export function LobbyPage() {
             }}
           >
             <label className='flex flex-col gap-2 text-left text-lg text-white uppercase'>
-              Seu nome
+              {t.lobby.yourName}
               <input
                 value={name}
                 maxLength={NAME_MAX}
@@ -81,7 +83,7 @@ export function LobbyPage() {
               disabled={!name.trim() || status === 'connecting'}
               className={`${CHUNKY} bg-[#2fd15a]`}
             >
-              {status === 'connecting' ? 'Conectando...' : 'Entrar'}
+              {status === 'connecting' ? t.lobby.connecting : t.lobby.enter}
             </button>
           </form>
         )}
@@ -89,7 +91,7 @@ export function LobbyPage() {
         {status === 'lobby' && (
           <>
             <section className={PANEL}>
-              <h2 className='text-xl text-[#ffd21f] uppercase'>Criar sessao</h2>
+              <h2 className='text-xl text-[#ffd21f] uppercase'>{t.lobby.createSession}</h2>
               <div className='grid grid-cols-2 gap-3'>
                 <button
                   type='button'
@@ -101,7 +103,7 @@ export function LobbyPage() {
                     className='size-5'
                     strokeWidth={3}
                   />
-                  Publica
+                  {t.lobby.public}
                 </button>
                 <button
                   type='button'
@@ -113,7 +115,7 @@ export function LobbyPage() {
                     className='size-5'
                     strokeWidth={3}
                   />
-                  Privada
+                  {t.lobby.private}
                 </button>
               </div>
             </section>
@@ -125,7 +127,7 @@ export function LobbyPage() {
               }}
             >
               <label className='flex flex-col gap-2 text-left text-xl text-[#ffd21f] uppercase'>
-                Entrar com codigo
+                {t.lobby.joinCode}
                 <input
                   value={code}
                   placeholder='ABCDE'
@@ -138,19 +140,19 @@ export function LobbyPage() {
                 disabled={code.length < 5}
                 className={`${CHUNKY} bg-[#3d4fd6]`}
               >
-                Entrar
+                {t.lobby.enter}
               </button>
             </form>
             <section
-              aria-label='Sessoes publicas'
+              aria-label={t.lobby.publicSessions}
               className={PANEL}
             >
               <h2 className='text-xl text-[#ffd21f] uppercase'>
-                Sessoes publicas
+                {t.lobby.publicSessions}
               </h2>
               {sessions.length === 0 && (
                 <p className='font-sans text-sm text-white/70'>
-                  Nenhuma sessao aberta agora. Crie a sua.
+                  {t.lobby.noSessions}
                 </p>
               )}
               <ul className='flex flex-col gap-2'>
@@ -167,11 +169,11 @@ export function LobbyPage() {
                     </span>
                     <button
                       type='button'
-                      aria-label={`Entrar na sessao de ${open.hostName}`}
+                      aria-label={t.lobby.joinHost(open.hostName)}
                       className={`${CHUNKY} bg-[#2fd15a] px-4 py-1 text-base`}
                       onClick={() => join(open.code)}
                     >
-                      Entrar
+                      {t.lobby.enter}
                     </button>
                   </li>
                 ))}
@@ -183,17 +185,16 @@ export function LobbyPage() {
         {status === 'room' && session && (
           <section className={PANEL}>
             <p className='font-sans text-sm font-bold text-white/80 uppercase'>
-              {session.public ? 'Sessao publica' : 'Sessao privada'}. Codigo de
-              convite:
+              {t.lobby.sessionType(session.public)}. {t.lobby.inviteCode}:
             </p>
             <p
-              aria-label='Codigo de convite'
+              aria-label={t.lobby.inviteCode}
               className='text-outline text-5xl tracking-[0.25em] text-[#ffd21f]'
             >
               {session.code}
             </p>
             <ul
-              aria-label='Jogadores'
+              aria-label={t.lobby.players}
               className='flex flex-col gap-2'
             >
               {session.players.map((player) => (
@@ -211,11 +212,11 @@ export function LobbyPage() {
                     style={{ color: player.color }}
                   >
                     {player.name}
-                    {player.id === you?.id && ' (voce)'}
+                    {player.id === you?.id && t.lobby.you}
                   </span>
                   {player.host && (
                     <Crown
-                      aria-label='Host'
+                      aria-label={t.lobby.host}
                       className='size-5 text-[#ffd21f]'
                       strokeWidth={3}
                     />
@@ -224,10 +225,10 @@ export function LobbyPage() {
               ))}
             </ul>
             <p className='font-sans text-sm text-white/70'>
-              {session.players.length}/{MAX_PLAYERS} jogadores.{' '}
+              {t.lobby.playerCount(session.players.length, MAX_PLAYERS)}{' '}
               {you?.host
-                ? 'Comece quando todos entrarem.'
-                : 'Esperando o host comecar.'}
+                ? t.lobby.hostHint
+                : t.lobby.guestHint}
             </p>
             <div className='grid grid-cols-2 gap-3'>
               <button
@@ -235,7 +236,7 @@ export function LobbyPage() {
                 className={`${CHUNKY} bg-[#3d4fd6]`}
                 onClick={leave}
               >
-                Sair
+                {t.lobby.leave}
               </button>
               <button
                 type='button'
@@ -248,7 +249,7 @@ export function LobbyPage() {
                   className='size-5 fill-white'
                   strokeWidth={3}
                 />
-                Comecar
+                {t.common.start}
               </button>
             </div>
           </section>

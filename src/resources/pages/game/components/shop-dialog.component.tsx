@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/resources/components/ui/dialog';
 import { cn } from '@/shared/lib/utils';
+import { getTexts, useTexts } from '@/shared/i18n';
 
 type ShopDialogProps = {
   open: boolean;
@@ -40,8 +41,8 @@ const CARD_COLOR: Record<ItemId, string> = {
 };
 
 function describeItem(item: ItemDef): string {
-  if (item.kind === 'armor') return `+${item.bonusHp} de vida`;
-  return `${item.ammo} tiros${item.pellets > 1 ? `, ${item.pellets} balas` : ''}`;
+  if (item.kind === 'armor') return getTexts().shop.bonusHealth(item.bonusHp);
+  return getTexts().shop.shots(item.ammo, item.pellets);
 }
 
 function percent(ratio: number): number {
@@ -78,6 +79,7 @@ function ItemCard({
   preview,
   onBuy,
 }: ItemCardProps) {
+  const t = useTexts();
   return (
     <button
       type='button'
@@ -93,7 +95,7 @@ function ItemCard({
       >
         {/* altura de duas linhas: nome longo nao desalinha os cartoes */}
         <span className='flex h-8 items-center text-center text-xs leading-tight font-black tracking-wide uppercase'>
-          {item.name}
+          {t.shop.items[item.id]}
         </span>
         {/* no celular a arte e menor, para os quatro cartoes caberem */}
         <span className='flex aspect-square w-3/5 items-center justify-center rounded-full bg-white/20 sm:w-full'>
@@ -115,8 +117,8 @@ function ItemCard({
           {refill === undefined
             ? describeItem(item)
             : refill > 0
-              ? `Recarga: +${refill} balas`
-              : 'Municao cheia'}
+              ? t.shop.refill(refill)
+              : t.shop.fullAmmo}
         </span>
       </span>
       <span className='flex items-center gap-1.5 rounded-xl border-4 border-white bg-green-500 px-3 text-base font-black text-white shadow-md group-disabled:bg-slate-500 group-disabled:text-white/70 sm:py-0.5 sm:text-lg'>
@@ -130,7 +132,7 @@ function ItemCard({
         {refill === undefined ? (
           <PriceChange change={percent(price / item.price)} />
         ) : (
-          <span className='text-sky-300'>voce ja tem</span>
+          <span className='text-sky-300'>{t.shop.owned}</span>
         )}
       </span>
     </button>
@@ -146,6 +148,7 @@ export function ShopDialog({
   onBuy,
   onClose,
 }: ShopDialogProps) {
+  const t = useTexts();
   return (
     <Dialog
       open={open}
@@ -163,11 +166,10 @@ export function ShopDialog({
       >
         <DialogHeader className='items-center sm:text-center'>
           <DialogTitle className='rounded-full border-4 border-white bg-[#1f4f8f] px-5 py-2 text-base font-black tracking-wide text-white uppercase shadow-lg'>
-            Escolha o equipamento
+            {t.shop.title}
           </DialogTitle>
           <DialogDescription className='text-xs font-bold tracking-wide text-white/80 uppercase'>
-            Vale so para a run atual. Voce tem $ {money}. Inflacao: +
-            {percent(market.inflation)}%.
+            {t.shop.summary(money, percent(market.inflation))}
           </DialogDescription>
         </DialogHeader>
         {/* touch-pan-y: o body trava gestos; aqui o arrasto vertical rola */}
@@ -201,7 +203,7 @@ export function ShopDialog({
             size='lg'
             onClick={onClose}
           >
-            Continuar
+            {t.common.continue}
           </Button>
         </DialogFooter>
       </DialogContent>

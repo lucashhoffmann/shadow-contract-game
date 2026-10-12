@@ -7,7 +7,12 @@ import {
 } from '@/app/store/game-store/game.store';
 import { HomePage } from '@/resources/pages/home/home.page';
 
+// servidor de salas: cada teste diz se esta no ar
+const { pingServer } = vi.hoisted(() => ({ pingServer: vi.fn() }));
+vi.mock('@/app/net/session.client', () => ({ pingServer }));
+
 beforeEach(() => {
+  pingServer.mockResolvedValue(false);
   useGameStore.getState().backToMenu();
   useGameStore.setState({ best: 0, bloodColor: DEFAULT_BLOOD_COLOR });
 });
@@ -50,5 +55,22 @@ describe('HomePage', () => {
       target: { value: '#22aa44' },
     });
     expect(useGameStore.getState().bloodColor).toBe('#22aa44');
+  });
+});
+
+describe('multiplayer na home', () => {
+  it('sem servidor de salas, o botao nao aparece', async () => {
+    render(<HomePage />);
+    await vi.waitFor(() => expect(pingServer).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'Multiplayer' })).toBeNull();
+  });
+
+  it('com o servidor no ar, aparece e abre a sala de espera', async () => {
+    pingServer.mockResolvedValue(true);
+    render(<HomePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Multiplayer' }),
+    );
+    expect(useGameStore.getState().screen).toBe('lobby');
   });
 });

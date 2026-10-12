@@ -4,10 +4,12 @@ import {
   type RecordCard,
   useShareRecord,
 } from '@/resources/pages/game/components/share-record/use-share-record.component';
+import { useTexts } from '@/shared/i18n';
 
 // Botao da tela de morte: gera o cartao do recorde e abre o
 // compartilhamento. So aparece em aparelho de toque.
 export function ShareRecord(card: RecordCard) {
+  const t = useTexts();
   const { busy, share } = useShareRecord(card);
 
   return (
@@ -22,7 +24,7 @@ export function ShareRecord(card: RecordCard) {
         className='size-5'
         strokeWidth={3}
       />
-      {busy ? 'Gerando...' : 'Compartilhar recorde'}
+      {busy ? t.share.generating : t.share.button}
     </button>
   );
 }

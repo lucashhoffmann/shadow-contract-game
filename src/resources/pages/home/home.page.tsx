@@ -1,6 +1,7 @@
 import { Play, Settings, Trophy, UserRound, Users } from 'lucide-react';
 
 import { useGameStore } from '@/app/store/game-store/game.store';
+import { useHomePage } from '@/resources/pages/home/use-home.page';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
   DialogTrigger,
 } from '@/resources/components/ui/dialog';
 import { InstallApp } from '@/resources/pages/home/components/install-app/install-app.component';
+import { useLanguage, useTexts } from '@/shared/i18n';
 
 // botao gordo de jogo: borda branca, sombra dura embaixo, afunda ao clicar
 const CHUNKY =
@@ -17,10 +19,14 @@ const CHUNKY =
 const SECONDARY = `${CHUNKY} w-full bg-[#3d4fd6] px-5 py-2 text-lg`;
 
 export function HomePage() {
+  const t = useTexts();
+  const language = useLanguage((state) => state.language);
+  const setLanguage = useLanguage((state) => state.setLanguage);
   const best = useGameStore((state) => state.best);
   const startRun = useGameStore((state) => state.startRun);
   const openCharacter = useGameStore((state) => state.openCharacter);
   const openLobby = useGameStore((state) => state.openLobby);
+  const { online } = useHomePage();
   const bloodColor = useGameStore((state) => state.bloodColor);
   const setBloodColor = useGameStore((state) => state.setBloodColor);
 
@@ -53,7 +59,7 @@ export function HomePage() {
           className='size-5'
           strokeWidth={3}
         />
-        Recorde: sala {best}
+        {t.home.record(best)}
       </p>
       <button
         type='button'
@@ -65,7 +71,7 @@ export function HomePage() {
           className='size-8 fill-white'
           strokeWidth={3}
         />
-        Play
+        {t.home.play}
       </button>
       <div className='relative flex w-full max-w-xs flex-col gap-3'>
         <button
@@ -78,20 +84,23 @@ export function HomePage() {
             className='size-5'
             strokeWidth={3}
           />
-          Configurar personagem
+          {t.home.character}
         </button>
-        <button
-          type='button'
-          className={SECONDARY}
-          onClick={openLobby}
-        >
-          <Users
-            aria-hidden
-            className='size-5'
-            strokeWidth={3}
-          />
-          Multiplayer
-        </button>
+        {/* so com o servidor de salas no ar (use-home.page) */}
+        {online && (
+          <button
+            type='button'
+            className={SECONDARY}
+            onClick={openLobby}
+          >
+            <Users
+              aria-hidden
+              className='size-5'
+              strokeWidth={3}
+            />
+            {t.home.multiplayer}
+          </button>
+        )}
         <Dialog>
           <DialogTrigger asChild>
             <button
@@ -103,18 +112,18 @@ export function HomePage() {
                 className='size-5'
                 strokeWidth={3}
               />
-              Configurações
+              {t.home.settings}
             </button>
           </DialogTrigger>
           <DialogContent className='font-sans'>
             <DialogHeader>
-              <DialogTitle>Configurações</DialogTitle>
+              <DialogTitle>{t.home.settings}</DialogTitle>
               <DialogDescription>
-                Preferências visuais do jogo.
+                {t.home.settingsDescription}
               </DialogDescription>
             </DialogHeader>
             <label className='flex items-center justify-between gap-4'>
-              Cor do sangue
+              {t.home.bloodColor}
               <input
                 type='color'
                 value={bloodColor}
@@ -122,16 +131,28 @@ export function HomePage() {
                 className='h-10 w-14 cursor-pointer bg-transparent'
               />
             </label>
+            <label className='flex items-center justify-between gap-4'>
+              {t.home.language}
+              <select
+                value={language}
+                onChange={(event) =>
+                  setLanguage(event.target.value as 'pt-BR' | 'en')
+                }
+                className='rounded border p-2'
+              >
+                <option value='pt-BR'>Português</option>
+                <option value='en'>English</option>
+              </select>
+            </label>
           </DialogContent>
         </Dialog>
       </div>
       <InstallApp />
       <p className='relative max-w-xs font-sans text-sm text-white/70'>
-        WASD ou setas para andar. Chegue por tras para eliminar. Fique fora do
-        cone de visao.
+        {t.home.instructions}
       </p>
       <footer className='text-outline animate-credit absolute inset-x-0 bottom-3 text-base tracking-wide text-white motion-reduce:animate-none'>
-        Desenvolvido por{' '}
+        {t.home.credit}{' '}
         <a
           href='https://github.com/lucashhoffmann/'
           target='_blank'

@@ -6,6 +6,7 @@ import type { InputState } from '@/app/modules/world/types/world.types';
 import type { Joined, PlayerInfo, SessionInfo } from '@/app/net/protocol';
 import { connectSession, type SessionSocket } from '@/app/net/session.client';
 import { useGameStore } from '@/app/store/game-store/game.store';
+import { getTexts } from '@/shared/i18n';
 
 // Sala de espera do multiplayer: nome, listagem de sessoes, quem esta na
 // sessao e o comeco da partida. Liga o servidor de salas ao game.store.
@@ -83,7 +84,7 @@ export const useSessionStore = create<SessionStore>()(
         live.on('connect_error', () =>
           set({
             status: 'idle',
-            error: 'Nao foi possivel conectar ao servidor de salas.',
+            error: getTexts().lobby.connectionError,
           }),
         );
         live.on('session:list', (sessions) => set({ sessions }));
@@ -95,7 +96,7 @@ export const useSessionStore = create<SessionStore>()(
             status: 'lobby',
             session: null,
             you: null,
-            error: 'O host saiu: a sessao acabou.',
+            error: getTexts().lobby.closedError,
           });
           live.emit('session:list', (sessions) => set({ sessions }));
           // tira da partida quem estava jogando

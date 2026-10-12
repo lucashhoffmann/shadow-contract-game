@@ -22,6 +22,7 @@ import type {
   World,
 } from '@/app/modules/world/types/world.types';
 import { alivePlayers, asPlayer } from '@/app/modules/world/utils/players.util';
+import { getTexts } from '@/shared/i18n';
 
 // Regras que so valem com varios jogadores. O nucleo (movimento, inimigo,
 // combate) e o mesmo do solo; aqui fica quem age em que ordem, como o grupo
@@ -92,6 +93,6 @@ export function stepMultiWorld(
   world.status = 'dead';
   world.run.events.push({
     at: world.run.seconds,
-    text: `Contrato encerrado na sala ${world.run.roomIndex}.`,
+    text: getTexts().events.contractEnded(world.run.roomIndex),
   });
 }

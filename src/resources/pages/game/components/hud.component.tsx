@@ -8,6 +8,7 @@ import {
 import type { WeaponId } from '@/app/modules/world/types/world.types';
 import type { Hud as HudData } from '@/app/store/game-store/game.store';
 import { cn } from '@/shared/lib/utils';
+import { useTexts } from '@/shared/i18n';
 
 const SEGMENT_STYLE = {
   done: 'bg-primary text-primary-foreground',
@@ -17,16 +18,17 @@ const SEGMENT_STYLE = {
 
 // um contrato = SHOP_EVERY salas; o ultimo segmento e a loja
 function ContractBar({ room }: { room: number }) {
+  const t = useTexts();
   const contract = Math.max(0, Math.floor((room - 1) / SHOP_EVERY)) + 1;
   const position = room - (contract - 1) * SHOP_EVERY;
 
   return (
     <div className='flex flex-col items-center gap-1'>
       <p className='text-sm font-black tracking-wide uppercase'>
-        Contrato {contract}
+        {t.game.contract(contract)}
       </p>
       <ol
-        aria-label={`Sala ${position} de ${SHOP_EVERY} do contrato`}
+        aria-label={t.game.contractRoom(position, SHOP_EVERY)}
         className='flex items-center gap-1 rounded-lg border-2 border-white/80 bg-[#1b1d3a] p-1.5'
       >
         {Array.from({ length: SHOP_EVERY }, (_, i) => {
@@ -54,10 +56,11 @@ function ContractBar({ room }: { room: number }) {
 
 // saltos guardados: um traco por salto, aceso enquanto houver
 function DashPips({ dashes }: { dashes: number }) {
+  const t = useTexts();
   return (
     <div
       role='img'
-      aria-label={`Saltos: ${dashes} de ${DASH_MAX}`}
+      aria-label={t.game.dashes(dashes, DASH_MAX)}
       className='flex items-center gap-1'
     >
       <ChevronsRight
@@ -93,6 +96,7 @@ type HudProps = {
 // arma na mao: foto do modelo, nome e, se for de fogo, balas restantes.
 // Sem bala fica cinza e opaca: esta na mao, mas nao atira.
 function WeaponCard({ hud, previews }: Pick<HudProps, 'hud' | 'previews'>) {
+  const t = useTexts();
   const weapon = hud.weaponId ? ITEMS[hud.weaponId] : null;
   const empty = !!weapon && hud.ammo <= 0;
   return (
@@ -110,11 +114,11 @@ function WeaponCard({ hud, previews }: Pick<HudProps, 'hud' | 'previews'>) {
       />
       <div>
         <p className='text-xs font-black tracking-wide uppercase'>
-          {weapon?.name ?? 'Espada'}
+          {weapon ? t.shop.items[weapon.id] : t.common.sword}
         </p>
         {weapon && (
           <p
-            aria-label={`Balas: ${hud.ammo} de ${weapon.ammo}`}
+            aria-label={t.game.bullets(hud.ammo, weapon.ammo)}
             className='text-lg leading-none font-black'
           >
             {hud.ammo}
@@ -134,15 +138,16 @@ function WeaponCard({ hud, previews }: Pick<HudProps, 'hud' | 'previews'>) {
 // Escolha da arma: espada e cada arma de fogo do arsenal. So aparece quando
 // ha arma de fogo. Arma sem bala continua escolhivel, cinza e opaca.
 function WeaponSlots({ hud, arsenal, previews, onSelectWeapon }: HudProps) {
+  const t = useTexts();
   if (arsenal.length === 0) return null;
   const slots: { id: WeaponId | null; name: string; ammo: number | null }[] = [
-    { id: null, name: 'Espada', ammo: null },
-    ...arsenal.map(({ id, ammo }) => ({ id, name: ITEMS[id].name, ammo })),
+    { id: null, name: t.common.sword, ammo: null },
+    ...arsenal.map(({ id, ammo }) => ({ id, name: t.shop.items[id], ammo })),
   ];
   return (
     <div
       role='group'
-      aria-label='Armas'
+      aria-label={t.common.weapons}
       className='pointer-events-auto flex gap-1'
     >
       {slots.map(({ id, name, ammo }) => {
@@ -156,7 +161,7 @@ function WeaponSlots({ hud, arsenal, previews, onSelectWeapon }: HudProps) {
             aria-label={
               ammo === null
                 ? name
-                : `${name}: ${ammo} ${empty ? '(sem balas)' : 'balas'}`
+                : `${name}: ${ammo} ${empty ? t.common.noBullets : t.common.bullets}`
             }
             data-empty={empty}
             onClick={() => onSelectWeapon(id)}
@@ -186,6 +191,7 @@ export function Hud({
   onSelectWeapon,
   onPause,
 }: HudProps) {
+  const t = useTexts();
   // escudo soma na barra: ela passa a medir vida maxima + escudo, com a
   // parte do escudo em azul logo depois da vida
   const capacity = hud.maxHp + hud.shield;
@@ -195,7 +201,7 @@ export function Hud({
         <div className='flex items-center gap-2'>
           <div
             role='progressbar'
-            aria-label='Vida'
+            aria-label={t.common.health}
             aria-valuemin={0}
             aria-valuemax={hud.maxHp}
             aria-valuenow={hud.hp}
@@ -214,7 +220,7 @@ export function Hud({
           <p className='text-sm font-black'>{hud.hp}</p>
           {hud.shield > 0 && (
             <p
-              aria-label='Escudo'
+              aria-label={t.common.shield}
               className='text-sm font-black text-sky-300'
             >
               +{hud.shield}
@@ -225,7 +231,7 @@ export function Hud({
         {hud.revives > 0 && (
           <div
             role='img'
-            aria-label={`Fichas de revive: ${hud.revives}`}
+            aria-label={t.game.revives(hud.revives)}
             className='flex items-center gap-1'
           >
             {Array.from({ length: hud.revives }, (_, i) => (
@@ -252,13 +258,13 @@ export function Hud({
       <ContractBar room={hud.room} />
       <div className='flex flex-col items-end gap-2 text-right font-black'>
         <div>
-          <p>Sala {hud.room}</p>
+          <p>{t.game.room(hud.room)}</p>
           <p className='text-green-400'>$ {hud.money}</p>
         </div>
         {onPause && (
           <button
             type='button'
-            aria-label='Pausar'
+            aria-label={t.common.pause}
             onClick={onPause}
             className='pointer-events-auto flex size-11 cursor-pointer items-center justify-center rounded-xl border-4 border-white bg-[#3d4fd6] text-white shadow-[0_4px_0_#14141f] transition-transform active:translate-y-1 active:shadow-none'
           >

@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/resources/components/ui/dialog';
 import { cn } from '@/shared/lib/utils';
+import { useTexts } from '@/shared/i18n';
 
 type LegendDialogProps = {
   open: boolean;
@@ -17,81 +18,6 @@ type LegendDialogProps = {
   onMenu: () => void;
   onRestart?: () => void;
 };
-
-type Entry = [label: string, text: string];
-
-const SECTIONS: [title: string, entries: Entry[]][] = [
-  [
-    'Controles',
-    [
-      ['WASD / setas / joystick', 'mover'],
-      [
-        'Espaco',
-        'salto de esquiva. Livre na sala inicial; depois gasta 1 dos 6',
-      ],
-      ['C / Ctrl', 'agachar: mais lento, inimigos ouvem menos'],
-      ['F', 'quebrar a caixa ao alcance; com arma, facada no inimigo ao lado'],
-      ['B', 'abrir e fechar o bau da loja, no fim do contrato'],
-      ['Q', 'trocar entre espada e armas (ou clique na arma, no topo)'],
-      [
-        'Toque',
-        'no celular: icone de mao sobre o alvo; botao de setas para saltar',
-      ],
-      ['P', 'pausar e ver esta legenda'],
-    ],
-  ],
-  [
-    'Furtividade',
-    [
-      ['Cone branco', 'patrulha. Amarelo: suspeito. Vermelho: alerta'],
-      [
-        'Orelha',
-        'ele esta te ouvindo. Branca: notou algo. Amarela: vem investigar',
-      ],
-      ['Barulho', 'parado pouco, andando mais, salto e tiro muito mais'],
-      ['Agachado', 'ele nota e investiga, mas nao entra em alerta pelo som'],
-      ['De perto', 'colado nele, ele te percebe mesmo de costas'],
-      ['Silenciador', 'tiro sem ele chama todo inimigo por perto'],
-      ['Parede', 'bloqueia visao e bala, mas nao o som'],
-    ],
-  ],
-  [
-    'Combate',
-    [
-      [
-        'Espada',
-        'por tras elimina na hora; inimigo em alerta leva 30 a 45 de dano',
-      ],
-      [
-        'Com arma',
-        'atira sozinho de longe; colado no inimigo, so ataca no F (faca)',
-      ],
-      ['Tiro', 'perde forca com a distancia; escopeta so resolve de perto'],
-      [
-        'Headshot',
-        'chance de a bala dar dano dobrado; a mira das caixas aumenta',
-      ],
-      ['Numeros', '+ e o dano que voce causou; - vermelho e o que ele te deu'],
-      ['Adrenalina', 'cada eliminacao acelera voce por um instante'],
-    ],
-  ],
-  [
-    'Inimigos e cenario',
-    [
-      ['Terno', 'atira de longe, aguenta 2 tiros. Desvie das balas vermelhas'],
-      ['Ninja', 'corre e golpeia de perto, aguenta 2 golpes'],
-      [
-        'Caixa',
-        'cobre de bala e quebra com tiro ou briga; pode soltar vida ou escudo',
-      ],
-      ['Coracao', 'recupera vida. Escudo: absorve dano antes da vida'],
-      [
-        'Cruz',
-        'ficha de revive: ao morrer, voce volta na entrada da sala. Guarda 3',
-      ],
-    ],
-  ],
-];
 
 // botao gordo de jogo, igual ao da home e da tela de derrota
 const CHUNKY =
@@ -109,6 +35,7 @@ export function LegendDialog({
   onMenu,
   onRestart,
 }: LegendDialogProps) {
+  const t = useTexts();
   return (
     <Dialog
       open={open}
@@ -126,10 +53,10 @@ export function LegendDialog({
               {title}
             </DialogTitle>
             <DialogDescription className='font-display text-outline text-lg text-[#ff2d55]'>
-              Atravesse as salas sem ser visto.
+              {t.legend.subtitle}
             </DialogDescription>
           </DialogHeader>
-          {SECTIONS.map(([section, entries]) => (
+          {t.legend.sections.map(({ title: section, entries }) => (
             <section
               key={section}
               className='rounded-2xl bg-black/25 p-3'
@@ -159,7 +86,7 @@ export function LegendDialog({
             className={cn(CHUNKY, SMALL, 'bg-[#5b5f7a]')}
             onClick={onMenu}
           >
-            Inicio
+            {t.legend.home}
           </button>
           <button
             type='button'
@@ -171,7 +98,7 @@ export function LegendDialog({
                 : document.documentElement.requestFullscreen?.()
             }
           >
-            Tela cheia
+            {t.legend.fullscreen}
           </button>
           {onRestart && (
             <button
@@ -179,7 +106,7 @@ export function LegendDialog({
               className={`${CHUNKY} bg-[#3d4fd6]`}
               onClick={onRestart}
             >
-              Reiniciar
+              {t.legend.restart}
             </button>
           )}
           <button

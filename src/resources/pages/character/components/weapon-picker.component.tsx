@@ -3,6 +3,7 @@ import { Check } from 'lucide-react';
 import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import type { WeaponId } from '@/app/modules/world/types/world.types';
 import { cn } from '@/shared/lib/utils';
+import { useTexts } from '@/shared/i18n';
 
 type WeaponPickerProps = {
   // null = espada
@@ -13,11 +14,11 @@ type WeaponPickerProps = {
 };
 
 // cor do cartao: as armas de fogo usam as mesmas da loja
-const OPTIONS: [id: WeaponId | null, label: string, color: string][] = [
-  [null, 'Espada', 'bg-rose-500'],
-  ['pistol', ITEMS.pistol.name, 'bg-sky-500'],
-  ['silenced', ITEMS.silenced.name, 'bg-violet-500'],
-  ['shotgun', ITEMS.shotgun.name, 'bg-orange-500'],
+const OPTIONS: [id: WeaponId | null, color: string][] = [
+  [null, 'bg-rose-500'],
+  ['pistol', 'bg-sky-500'],
+  ['silenced', 'bg-violet-500'],
+  ['shotgun', 'bg-orange-500'],
 ];
 
 // Cartoes no estilo da loja. So muda o preview: na run a arma vem da loja
@@ -26,23 +27,25 @@ export function WeaponPicker({
   previews,
   onChange,
 }: WeaponPickerProps) {
+  const t = useTexts();
   return (
     <section
-      aria-label='Arma no preview'
+      aria-label={t.character.weaponPreview}
       className='font-display mt-5 flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border-4 border-white/80 bg-[#16345c] p-4 pt-0 text-center'
     >
       <h2 className='-mt-5 rounded-full border-4 border-white bg-[#1f4f8f] px-5 py-1 tracking-wide text-white uppercase shadow-lg'>
-        Arma no preview
+        {t.character.weaponPreview}
       </h2>
       <p className='font-sans text-xs font-bold tracking-wide text-white/80 uppercase'>
-        So para ver como fica. Na run, a arma vem da loja.
+        {t.character.weaponNote}
       </p>
       <div className='grid w-full grid-cols-2 gap-3'>
-        {OPTIONS.map(([id, label, color]) => {
+        {OPTIONS.map(([id, color]) => {
           const picked = id === weapon;
+          const label = id ? t.shop.items[id] : t.common.sword;
           return (
             <button
-              key={label}
+              key={id ?? 'sword'}
               type='button'
               aria-pressed={picked}
               onClick={() => onChange(id)}

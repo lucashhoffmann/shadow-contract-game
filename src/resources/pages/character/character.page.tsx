@@ -4,8 +4,10 @@ import { Button } from '@/resources/components/ui/button';
 import { WeaponPicker } from '@/resources/pages/character/components/weapon-picker.component';
 import { LookEditor } from '@/resources/pages/character/components/look-editor.component';
 import { useCharacterPage } from '@/resources/pages/character/use-character.page';
+import { useTexts } from '@/shared/i18n';
 
 export function CharacterPage() {
+  const t = useTexts();
   const { canvasRef, look, setLook, weapon, setWeapon, previews, backToMenu } =
     useCharacterPage();
 
@@ -18,11 +20,11 @@ export function CharacterPage() {
       <div className='relative h-[38vh] min-w-0 shrink-0 md:h-auto md:min-h-0 md:flex-1'>
         <canvas
           ref={canvasRef}
-          aria-label='Preview do personagem'
+          aria-label={t.character.preview}
           className='block h-full w-full cursor-grab touch-none active:cursor-grabbing'
         />
         <p className='text-muted-foreground pointer-events-none absolute inset-x-0 bottom-3 text-center text-sm'>
-          Arraste para girar
+          {t.character.drag}
         </p>
       </div>
       <div className='flex min-h-0 flex-1 flex-col items-center gap-4 overflow-y-auto p-6 md:flex-none md:[justify-content:safe_center]'>
@@ -47,7 +49,7 @@ export function CharacterPage() {
             aria-hidden
             strokeWidth={3}
           />
-          Voltar
+          {t.common.back}
         </Button>
       </div>
     </main>
