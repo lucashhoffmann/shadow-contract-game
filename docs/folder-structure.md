@@ -46,11 +46,17 @@ src
 │   │   ├── player
 │   │   ├── enemy
 │   │   ├── combat
-│   │   └── shop
+│   │   ├── shop
+│   │   └── multiplayer
+│   ├── net                              servidor de salas (multiplayer)
+│   │   ├── protocol.ts                  copia de shadow-contract-server
+│   │   └── session.client.ts            conexao socket.io
 │   └── store
-│       └── game-store
-│           ├── game.store.ts
-│           └── tests
+│       ├── game-store
+│       │   ├── game.store.ts
+│       │   └── tests
+│       └── session-store
+│           └── session.store.ts         nome, sessoes, sala de espera
 ├── resources
 │   ├── components
 │   │   ├── base
@@ -59,6 +65,7 @@ src
 │   ├── pages
 │   │   ├── app.tsx
 │   │   ├── home
+│   │   ├── lobby
 │   │   ├── character
 │   │   └── game
 │   └── main.tsx
@@ -78,7 +85,8 @@ src/app/modules
 ├── world
 │   ├── constants/world.constants.ts     numeros de balanceamento
 │   ├── types/world.types.ts             tipos compartilhados
-│   ├── systems/world.system.ts          createWorld, stepWorld
+│   ├── systems/world.system.ts          createWorld, stepWorld (solo)
+│   ├── utils/players.util.ts            jogador em foco, vivos, mais perto
 │   └── tests
 ├── level
 │   ├── templates/room.template.ts       salas pre-fabricadas
@@ -95,9 +103,14 @@ src/app/modules
 ├── combat
 │   ├── systems/combat.system.ts         ataque, balas, morte, coleta
 │   └── tests
-└── shop
-    ├── constants/shop.constants.ts      catalogo de itens
-    ├── systems/shop.system.ts           mercado, compra e gatilho da loja
+├── shop
+│   ├── constants/shop.constants.ts      catalogo de itens
+│   ├── systems/shop.system.ts           mercado, compra e gatilho da loja
+│   └── tests
+└── multiplayer                          so o que muda com varios jogadores
+    ├── systems/multiplayer.system.ts    createMultiWorld, stepMultiWorld
+    ├── utils/snapshot.util.ts           mensagens host <-> convidado
+    ├── templates/room.template.ts       salas 17x19
     └── tests
 ```
 

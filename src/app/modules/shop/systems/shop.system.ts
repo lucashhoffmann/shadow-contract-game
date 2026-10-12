@@ -74,14 +74,14 @@ export function canBuy(world: World, id: ItemId): boolean {
   const owned = ownedWeapon(world, id);
   // arma cheia nao tem o que recarregar
   if (owned && owned.ammo >= ITEMS[owned.id].ammo) return false;
-  return world.run.money >= itemPrice(world, id);
+  return world.player.money >= itemPrice(world, id);
 }
 
 export function buyItem(world: World, id: ItemId): boolean {
   if (!canBuy(world, id)) return false;
   const price = itemPrice(world, id);
   const owned = ownedWeapon(world, id);
-  world.run.money -= price;
+  world.player.money -= price;
   if (id === 'armor') {
     const previousHp = world.player.hp;
     world.player.maxHp += ITEMS.armor.bonusHp;

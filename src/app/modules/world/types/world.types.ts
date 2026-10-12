@@ -105,6 +105,8 @@ export type Projectile = {
   travelled: number;
   // id do inimigo que atirou: o aviso de dano ou erro sobe sobre ele
   shooter?: number;
+  // `player.id` de quem atirou: a morte conta para ele
+  by?: number;
   // estrela arremessada por ninja: so muda o modelo
   shuriken?: boolean;
   // bala do player que saiu como headshot: `damage` ja vem multiplicado
@@ -169,6 +171,13 @@ export type Market = {
 export type Weapon = { id: WeaponId; ammo: number };
 
 export type Player = {
+  // posicao em `world.players`
+  id: number;
+  // multiplayer: nome sobre a cabeca e cor do jogador; solo: '' e null
+  name: string;
+  color: string | null;
+  // carteira: cada jogador pega e gasta o proprio dinheiro
+  money: number;
   pos: Vec2;
   facing: number;
   hp: number;
@@ -204,7 +213,7 @@ export type Player = {
 };
 
 export type Run = {
-  money: number;
+  // total coletado pelo grupo (a carteira de cada um e `player.money`)
   earned: number;
   roomIndex: number;
   kills: number;
@@ -233,6 +242,9 @@ export type Run = {
   events: { at: number; text: string }[];
 };
 
+// solo: um jogador, regras de `stepWorld`. multi: ate 4, `stepMultiWorld`
+export type WorldMode = 'solo' | 'multi';
+
 export type WorldStatus = 'intro' | 'playing' | 'paused' | 'shop' | 'dead';
 
 // texto que sobe do ponto do golpe: dano causado ou sofrido, ou "Errou!".
@@ -257,6 +269,13 @@ export type World = {
   rngState: number;
   nextId: number;
   status: WorldStatus;
+  mode: WorldMode;
+  // todos os jogadores, vivos ou mortos (`hp <= 0`); solo tem um so
+  players: Player[];
+  // Jogador em foco, sempre um de `players`. Fora do passo e o jogador local
+  // (o que a camera e o HUD seguem). Durante o passo e quem esta agindo ou
+  // sendo alvo no momento (ver players.util): os sistemas leem `world.player`
+  // e servem para um ou varios jogadores sem mudar.
   player: Player;
   enemies: Enemy[];
   projectiles: Projectile[];

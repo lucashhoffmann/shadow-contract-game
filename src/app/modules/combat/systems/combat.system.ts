@@ -352,7 +352,7 @@ export function updateCombat(world: World, dt: number, knife = false): void {
       player.weapon.id,
       undefined,
       headshot,
-    );
+    ).by = player.id;
   }
   world.run.stats.projectilesFired += item.pellets;
   world.run.events.push({
@@ -372,8 +372,10 @@ function shooterPos(world: World, bullet: Projectile): Vec2 {
 
 // anda as balas e resolve contato: parede some, personagem leva dano
 export function updateProjectiles(world: World, dt: number): void {
-  const player = world.player;
+  const focus = world.player;
   world.projectiles = world.projectiles.filter((bullet) => {
+    // quem leva ou causa o dano fica em foco ate o fim da bala
+    world.player = focus;
     bullet.pos.x += bullet.vel.x * dt;
     bullet.pos.y += bullet.vel.y * dt;
     bullet.life -= dt;
@@ -388,9 +390,13 @@ export function updateProjectiles(world: World, dt: number): void {
     // caixa segura a bala e quebra
     if (breakPropAt(world, bullet.pos.x, bullet.pos.y)) return false;
     if (bullet.owner === 'enemy') {
-      if (distance(bullet.pos, player.pos) > PLAYER_RADIUS + BULLET_RADIUS) {
-        return true;
-      }
+      const struck = world.players.find(
+        (player) =>
+          player.hp > 0 &&
+          distance(bullet.pos, player.pos) <= PLAYER_RADIUS + BULLET_RADIUS,
+      );
+      if (!struck) return true;
+      world.player = struck;
       damagePlayer(world, bullet.damage, shooterPos(world, bullet));
       return false;
     }
@@ -400,6 +406,8 @@ export function updateProjectiles(world: World, dt: number): void {
         distance(bullet.pos, e.pos) <= ENEMY_RADIUS + BULLET_RADIUS,
     );
     if (!hit) return true;
+    // a morte (adrenalina, direcao do lancamento) conta para quem atirou
+    world.player = world.players[bullet.by ?? focus.id] ?? focus;
     world.run.stats.projectilesHit++;
     damageEnemy(
       world,
@@ -409,6 +417,7 @@ export function updateProjectiles(world: World, dt: number): void {
     );
     return false;
   });
+  world.player = focus;
 }
 
 export function collectPickups(world: World): void {
@@ -416,7 +425,7 @@ export function collectPickups(world: World): void {
   world.pickups = world.pickups.filter((pickup) => {
     if (distance(player.pos, pickup.pos) > PICKUP_RADIUS) return true;
     if (pickup.kind === 'money') {
-      world.run.money += pickup.value;
+      player.money += pickup.value;
       world.run.earned += pickup.value;
       world.run.events.push({
         at: world.run.seconds,

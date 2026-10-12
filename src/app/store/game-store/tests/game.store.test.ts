@@ -69,7 +69,7 @@ describe('game store', () => {
   it('tick avanca a simulacao e sincroniza o hud', () => {
     play();
     const startY = getWorld()!.player.pos.y;
-    getWorld()!.run.money = 80;
+    getWorld()!.player.money = 80;
 
     store().tick(FORWARD, FIXED_DT);
 
@@ -105,7 +105,7 @@ describe('game store', () => {
 
   it('buy debita, mostra a arma no hud e publica o mercado novo', () => {
     play();
-    getWorld()!.run.money = 300;
+    getWorld()!.player.money = 300;
     const market = store().market;
 
     store().buy('pistol');

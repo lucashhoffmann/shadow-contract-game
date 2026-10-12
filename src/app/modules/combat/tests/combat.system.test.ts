@@ -428,7 +428,7 @@ describe('collectPickups', () => {
 
     collectPickups(world);
 
-    expect(world.run.money).toBe(25);
+    expect(world.player.money).toBe(25);
     expect(world.run.earned).toBe(25);
     expect(world.pickups.map((p) => p.id)).toEqual([91]);
   });

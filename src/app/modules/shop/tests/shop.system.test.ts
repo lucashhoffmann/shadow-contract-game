@@ -45,11 +45,11 @@ function marketFor(seed: number, shops: number) {
 describe('buyItem', () => {
   it('debita o preco de mercado e equipa a arma com municao cheia', () => {
     const world = createArenaWorld();
-    world.run.money = 250;
+    world.player.money = 250;
 
     expect(buyItem(world, 'pistol')).toBe(true);
 
-    expect(world.run.money).toBe(250 - ITEMS.pistol.price);
+    expect(world.player.money).toBe(250 - ITEMS.pistol.price);
     expect(world.player.weapon).toEqual({
       id: 'pistol',
       ammo: ITEMS.pistol.ammo,
@@ -59,27 +59,27 @@ describe('buyItem', () => {
   it('cobra o preco do mercado, nao o preco base', () => {
     const world = createArenaWorld();
     world.market.prices.pistol = 300;
-    world.run.money = 299;
+    world.player.money = 299;
     expect(canBuy(world, 'pistol')).toBe(false);
 
-    world.run.money = 300;
+    world.player.money = 300;
     expect(buyItem(world, 'pistol')).toBe(true);
-    expect(world.run.money).toBe(0);
+    expect(world.player.money).toBe(0);
   });
 
   it('nao compra sem saldo', () => {
     const world = createArenaWorld();
-    world.run.money = ITEMS.pistol.price - 1;
+    world.player.money = ITEMS.pistol.price - 1;
 
     expect(buyItem(world, 'pistol')).toBe(false);
 
-    expect(world.run.money).toBe(ITEMS.pistol.price - 1);
+    expect(world.player.money).toBe(ITEMS.pistol.price - 1);
     expect(world.player.weapon).toBeNull();
   });
 
   it('colete aumenta a vida maxima e cura', () => {
     const world = createArenaWorld();
-    world.run.money = ITEMS.armor.price;
+    world.player.money = ITEMS.armor.price;
     world.player.hp = 40;
 
     buyItem(world, 'armor');
@@ -91,7 +91,7 @@ describe('buyItem', () => {
 
   it('arma nova substitui a anterior', () => {
     const world = createArenaWorld();
-    world.run.money = 1000;
+    world.player.money = 1000;
     buyItem(world, 'pistol');
     buyItem(world, 'shotgun');
     expect(world.player.weapon?.id).toBe('shotgun');
@@ -99,7 +99,7 @@ describe('buyItem', () => {
 
   it('recomprar o mesmo item encarece so ele, em um mercado novo', () => {
     const world = createArenaWorld();
-    world.run.money = 1000;
+    world.player.money = 1000;
     const before = world.market;
 
     buyItem(world, 'armor');
@@ -116,7 +116,7 @@ describe('buyItem', () => {
 describe('arsenal e recarga', () => {
   function richWorld() {
     const world = createArenaWorld();
-    world.run.money = 5000;
+    world.player.money = 5000;
     return world;
   }
 
@@ -138,13 +138,13 @@ describe('arsenal e recarga', () => {
     const pistol = world.player.arsenal[0];
     pistol.ammo = 3;
     const market = world.market.prices.pistol;
-    const before = world.run.money;
+    const before = world.player.money;
 
     expect(itemPrice(world, 'pistol')).toBe(refillPrice(market));
     expect(refillPrice(market)).toBeLessThan(market / 2);
     expect(buyItem(world, 'pistol')).toBe(true);
 
-    expect(world.run.money).toBe(before - refillPrice(market));
+    expect(world.player.money).toBe(before - refillPrice(market));
     expect(pistol.ammo).toBe(ITEMS.pistol.ammo);
     expect(world.player.arsenal).toHaveLength(1);
     expect(world.run.events.at(-1)?.text).toContain('Recarregou');
@@ -153,11 +153,11 @@ describe('arsenal e recarga', () => {
   it('arma cheia nao tem o que recarregar', () => {
     const world = richWorld();
     buyItem(world, 'pistol');
-    const before = world.run.money;
+    const before = world.player.money;
 
     expect(canBuy(world, 'pistol')).toBe(false);
     expect(buyItem(world, 'pistol')).toBe(false);
-    expect(world.run.money).toBe(before);
+    expect(world.player.money).toBe(before);
   });
 });
 

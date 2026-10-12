@@ -72,13 +72,12 @@ export function tileCenter(roomIndex: number, col: number, row: number): Vec2 {
   return { x: col + 0.5, y: roomIndex * ROOM_H + (ROOM_H - 1 - row) + 0.5 };
 }
 
-// Porta de correr: fica no vao de saida (colunas DOOR_COLS da linha do fundo)
+// Porta de correr: fica no vao de saida (3 colunas do meio da linha do fundo)
 // da sala inicial e de cada loja, ou seja, na entrada de cada nivel.
-const DOOR_COLS = [4, 6];
 export function isDoorTile(tx: number, ty: number): boolean {
   return (
-    tx >= DOOR_COLS[0] &&
-    tx <= DOOR_COLS[1] &&
+    // vao de 3 tiles no meio da parede; a largura da sala muda por modo
+    Math.abs(tx - Math.floor(ROOM_W / 2)) <= 1 &&
     ty % ROOM_H === ROOM_H - 1 &&
     Math.floor(ty / ROOM_H) % SHOP_EVERY === 0
   );
@@ -99,7 +98,7 @@ export function doorOpen(world: World, ty: number): boolean {
     Math.abs(pos.y - ty) < DOOR_RANGE &&
     Math.abs(pos.x - ROOM_W / 2) < DOOR_RANGE;
   return (
-    reaches(world.player.pos) ||
+    world.players.some((player) => player.hp > 0 && reaches(player.pos)) ||
     (!doorsSealed(world) &&
       world.enemies.some((e) => e.state !== 'dead' && reaches(e.pos)))
   );

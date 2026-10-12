@@ -19,7 +19,9 @@ type World = {
   rngState: number; // estado do mulberry32
   nextId: number; // gerador de id de entidade
   status: 'intro' | 'playing' | 'paused' | 'shop' | 'dead';
-  player: Player;
+  mode: 'solo' | 'multi';
+  players: Player[]; // todos, vivos ou mortos; solo tem um so
+  player: Player; // jogador em foco, sempre um de `players`
   enemies: Enemy[];
   projectiles: Projectile[];
   props: Prop[];
@@ -27,8 +29,7 @@ type World = {
   floaters: Floater[]; // numeros de dano no ar, so visual
   rooms: Room[]; // ordenadas por index, no maximo 3 vivas
   run: {
-    money;
-    earned;
+    earned; // total do grupo; a carteira de cada um e `player.money`
     roomIndex;
     kills;
     shops;
@@ -48,7 +49,18 @@ type World = {
 
 Invariantes:
 
-- so `stepWorld` e acoes do store mutam `World`
+- so `stepWorld` (solo), `stepMultiWorld` (multi) e acoes do store mutam
+  `World`
+- `world.player` e o jogador em foco. Fora do passo e o jogador local, o que
+  a camera e o HUD seguem. Durante o passo, quem chama um sistema aponta
+  `world.player` para o jogador da vez (`asPlayer`, em
+  `world/utils/players.util.ts`): por isso os sistemas leem `world.player` e
+  valem para um ou varios jogadores. Cada inimigo usa como foco o jogador
+  vivo mais perto dele; a bala usa quem ela acertou ou quem atirou
+  (`Projectile.by`)
+- jogador com `hp <= 0` esta morto: nao age, nao e alvo, nao abre porta
+- `Player` tem `id` (posicao em `players`), `name` e `color` (multi; solo usa
+  `''` e `null`) e `money`
 - `status !== 'playing'` congela a simulacao
 - apos 10 segundos sem deslocamento real, `idleWarnings` sobe e a UI pulsa
   bordas azuis; a cada 5 segundos parado, outro inimigo e alertado ou criado
@@ -655,3 +667,80 @@ function createCharacterPreview(canvas: HTMLCanvasElement): {
 - a tela inicial oferece a instalacao em aparelho de toque
   (`home/components/install-app`): botao quando o navegador avisa
   (`beforeinstallprompt`), instrucao manual no iPhone, nada se ja instalado
+
+## Multiplayer (`modules/multiplayer`)
+
+O nucleo de regras e o mesmo do solo. Este modulo guarda so o que muda com
+varios jogadores. Quem simula e o host; o servidor de salas
+(`shadow-contract-server`) so junta jogadores e repassa mensagens.
+
+```ts
+type Seat = { name: string; color: string };
+function createMultiWorld(seed: number, seats: Seat[]): World;
+function stepMultiWorld(
+  world: World,
+  inputs: (InputState | undefined)[],
+  dt: number,
+): void;
+```
+
+- `createMultiWorld`: `mode: 'multi'`, um `Player` por `Seat`, lado a lado no
+  ponto de partida; `players[0]` e o host e comeca em foco
+- sala: `ROOM_W` x `ROOM_H` deixam de ser fixos. `setRoomSize(mode)` troca
+  entre `ROOM_SIZES.solo` (11x13) e `ROOM_SIZES.multi` (17x19) e e chamado
+  por `createEmptyWorld` antes de gerar qualquer sala. O tamanho e global do
+  processo, nao do `World`: so ha uma partida por navegador
+- templates proprios em `multiplayer/templates/room.template.ts`, com ate 8
+  rondas por sala; `pickTemplate` escolhe o conjunto por `world.mode`
+- dificuldade: cada jogador alem do primeiro multiplica os inimigos da sala
+  por `+MULTI_ENEMIES_PER_PLAYER` (`enemyMultiplier`) e adianta a dificuldade
+  em `MULTI_THREAT_ROOMS` salas (`threatBoost`): contagem de inimigos, chance
+  de ninja, visao, tempo de deteccao, saltos e inteligencia nascem como se a
+  sala fosse mais funda. Com 4 jogadores a sala 1 ja vale a sala 13 do solo
+- `stepMultiWorld`: `inputs[i]` e o input de `players[i]`; sem input, parado.
+  Ordem: todos andam, o grupo avanca de sala, inimigos, todos atacam, balas,
+  todos coletam
+- o grupo anda junto: a sala avanca com o jogador vivo mais a frente; quem
+  ficou alem de `ROOMS_BEHIND` e puxado para `run.checkpoint`
+- dinheiro e individual: a moeda e de quem pegou
+- a partida acaba (`status: 'dead'`) quando todos os jogadores morrem
+- ainda nao valem no multi: inatividade, loja e revive
+
+### Rede
+
+Quem simula e o host, no navegador dele. O servidor de salas so repassa.
+
+```ts
+type Snapshot; // World sem `player` e `intelligence`; `rooms` e `run.events` opcionais
+function encodeSnapshot(world: World, sentRooms: string): Snapshot;
+function applySnapshot(previous: World | null, snapshot: Snapshot, you: number): World;
+function cleanInput(payload: unknown): InputState | null;
+```
+
+- host: a cada `SNAPSHOT_EVERY` passos (20 vezes por segundo) manda o mundo
+  em JSON. `rooms` so vai quando `roomsKey` muda (sala nova, caixa quebrada);
+  `run.events` so vai com `status: 'dead'`. O fim da partida vai na hora
+- convidado: nao simula. Manda o `InputState` quando ele muda e troca o mundo
+  inteiro a cada snapshot; `world.player` vira `players[you]`. A engine ja
+  suaviza posicao entre estados
+- host guarda o ultimo input de cada convidado; pulso (`interact`, `open`)
+  fica guardado ate o passo seguinte (`mergeInput`, `clearPulses`) e todo
+  input passa por `cleanInput`
+- aba do host em segundo plano para o `requestAnimationFrame`: a partida
+  congela para todos ate ele voltar
+
+### Store
+
+- `game.store`: `Screen` ganha `'lobby'`. `openLobby()`, `startMulti(seats,
+link, seed?)`, `receiveInput(index, payload)`, `receiveState(snapshot)`.
+  `tick` simula (solo ou host) ou so envia input (convidado). No multi nao ha
+  legenda inicial nem pausa, e a sala nao conta para `best`. `backToMenu` e
+  `startRun` chamam `link.leave()`
+- `session.store`: `status` (`idle`, `connecting`, `lobby`, `room`,
+  `playing`), `name` (persistido), `sessions`, `session`, `you`, `error`;
+  `connect`, `create(publica)`, `join(codigo)`, `start`, `leave`,
+  `disconnect`. Ao receber `session:started` monta o `MultiLink` e chama
+  `startMulti`; `session:closed` (host saiu) tira todos da partida
+- `app/net`: `protocol.ts` (copia do servidor) e `session.client.ts`
+  (socket.io). Endereco do servidor: `VITE_SERVER_URL`, ou a mesma maquina na
+  porta 3001

@@ -6,6 +6,21 @@ import {
   selectWeapon as selectWorldWeapon,
 } from '@/app/modules/player/systems/player.system';
 import {
+  createMultiWorld,
+  type Seat,
+  stepMultiWorld,
+} from '@/app/modules/multiplayer/systems/multiplayer.system';
+import {
+  applySnapshot,
+  cleanInput,
+  clearPulses,
+  encodeSnapshot,
+  mergeInput,
+  roomsKey,
+  type Snapshot,
+} from '@/app/modules/multiplayer/utils/snapshot.util';
+import { setRoomSize } from '@/app/modules/world/constants/world.constants';
+import {
   buyItem,
   closeShop as closeWorldShop,
   createMarket,
@@ -31,7 +46,26 @@ import type {
 // Contrato em docs/contracts.md (secao Store).
 
 export type Screen =
-  'menu' | 'character' | 'intro' | 'playing' | 'paused' | 'shop' | 'gameover';
+  | 'menu'
+  | 'character'
+  | 'lobby'
+  | 'intro'
+  | 'playing'
+  | 'paused'
+  | 'shop'
+  | 'gameover';
+
+// Ligacao de uma partida multiplayer com a rede (session.store). O host
+// simula e manda o estado; o convidado manda o proprio input.
+export type MultiLink = {
+  host: boolean;
+  // posicao do jogador local em `world.players`
+  you: number;
+  sendState: (snapshot: Snapshot) => void;
+  sendInput: (input: InputState) => void;
+  // sair da sessao: chamado quando o jogador volta ao menu
+  leave: () => void;
+};
 
 export type Hud = {
   hp: number;
@@ -157,6 +191,13 @@ type GameStore = {
   setLook: (patch: Partial<PlayerLook>) => void;
   setBloodColor: (color: string) => void;
   openCharacter: () => void;
+  openLobby: () => void;
+  // partida multiplayer: `seats[i]` vira `world.players[i]`
+  startMulti: (seats: Seat[], link: MultiLink, seed?: number) => void;
+  // host: chegou input do jogador `index`
+  receiveInput: (index: number, payload: unknown) => void;
+  // convidado: chegou o estado do mundo
+  receiveState: (snapshot: Snapshot) => void;
   startRun: (seed?: number) => void;
   begin: () => void;
   togglePause: () => void;
@@ -194,6 +235,21 @@ const SCREEN_BY_STATUS: Record<WorldStatus, Screen> = {
 // a engine precisa deles a cada frame
 let world: World | null = null;
 
+// partida multiplayer em andamento; null no solo
+let multi:
+  | (MultiLink & {
+      // host: ultimo input de cada jogador, pela posicao em `players`
+      inputs: (InputState | undefined)[];
+      ticks: number;
+      // chave das salas ja enviadas (snapshot.util)
+      sentRooms: string;
+      // convidado: ultimo input enviado, para nao repetir
+      sentInput: string;
+    })
+  | null = null;
+// o host manda o estado a cada tantos passos: 60 / 3 = 20 vezes por segundo
+const SNAPSHOT_EVERY = 3;
+
 export const joystickInput: InputState = { moveX: 0, moveY: 0, dash: false };
 
 export function getWorld(): World | null {
@@ -222,7 +278,7 @@ function readHud(w: World): Hud {
     shield: w.player.shield,
     dashes: w.player.dashes,
     revives: w.run.revives,
-    money: w.run.money,
+    money: w.player.money,
     room: w.run.roomIndex,
     kills: w.run.kills,
     weaponId: w.player.weapon?.id ?? null,
@@ -269,8 +325,15 @@ export const useGameStore = create<GameStore>()(
           intelligence: world.intelligence,
           attackVariance: world.run.attackVariance,
           idleWarnings: world.run.idleWarnings,
-          best: Math.max(prev.best, hud.room),
+          // recorde e do solo: sala de multiplayer nao conta
+          best: multi ? prev.best : Math.max(prev.best, hud.room),
         });
+      };
+      // host: manda o mundo para os convidados
+      const publish = () => {
+        if (!world || !multi) return;
+        multi.sendState(encodeSnapshot(world, multi.sentRooms));
+        multi.sentRooms = roomsKey(world);
       };
 
       return {
@@ -295,8 +358,44 @@ export const useGameStore = create<GameStore>()(
         openCharacter: () => {
           if (!world) set({ screen: 'character' });
         },
+        openLobby: () => {
+          if (!world) set({ screen: 'lobby' });
+        },
+        // sem legenda nem pausa: comeca valendo para todos ao mesmo tempo
+        startMulti: (seats, link, seed = Date.now()) => {
+          multi = {
+            ...link,
+            inputs: [],
+            ticks: 0,
+            sentRooms: '',
+            sentInput: '',
+          };
+          setJoystickInput(0, 0);
+          if (link.host) {
+            world = createMultiWorld(seed, seats);
+            publish();
+            sync();
+          } else {
+            // o mundo chega no primeiro estado do host
+            setRoomSize('multi');
+            world = null;
+            set({ screen: 'playing', hud: EMPTY_HUD, arsenal: [] });
+          }
+        },
+        receiveInput: (index, payload) => {
+          const input = cleanInput(payload);
+          if (!multi?.host || !input || index <= 0) return;
+          multi.inputs[index] = mergeInput(multi.inputs[index], input);
+        },
+        receiveState: (snapshot) => {
+          if (!multi || multi.host) return;
+          world = applySnapshot(world, snapshot, multi.you);
+          sync();
+        },
         // toda run abre na legenda; `begin` solta a simulacao
         startRun: (seed = Date.now()) => {
+          multi?.leave();
+          multi = null;
           world = createWorld(seed, get().intelligence, get().attackVariance);
           world.status = 'intro';
           setJoystickInput(0, 0);
@@ -308,13 +407,35 @@ export const useGameStore = create<GameStore>()(
           sync();
         },
         togglePause: () => {
-          if (!world) return;
+          // multiplayer nao pausa: o jogo e de todos
+          if (!world || multi) return;
           toggleWorldPause(world);
           sync();
         },
         tick: (input, dt) => {
+          if (multi && !multi.host) {
+            // convidado nao simula: manda o input quando muda
+            const next = JSON.stringify(input);
+            if (next !== multi.sentInput) {
+              multi.sentInput = next;
+              multi.sendInput({ ...input });
+            }
+            return;
+          }
           if (!world || world.status !== 'playing') return;
-          stepWorld(world, input, dt);
+          if (!multi) {
+            stepWorld(world, input, dt);
+            sync();
+            return;
+          }
+          multi.inputs[0] = input;
+          stepMultiWorld(world, multi.inputs, dt);
+          for (let i = 1; i < multi.inputs.length; i++) {
+            clearPulses(multi.inputs[i]);
+          }
+          // o fim da partida vai na hora, sem esperar a vez
+          const over = (world.status as WorldStatus) === 'dead';
+          if (++multi.ticks % SNAPSHOT_EVERY === 0 || over) publish();
           sync();
         },
         buy: (id) => {
@@ -336,6 +457,8 @@ export const useGameStore = create<GameStore>()(
           sync();
         },
         backToMenu: () => {
+          multi?.leave();
+          multi = null;
           world = null;
           set({ screen: 'menu' });
         },

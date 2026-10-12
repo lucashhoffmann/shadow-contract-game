@@ -6,8 +6,18 @@ import type {
 export const FIXED_DT = 1 / 60;
 
 // sala
-export const ROOM_W = 11;
-export const ROOM_H = 13;
+// Tamanho da sala, por modo. Solo 11x13; multiplayer 17x19, quase o dobro da
+// area. Vale para a partida inteira: `createEmptyWorld` e `createMultiWorld`
+// chamam `setRoomSize` antes de gerar a primeira sala.
+// ponytail: tamanho global em vez de campo no World. So existe uma partida
+// por processo (quem simula e o navegador do jogador); se um dia o servidor
+// simular varias partidas, levar o tamanho para dentro do World.
+export const ROOM_SIZES = { solo: [11, 13], multi: [17, 19] } as const;
+export let ROOM_W: number = ROOM_SIZES.solo[0];
+export let ROOM_H: number = ROOM_SIZES.solo[1];
+export function setRoomSize(mode: keyof typeof ROOM_SIZES): void {
+  [ROOM_W, ROOM_H] = ROOM_SIZES[mode];
+}
 export const ROOMS_AHEAD = 1;
 export const ROOMS_BEHIND = 1;
 // um contrato = SHOP_EVERY salas, a ultima e a loja
@@ -203,6 +213,13 @@ export const HEART_MAX = 0.6;
 // escudo: cada um da de 10% a 30%; o total nunca passa de 30%
 export const SHIELD_MIN = 0.1;
 export const SHIELD_MAX = 0.3;
+
+// multiplayer: mais dificil que o solo, e mais quanto mais gente. Cada
+// jogador alem do primeiro multiplica os inimigos da sala e adianta a
+// dificuldade em MULTI_THREAT_ROOMS salas (visao, deteccao, saltos, ninjas,
+// inteligencia)
+export const MULTI_ENEMIES_PER_PLAYER = 0.6;
+export const MULTI_THREAT_ROOMS = 4;
 
 // economia: recompensa fixa por sala; quem sobe e o preco (shop.constants)
 export const KILL_MONEY = 40;

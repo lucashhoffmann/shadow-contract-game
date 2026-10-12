@@ -177,7 +177,12 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     canvas.style.filter = blur > 0.05 ? `blur(${blur.toFixed(1)}px)` : '';
 
     // camera segue suavizada, como o personagem (ver world.renderer animate)
-    const { x, y } = world.player.pos;
+    // morto no multiplayer assiste: a camera passa a seguir um colega vivo
+    const followed =
+      world.player.hp > 0
+        ? world.player
+        : (world.players.find((p) => p.hp > 0) ?? world.player);
+    const { x, y } = followed.pos;
     const far = Math.hypot(x - focus.x, y - focus.y) > CAMERA_SNAP_DISTANCE;
     const follow = far ? 1 : Math.min(1, frameTime * CAMERA_FOLLOW_RATE);
     focus.x += (x - focus.x) * follow;

@@ -10,6 +10,10 @@ import {
 } from '@/app/modules/level/utils/grid.util';
 import { findPath } from '@/app/modules/level/utils/pathfinding.util';
 import {
+  nearestPlayer,
+  threatBoost,
+} from '@/app/modules/world/utils/players.util';
+import {
   ALERT_DURATION,
   DASH_SPEED,
   DASH_TIME,
@@ -92,7 +96,9 @@ export function createEnemy(
   kind: EnemyKind = 'suit',
 ): Enemy {
   const stats = ENEMY_KINDS[kind];
-  const intelligence = intelligenceForRoom(world, roomIndex);
+  // multiplayer adianta a dificuldade: `threat` e a sala que ele "vale"
+  const threat = roomIndex + threatBoost(world);
+  const intelligence = intelligenceForRoom(world, threat);
   return {
     id: world.nextId++,
     kind,
@@ -111,21 +117,21 @@ export function createEnemy(
     attack: 0,
     viewRange:
       stats.viewRange +
-      Math.min(VIEW_RANGE_MAX_BONUS, roomIndex * VIEW_RANGE_PER_ROOM),
+      Math.min(VIEW_RANGE_MAX_BONUS, threat * VIEW_RANGE_PER_ROOM),
     detectTime: Math.max(
       DETECT_TIME_MIN,
-      DETECT_TIME - roomIndex * DETECT_TIME_PER_ROOM,
+      DETECT_TIME - threat * DETECT_TIME_PER_ROOM,
     ),
     intelligence,
     dash: 0,
     dashCooldown: 0,
     dashEvery:
-      roomIndex < ENEMY_DASH_FROM_ROOM
+      threat < ENEMY_DASH_FROM_ROOM
         ? 0
         : Math.max(
             ENEMY_DASH_MIN_INTERVAL,
             ENEMY_DASH_INTERVAL -
-              (roomIndex - ENEMY_DASH_FROM_ROOM) * ENEMY_DASH_PER_ROOM,
+              (threat - ENEMY_DASH_FROM_ROOM) * ENEMY_DASH_PER_ROOM,
           ) / intelligence.dash,
     hearing: 0,
     heard: null,
@@ -428,11 +434,14 @@ function fly(world: World, enemy: Enemy, dt: number): void {
 }
 
 export function updateEnemies(world: World, dt: number): void {
+  const focus = world.player;
   for (const enemy of world.enemies) {
     if (enemy.state === 'dead') {
       fly(world, enemy, dt);
       continue;
     }
+    // cada inimigo lida com o jogador vivo mais perto dele
+    world.player = nearestPlayer(world, enemy.pos) ?? focus;
     enemy.attack = Math.max(0, enemy.attack - dt);
     // detection cheia vem de ver o player ou de levar tiro (damageEnemy)
     if (enemy.state !== 'alert' && enemy.detection >= 1) enterAlert(enemy);
@@ -464,4 +473,5 @@ export function updateEnemies(world: World, dt: number): void {
     enemy.state = 'patrol';
     patrol(world, enemy, dt);
   }
+  world.player = focus;
 }

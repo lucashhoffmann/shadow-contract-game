@@ -80,7 +80,7 @@ describe('stepWorld', () => {
 
     expect(enemy.state).toBe('dead');
     expect(world.run.kills).toBe(1);
-    expect(world.run.money).toBe(KILL_MONEY);
+    expect(world.player.money).toBe(KILL_MONEY);
     expect(world.status).toBe('playing');
   });
 

@@ -1,0 +1,134 @@
+import type { Snapshot } from '@/app/modules/multiplayer/utils/snapshot.util';
+import {
+  FIXED_DT,
+  ROOM_W,
+} from '@/app/modules/world/constants/world.constants';
+import type { InputState } from '@/app/modules/world/types/world.types';
+import {
+  getWorld,
+  type MultiLink,
+  useGameStore,
+} from '@/app/store/game-store/game.store';
+
+const store = () => useGameStore.getState();
+const SEATS = [
+  { name: 'Host', color: '#ff8a3c' },
+  { name: 'Ana', color: '#39d0ff' },
+];
+const IDLE: InputState = { moveX: 0, moveY: 0, dash: false };
+const RIGHT: InputState = { moveX: 1, moveY: 0, dash: false };
+
+function link(host: boolean, you: number) {
+  return {
+    host,
+    you,
+    sendState: vi.fn<(snapshot: Snapshot) => void>(),
+    sendInput: vi.fn<(input: InputState) => void>(),
+    leave: vi.fn<() => void>(),
+  } satisfies MultiLink;
+}
+
+beforeEach(() => {
+  store().backToMenu();
+  useGameStore.setState({ best: 0 });
+});
+
+describe('game store no multiplayer', () => {
+  it('lobby so abre fora de uma run', () => {
+    store().openLobby();
+    expect(store().screen).toBe('lobby');
+    store().startRun(1);
+    store().openLobby();
+    expect(store().screen).toBe('intro');
+  });
+
+  it('host comeca jogando, sem legenda, e manda o estado 20 vezes por segundo', () => {
+    const net = link(true, 0);
+    store().startMulti(SEATS, net, 1);
+    expect(store().screen).toBe('playing');
+    expect(getWorld()?.players).toHaveLength(2);
+    expect(net.sendState).toHaveBeenCalledTimes(1);
+
+    for (let i = 0; i < 60; i++) store().tick(IDLE, FIXED_DT);
+    expect(net.sendState).toHaveBeenCalledTimes(21);
+    // salas so no primeiro envio
+    expect(net.sendState.mock.calls[0][0].rooms).toBeDefined();
+    expect(net.sendState.mock.calls[5][0].rooms).toBeUndefined();
+  });
+
+  it('host anda o convidado pelo input recebido e nao aceita input do proprio lugar', () => {
+    store().startMulti(SEATS, link(true, 0), 1);
+    const [host, guest] = getWorld()!.players;
+    const from = { host: host.pos.x, guest: guest.pos.x };
+
+    store().receiveInput(1, { moveX: -1, moveY: 0, dash: false });
+    store().receiveInput(0, { moveX: 1, moveY: 0, dash: false });
+    store().receiveInput(1, 'lixo');
+    for (let i = 0; i < 30; i++) store().tick(IDLE, FIXED_DT);
+
+    expect(guest.pos.x).toBeLessThan(from.guest - 1);
+    expect(host.pos.x).toBe(from.host);
+  });
+
+  it('multiplayer nao pausa e a sala nao conta para o recorde do solo', () => {
+    store().startMulti(SEATS, link(true, 0), 1);
+    store().togglePause();
+    expect(store().screen).toBe('playing');
+    getWorld()!.run.roomIndex = 9;
+    store().tick(IDLE, FIXED_DT);
+    expect(store().hud.room).toBe(9);
+    expect(store().best).toBe(0);
+  });
+
+  it('convidado nao simula: manda o input so quando muda', () => {
+    const net = link(false, 1);
+    store().startMulti(SEATS, net);
+    expect(store().screen).toBe('playing');
+    expect(getWorld()).toBeNull();
+    expect(ROOM_W).toBe(17);
+
+    store().tick(RIGHT, FIXED_DT);
+    store().tick(RIGHT, FIXED_DT);
+    store().tick(IDLE, FIXED_DT);
+    expect(net.sendInput).toHaveBeenCalledTimes(2);
+    expect(net.sendInput.mock.calls[0][0]).toMatchObject({ moveX: 1 });
+    expect(net.sendState).not.toHaveBeenCalled();
+  });
+
+  it('convidado desenha o estado do host, com o HUD do proprio jogador', () => {
+    const hostNet = link(true, 0);
+    store().startMulti(SEATS, hostNet, 1);
+    getWorld()!.players[1].money = 70;
+    for (let i = 0; i < 3; i++) store().tick(IDLE, FIXED_DT);
+    const sent = JSON.parse(
+      JSON.stringify(hostNet.sendState.mock.calls.at(-1)![0]),
+    ) as Snapshot;
+    // primeiro envio levou as salas
+    const first = JSON.parse(
+      JSON.stringify(hostNet.sendState.mock.calls[0][0]),
+    ) as Snapshot;
+
+    store().backToMenu();
+    store().startMulti(SEATS, link(false, 1));
+    store().receiveState(first);
+    store().receiveState(sent);
+
+    expect(getWorld()?.player.name).toBe('Ana');
+    expect(getWorld()?.rooms.length).toBeGreaterThan(0);
+    expect(store().hud.money).toBe(70);
+  });
+
+  it('voltar ao menu ou comecar um solo sai da sessao', () => {
+    const net = link(true, 0);
+    store().startMulti(SEATS, net, 1);
+    store().backToMenu();
+    expect(net.leave).toHaveBeenCalledTimes(1);
+
+    const again = link(false, 1);
+    store().startMulti(SEATS, again);
+    store().startRun(1);
+    expect(again.leave).toHaveBeenCalledTimes(1);
+    expect(getWorld()?.mode).toBe('solo');
+    expect(ROOM_W).toBe(11);
+  });
+});

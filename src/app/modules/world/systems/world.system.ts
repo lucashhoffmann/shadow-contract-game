@@ -38,53 +38,79 @@ import {
   REVIVE_HP,
   ROOM_H,
   ROOM_W,
+  setRoomSize,
   SLASH_TIME,
 } from '@/app/modules/world/constants/world.constants';
 import type {
   AttackVariance,
   EnemyIntelligence,
   InputState,
+  Player,
   Vec2,
   World,
+  WorldMode,
 } from '@/app/modules/world/types/world.types';
 import { angleTo, distance } from '@/shared/utils/math.util';
 import { nextRandom } from '@/shared/utils/rng.util';
+
+// ponto de partida: centro da sala inicial, perto da parede de tras
+function startPoint(): Vec2 {
+  return tileCenter(0, Math.floor(ROOM_W / 2), ROOM_H - 3);
+}
+
+// jogador novo, de vida cheia, no ponto de partida da sala inicial
+export function createPlayer(
+  id: number,
+  name = '',
+  color: string | null = null,
+): Player {
+  return {
+    id,
+    name,
+    color,
+    money: 0,
+    pos: startPoint(),
+    facing: Math.PI / 2,
+    hp: PLAYER_MAX_HP,
+    maxHp: PLAYER_MAX_HP,
+    shield: 0,
+    attackCooldown: 0,
+    slash: 0,
+    shot: 0,
+    adrenaline: 0,
+    dash: 0,
+    dashCooldown: 0,
+    dashes: DASH_MAX,
+    noise: 0,
+    crouching: false,
+    headshot: HEADSHOT_BASE,
+    weapon: null,
+    arsenal: [],
+  };
+}
 
 // mundo sem salas; usado pela fixture de teste para montar geometria propria
 export function createEmptyWorld(
   seed: number,
   intelligence: Record<number, EnemyIntelligence> = {},
   savedAttackVariance?: AttackVariance | null,
+  mode: WorldMode = 'solo',
 ): World {
+  setRoomSize(mode);
   const attackRng = { rngState: seed ^ 0x51f15e };
   const attackVariance = savedAttackVariance ?? {
     // minimo nunca abaixo do dano base: dois golpes sempre matam
     min: (100 + Math.floor(nextRandom(attackRng) * 11)) / 100,
     max: (140 + Math.floor(nextRandom(attackRng) * 11)) / 100,
   };
+  const player = createPlayer(0);
   return {
     rngState: seed | 0,
     nextId: 1,
     status: 'playing',
-    player: {
-      pos: tileCenter(0, 5, 10),
-      facing: Math.PI / 2,
-      hp: PLAYER_MAX_HP,
-      maxHp: PLAYER_MAX_HP,
-      shield: 0,
-      attackCooldown: 0,
-      slash: 0,
-      shot: 0,
-      adrenaline: 0,
-      dash: 0,
-      dashCooldown: 0,
-      dashes: DASH_MAX,
-      noise: 0,
-      crouching: false,
-      headshot: HEADSHOT_BASE,
-      weapon: null,
-      arsenal: [],
-    },
+    mode,
+    players: [player],
+    player,
     enemies: [],
     projectiles: [],
     props: [],
@@ -92,13 +118,12 @@ export function createEmptyWorld(
     floaters: [],
     rooms: [],
     run: {
-      money: 0,
       earned: 0,
       roomIndex: 0,
       kills: 0,
       shops: 0,
       revives: 0,
-      checkpoint: tileCenter(0, 5, 10),
+      checkpoint: startPoint(),
       seconds: 0,
       lastMovedAt: 0,
       lastIdleWarningAt: 0,
@@ -230,14 +255,8 @@ function revive(world: World): void {
   });
 }
 
-export function stepWorld(world: World, input: InputState, dt: number): void {
-  if (world.status !== 'playing') return;
-  world.run.seconds += dt;
-  const before = { ...world.player.pos };
-  movePlayer(world, input, dt);
-  updateRooms(world);
-  updateIdlePressure(world, before);
-  updateEnemies(world, dt);
+// F e ataque do jogador em foco: facada, caixa ou tiro
+export function fight(world: World, input: InputState, dt: number): void {
   // F com arma na mao e inimigo ao alcance e facada, nao caixa
   const knife =
     !!input.interact && !!world.player.weapon && !!meleeTarget(world);
@@ -249,6 +268,17 @@ export function stepWorld(world: World, input: InputState, dt: number): void {
     breakProp(world, prop);
   }
   updateCombat(world, dt, knife);
+}
+
+export function stepWorld(world: World, input: InputState, dt: number): void {
+  if (world.status !== 'playing') return;
+  world.run.seconds += dt;
+  const before = { ...world.player.pos };
+  movePlayer(world, input, dt);
+  updateRooms(world);
+  updateIdlePressure(world, before);
+  updateEnemies(world, dt);
+  fight(world, input, dt);
   updateProjectiles(world, dt);
   updateFloaters(world, dt);
   collectPickups(world);

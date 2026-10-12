@@ -4,6 +4,15 @@ import {
   SHOP_TEMPLATE,
   START_TEMPLATE,
 } from '@/app/modules/level/templates/room.template';
+import {
+  MULTI_COMBAT_TEMPLATES,
+  MULTI_SHOP_TEMPLATE,
+  MULTI_START_TEMPLATE,
+} from '@/app/modules/multiplayer/templates/room.template';
+import {
+  enemyMultiplier,
+  threatBoost,
+} from '@/app/modules/world/utils/players.util';
 import { roomIndexAt, tileCenter } from '@/app/modules/level/utils/grid.util';
 import {
   NINJA_CHANCE,
@@ -20,12 +29,25 @@ import type {
 } from '@/app/modules/world/types/world.types';
 import { nextRandom } from '@/shared/utils/rng.util';
 
+// cada modo tem as proprias salas, no tamanho dele
+const TEMPLATES = {
+  solo: {
+    start: START_TEMPLATE,
+    shop: SHOP_TEMPLATE,
+    combat: COMBAT_TEMPLATES,
+  },
+  multi: {
+    start: MULTI_START_TEMPLATE,
+    shop: MULTI_SHOP_TEMPLATE,
+    combat: MULTI_COMBAT_TEMPLATES,
+  },
+};
+
 export function pickTemplate(world: World, index: number): RoomTemplate {
-  if (index === 0) return START_TEMPLATE;
-  if (index % SHOP_EVERY === 0) return SHOP_TEMPLATE;
-  return COMBAT_TEMPLATES[
-    Math.floor(nextRandom(world) * COMBAT_TEMPLATES.length)
-  ];
+  const { start, shop, combat } = TEMPLATES[world.mode];
+  if (index === 0) return start;
+  if (index % SHOP_EVERY === 0) return shop;
+  return combat[Math.floor(nextRandom(world) * combat.length)];
 }
 
 export function spawnRoom(
@@ -47,16 +69,20 @@ export function spawnRoom(
     shopVisited: false,
   });
 
+  // multiplayer: mais inimigos por sala e dificuldade adiantada
+  const threat = index + threatBoost(world);
   const enemyCount = Math.min(
     template.enemies.length,
-    1 + Math.floor(index / ROOMS_PER_EXTRA_ENEMY),
+    Math.round(
+      (1 + Math.floor(threat / ROOMS_PER_EXTRA_ENEMY)) * enemyMultiplier(world),
+    ),
   );
   for (let i = 0; i < enemyCount; i++) {
     const patrol = template.enemies[i].path.map(([col, row]) =>
       tileCenter(index, col, row),
     );
     const kind =
-      index >= NINJA_FROM_ROOM && nextRandom(world) < NINJA_CHANCE
+      threat >= NINJA_FROM_ROOM && nextRandom(world) < NINJA_CHANCE
         ? 'ninja'
         : 'suit';
     world.enemies.push(createEnemy(world, index, patrol, kind));

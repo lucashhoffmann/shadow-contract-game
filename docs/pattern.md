@@ -16,6 +16,7 @@ Dentro de `app`:
 
 - `modules/`: regras do jogo em TS puro
 - `engine/`: three.js, loop de render e teclado
+- `net/`: conexao com o servidor de salas; so transporte, sem regra
 - `store/`: estado zustand, dono do `World` e ponte entre engine e UI
 
 ## Direcao de dependencias

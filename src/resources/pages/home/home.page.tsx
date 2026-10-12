@@ -1,4 +1,4 @@
-import { Play, Settings, Trophy, UserRound } from 'lucide-react';
+import { Play, Settings, Trophy, UserRound, Users } from 'lucide-react';
 
 import { useGameStore } from '@/app/store/game-store/game.store';
 import {
@@ -20,6 +20,7 @@ export function HomePage() {
   const best = useGameStore((state) => state.best);
   const startRun = useGameStore((state) => state.startRun);
   const openCharacter = useGameStore((state) => state.openCharacter);
+  const openLobby = useGameStore((state) => state.openLobby);
   const bloodColor = useGameStore((state) => state.bloodColor);
   const setBloodColor = useGameStore((state) => state.setBloodColor);
 
@@ -78,6 +79,18 @@ export function HomePage() {
             strokeWidth={3}
           />
           Configurar personagem
+        </button>
+        <button
+          type='button'
+          className={SECONDARY}
+          onClick={openLobby}
+        >
+          <Users
+            aria-hidden
+            className='size-5'
+            strokeWidth={3}
+          />
+          Multiplayer
         </button>
         <Dialog>
           <DialogTrigger asChild>

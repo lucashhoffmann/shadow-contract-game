@@ -41,6 +41,7 @@ import type {
   EnemyKind,
   EnemyState,
   PickupKind,
+  Player,
   Projectile,
   Prop,
   Room,
@@ -95,6 +96,11 @@ const CARDINALS = [
 ];
 // voltas da shuriken no ar (rad/s)
 const SHURIKEN_SPIN = 28;
+// nome do jogador sobre a cabeca (multiplayer). Fonte do index.html
+const NAME_TAG_FONT = "64px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
+const NAME_TAG_CANVAS = [512, 96];
+const NAME_TAG_SIZE = [2.4, 0.45];
+const NAME_TAG_Y = 2.05;
 // F da facada: acima da cabeca e do marcador do inimigo
 const KNIFE_PROMPT_Y = 2.2;
 // altura maxima do corpo lancado por um golpe so
@@ -139,8 +145,6 @@ const PROMPT_TILT = -0.9;
 const PROMPT_SCALE = 1.4;
 const PROMPT_HOP = 0.22;
 const PROMPT_PULSE = 0.09;
-// porta de correr na saida da sala inicial e de cada loja (entrada do nivel)
-const DOOR_X = ROOM_W / 2;
 // quanto cada folha corre para o lado ao abrir
 const DOOR_SLIDE = 1.45;
 // giro da tampa do bau aberta, em torno da dobradica
@@ -791,8 +795,8 @@ export function createWorldRenderer(
 
   const kit = createCharacterKit(look);
 
-  function makeCharacter(kind: CharacterKind): Character {
-    const character = kit.make(kind);
+  function makeCharacter(kind: CharacterKind, from = kit): Character {
+    const character = from.make(kind);
     scene.add(character.root);
     return character;
   }
@@ -1148,7 +1152,8 @@ export function createWorldRenderer(
     if (room.index % SHOP_EVERY === 0) {
       const y = (room.index + 1) * ROOM_H - 1;
       const door = buildDoor();
-      door.group.position.set(DOOR_X, 0, -y);
+      // porta de correr no meio da parede; a largura da sala muda por modo
+      door.group.position.set(ROOM_W / 2, 0, -y);
       group.add(door.group);
       doors.set(room.index, { leaves: door.leaves, y });
     }
@@ -1348,8 +1353,8 @@ export function createWorldRenderer(
 
   // vento do salto, nas costas: arcos cada vez menores e riscos soltos atras.
   // Fica no root, nao no lean: nao gira junto com o mergulho.
-  function makeJumper(kind: CharacterKind): Jumper {
-    const character = makeCharacter(kind);
+  function makeJumper(kind: CharacterKind, from = kit): Jumper {
+    const character = makeCharacter(kind, from);
     const wind = new THREE.Group();
     for (let i = 0; i < 3; i++) {
       const gust = new THREE.Mesh(geo.gust, mat.wind);
@@ -1565,27 +1570,155 @@ export function createWorldRenderer(
     position.needsUpdate = true;
   }
 
-  const hero = makeJumper('player');
-  const player = hero.character;
-  // arma de fogo na mao direita (weapon.renderer)
-  const held = createHeldGuns(player, look.weapon);
-  // clarao: lingua central e duas menores abertas para os lados
-  const flash = new THREE.Group();
-  flash.visible = false;
-  for (const [turn, size] of [
-    [0, 1],
-    [0.9, 0.55],
-    [-0.9, 0.55],
-  ]) {
-    const tongue = new THREE.Mesh(geo.flashTongue, mat.flash);
-    tongue.rotation.y = turn;
-    tongue.scale.setScalar(size);
-    flash.add(tongue);
+  // Um boneco por jogador. No solo e so o local, com o `look` dele. No
+  // multiplayer cada um veste a propria cor e leva o nome sobre a cabeca.
+  type PlayerView = {
+    jumper: Jumper;
+    // arma de fogo na mao direita (weapon.renderer)
+    held: ReturnType<typeof createHeldGuns>;
+    // clarao do tiro: lingua central e duas menores abertas para os lados
+    flash: THREE.Group;
+    // ultima arma na mao: o ultimo tiro zera a municao e tira a arma do
+    // World, mas o recuo e o clarao dele ainda precisam do modelo
+    lastGun: WeaponId | null;
+    // kit proprio de quem tem cor; null = usa o kit do jogador local
+    kit: ReturnType<typeof createCharacterKit> | null;
+    tag: THREE.Sprite | null;
+  };
+  const playerViews = new Map<number, PlayerView>();
+
+  // nome do jogador na cor dele, com contorno escuro; null sem canvas 2D
+  function nameTag(name: string, color: string): THREE.Sprite | null {
+    const canvas = document.createElement('canvas');
+    [canvas.width, canvas.height] = NAME_TAG_CANVAS;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.font = NAME_TAG_FONT;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.lineJoin = 'round';
+    context.lineWidth = 14;
+    context.strokeStyle = '#14141f';
+    context.fillStyle = color;
+    const [x, y] = [canvas.width / 2, canvas.height / 2];
+    context.strokeText(name, x, y, canvas.width - 24);
+    context.fillText(name, x, y, canvas.width - 24);
+    const map = new THREE.CanvasTexture(canvas);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const tag = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map, transparent: true, depthTest: false }),
+    );
+    tag.name = 'nameTag';
+    tag.renderOrder = 9;
+    tag.scale.set(NAME_TAG_SIZE[0], NAME_TAG_SIZE[1], 1);
+    scene.add(tag);
+    return tag;
   }
-  flash.add(new THREE.Mesh(geo.flashCore, mat.flashCore));
-  // ultima arma na mao: o ultimo tiro zera a municao e tira a arma do World,
-  // mas o recuo e o clarao dele ainda precisam do modelo
-  let lastGun: WeaponId | null = null;
+
+  function buildPlayer(player: Player): PlayerView {
+    const own = player.color
+      ? createCharacterKit({ ...look, cloth: player.color })
+      : null;
+    const jumper = makeJumper('player', own ?? kit);
+    const flash = new THREE.Group();
+    flash.visible = false;
+    for (const [turn, size] of [
+      [0, 1],
+      [0.9, 0.55],
+      [-0.9, 0.55],
+    ]) {
+      const tongue = new THREE.Mesh(geo.flashTongue, mat.flash);
+      tongue.rotation.y = turn;
+      tongue.scale.setScalar(size);
+      flash.add(tongue);
+    }
+    flash.add(new THREE.Mesh(geo.flashCore, mat.flashCore));
+    return {
+      jumper,
+      held: createHeldGuns(jumper.character, look.weapon),
+      flash,
+      lastGun: null,
+      kit: own,
+      tag: player.name ? nameTag(player.name, player.color ?? '#ffffff') : null,
+    };
+  }
+
+  function removePlayer(view: PlayerView) {
+    scene.remove(view.jumper.character.root);
+    view.held.dispose();
+    view.kit?.dispose();
+    if (view.tag) {
+      scene.remove(view.tag);
+      view.tag.material.map?.dispose();
+      view.tag.material.dispose();
+    }
+  }
+
+  function drawPlayer(world: World, who: Player, dt: number, time: number) {
+    let view = playerViews.get(who.id);
+    if (!view) {
+      view = buildPlayer(who);
+      playerViews.set(who.id, view);
+    }
+    const { jumper, held, flash } = view;
+    const body = jumper.character;
+    // morto no multiplayer fica caido enquanto os outros seguem
+    const lost = world.status === 'dead' || who.hp <= 0;
+    const shot = who.shot;
+    const gunId = lost
+      ? null
+      : (who.weapon?.id ?? (shot > 0 ? view.lastGun : null));
+    view.lastGun = gunId;
+    // encostado no inimigo o golpe e de espada, mesmo com arma de fogo
+    const armed = gunId !== null && who.slash <= 0;
+    held.hold(armed ? gunId : null);
+    if (lost) {
+      layDead(jumper, who.pos, who.facing);
+    } else {
+      animateJumper(
+        jumper,
+        world,
+        who.pos,
+        who.facing,
+        who.dash,
+        dt,
+        time,
+        who.adrenaline > 0 ? ADRENALINE_LEAN : RUN_LEAN,
+        who.slash <= 0,
+        true,
+        who.crouching,
+      );
+      poseAttack(body, who.slash);
+    }
+    body.shadow.visible = !lost;
+    if (view.tag) {
+      view.tag.position.set(
+        body.root.position.x,
+        NAME_TAG_Y,
+        body.root.position.z,
+      );
+      view.tag.material.opacity = lost ? 0.45 : 1;
+    }
+
+    flash.visible = false;
+    held.mount.position.y = HAND_Y;
+    if (!armed) return;
+    const { muzzle, kick, flash: flashSize } = GUNS[gunId];
+    // coice seco: forte no instante do tiro, some rapido
+    const recoil = (shot / SHOT_TIME) ** 2 * kick;
+    body.arms[0].rotation.z += recoil * RECOIL_RISE;
+    held.mount.position.y += recoil * RECOIL_BACK;
+    body.body.position.x -= recoil * RECOIL_PUSH;
+    if (shot <= SHOT_TIME - FLASH_TIME) return;
+    held.roots[gunId].add(flash);
+    flash.position.set(muzzle[0], muzzle[1], 0);
+    // tremula: tamanho e giro mudam a cada frame
+    flash.scale.setScalar(
+      flashSize * (0.8 + Math.abs(Math.sin(time * 90)) * 0.4),
+    );
+    flash.rotation.x = time * 40;
+    flash.visible = true;
+  }
 
   // icone de interacao: tecla 3D amarela com a letra em relevo, deitada para
   // a camera. `animatePrompt` faz pular e pulsar.
@@ -1767,55 +1900,12 @@ export function createWorldRenderer(
         lid.rotation.x += (target - lid.rotation.x) * Math.min(1, dt * 9);
       }
 
-      const lost = world.status === 'dead';
-      const shot = world.player.shot;
-      const gunId = lost
-        ? null
-        : (world.player.weapon?.id ?? (shot > 0 ? lastGun : null));
-      lastGun = gunId;
-      // encostado no inimigo o golpe e de espada, mesmo com arma de fogo
-      const armed = gunId !== null && world.player.slash <= 0;
-      held.hold(armed ? gunId : null);
-      if (lost) {
-        layDead(hero, world.player.pos, world.player.facing);
-      } else {
-        animateJumper(
-          hero,
-          world,
-          world.player.pos,
-          world.player.facing,
-          world.player.dash,
-          dt,
-          time,
-          world.player.adrenaline > 0 ? ADRENALINE_LEAN : RUN_LEAN,
-          world.player.slash <= 0,
-          true,
-          world.player.crouching,
-        );
-        poseAttack(player, world.player.slash);
-      }
-      player.shadow.visible = !lost;
-
-      flash.visible = false;
-      held.mount.position.y = HAND_Y;
-      if (armed) {
-        const { muzzle, kick, flash: flashSize } = GUNS[gunId];
-        // coice seco: forte no instante do tiro, some rapido
-        const recoil = (shot / SHOT_TIME) ** 2 * kick;
-        player.arms[0].rotation.z += recoil * RECOIL_RISE;
-        held.mount.position.y += recoil * RECOIL_BACK;
-        player.body.position.x -= recoil * RECOIL_PUSH;
-        if (shot > SHOT_TIME - FLASH_TIME) {
-          held.roots[gunId].add(flash);
-          flash.position.set(muzzle[0], muzzle[1], 0);
-          // tremula: tamanho e giro mudam a cada frame
-          flash.scale.setScalar(
-            flashSize * (0.8 + Math.abs(Math.sin(time * 90)) * 0.4),
-          );
-          flash.rotation.x = time * 40;
-          flash.visible = true;
-        }
-      }
+      for (const who of world.players) drawPlayer(world, who, dt, time);
+      reconcile(
+        playerViews,
+        new Set(world.players.map((p) => p.id)),
+        removePlayer,
+      );
 
       for (const enemy of world.enemies) {
         let view = enemies.get(enemy.id);
@@ -1959,11 +2049,10 @@ export function createWorldRenderer(
       reconcile(props, new Set(), (view) => scene.remove(view.group));
       reconcile(pickups, new Set(), removeMesh);
       reconcile(bullets, new Set(), removeMesh);
-      scene.remove(player.root);
+      reconcile(playerViews, new Set(), removePlayer);
       prompt.removeFromParent();
       chestPrompt.removeFromParent();
       knifePrompt.removeFromParent();
-      held.dispose();
       reconcile(floaters, new Set(), removeFloater);
       for (const particle of particles) scene.remove(particle.mesh);
       particles.length = 0;
