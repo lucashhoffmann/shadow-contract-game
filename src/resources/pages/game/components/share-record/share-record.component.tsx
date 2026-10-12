@@ -17,7 +17,7 @@ export function ShareRecord(card: RecordCard) {
       type='button'
       disabled={busy}
       onClick={share}
-      className='text-outline hidden items-center gap-2 rounded-2xl border-4 border-white bg-[#3d4fd6] px-5 py-2 text-xl text-white uppercase shadow-[0_5px_0_#14141f] transition-transform active:translate-y-1 active:shadow-none disabled:opacity-60 pointer-coarse:flex'
+      className='text-outline hidden items-center gap-2 rounded-2xl border-4 border-white bg-[var(--game-secondary)] px-5 py-2 text-xl text-white uppercase shadow-[0_5px_0_var(--game-ink)] transition-transform active:translate-y-1 active:shadow-none disabled:opacity-60 pointer-coarse:flex'
     >
       <Share2
         aria-hidden

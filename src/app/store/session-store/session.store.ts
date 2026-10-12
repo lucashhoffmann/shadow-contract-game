@@ -6,7 +6,7 @@ import type { InputState } from '@/app/modules/world/types/world.types';
 import type { Joined, PlayerInfo, SessionInfo } from '@/app/net/protocol';
 import { connectSession, type SessionSocket } from '@/app/net/session.client';
 import { useGameStore } from '@/app/store/game-store/game.store';
-import { getTexts } from '@/shared/i18n';
+import { getTexts, translateSessionError } from '@/shared/i18n';
 
 // Sala de espera do multiplayer: nome, listagem de sessoes, quem esta na
 // sessao e o comeco da partida. Liga o servidor de salas ao game.store.
@@ -47,7 +47,7 @@ export const useSessionStore = create<SessionStore>()(
   persist(
     (set, get) => {
       const entered = (result: Joined | { ok: false; error: string }) => {
-        if (!result.ok) return set({ error: result.error });
+        if (!result.ok) return set({ error: translateSessionError(result.error) });
         set({
           status: 'room',
           session: result.session,
@@ -137,7 +137,7 @@ export const useSessionStore = create<SessionStore>()(
           socket?.emit('session:join', { code, name: get().name }, entered),
         start: () =>
           socket?.emit('session:start', (result) => {
-            if (!result.ok) set({ error: result.error });
+            if (!result.ok) set({ error: translateSessionError(result.error) });
           }),
         leave: () => {
           if (!socket || !get().session) return;

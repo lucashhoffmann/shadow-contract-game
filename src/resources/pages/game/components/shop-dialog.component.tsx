@@ -165,7 +165,7 @@ export function ShopDialog({
         className='fill-mode-backwards max-h-dvh grid-rows-[auto_minmax(0,1fr)_auto] gap-3 border-0 bg-black/45 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_0_0_100vmax_rgb(0_0_0/0.45)] delay-500 sm:max-w-2xl sm:gap-4 sm:p-6'
       >
         <DialogHeader className='items-center sm:text-center'>
-          <DialogTitle className='rounded-full border-4 border-white bg-[#1f4f8f] px-5 py-2 text-base font-black tracking-wide text-white uppercase shadow-lg'>
+          <DialogTitle className='rounded-full border-4 border-white bg-[var(--game-panelTitle)] px-5 py-2 text-base font-black tracking-wide text-white uppercase shadow-lg'>
             {t.shop.title}
           </DialogTitle>
           <DialogDescription className='text-xs font-bold tracking-wide text-white/80 uppercase'>

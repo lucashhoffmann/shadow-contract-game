@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import * as THREE from 'three';
 
 import {
@@ -124,18 +125,18 @@ const FLOATER_RISE = 0.8;
 const FLOATER_POP = 1.45;
 const FLOATER_POP_END = 0.18;
 // destaques escritos sobre o numero, e a cor de cada um
-const FLOATER_BANNER = { HEADSHOT: '#ff9a1f', OVERKILL: '#d457ff' };
+const FLOATER_BANNER = { HEADSHOT: COLORS.ui.headshot, OVERKILL: COLORS.ui.overkill };
 // cor pelo tamanho do golpe: forte em vermelho, medio em amarelo, fraco em
 // verde; erro em claro, para nao parecer acerto
 const FLOATER_STRONG = 30;
 const FLOATER_WEAK = 5;
 function floaterColor(amount: number, onPlayer?: boolean): string {
-  if (amount <= 0) return '#f4f1e8';
+  if (amount <= 0) return COLORS.ui.missText;
   // dano sofrido e sempre vermelho
-  if (onPlayer) return '#ff2b2b';
-  if (amount < FLOATER_WEAK) return '#4be06a';
-  if (amount < FLOATER_STRONG) return '#ffd21f';
-  return '#ff2b2b';
+  if (onPlayer) return COLORS.ui.damageStrong;
+  if (amount < FLOATER_WEAK) return COLORS.ui.damageWeak;
+  if (amount < FLOATER_STRONG) return COLORS.ui.highlight;
+  return COLORS.ui.damageStrong;
 }
 // icone de interacao (F da caixa, B do bau)
 const LETTER_SIZE = 0.28;
@@ -175,8 +176,8 @@ const DEBRIS = [
 ];
 // visual do dinheiro no chao. amount/height 0 desliga a animacao
 const MONEY = {
-  color: 0xcfae52,
-  aura: { color: 0xffc83a, opacity: 0.16 },
+  color: COLORS.model.ccfae52,
+  aura: { color: COLORS.model.cffc83a, opacity: 0.16 },
   // pulso: escala vai e volta em torno de 1 (0.06 = +-6%)
   pulse: { amount: 0.06, speed: 4 },
   // pulo: altura maxima do salto, em tiles
@@ -701,39 +702,39 @@ export function createWorldRenderer(
     streak: new THREE.BoxGeometry(0.5, 0.02, 0.03),
   };
   const mat = {
-    chestLight: lambert(0xdcb980),
-    chestLock: lambert(0x9aa0aa),
-    doorFrame: lambert(0xd4d6da),
-    doorPanel: lambert(0x1d2028),
-    doorSeam: lambert(0x2c303b),
-    doorAccent: flat(0xf08a24),
-    doorLight: flat(0x7df3ee),
+    chestLight: lambert(COLORS.model.cdcb980),
+    chestLock: lambert(COLORS.model.c9aa0aa),
+    doorFrame: lambert(COLORS.model.cd4d6da),
+    doorPanel: lambert(COLORS.model.c1d2028),
+    doorSeam: lambert(COLORS.model.c2c303b),
+    doorAccent: flat(COLORS.model.cf08a24),
+    doorLight: flat(COLORS.model.c7df3ee),
     flash: new THREE.MeshBasicMaterial({
-      color: 0xffc94a,
+      color: COLORS.model.cffc94a,
       transparent: true,
       opacity: 0.9,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     }),
-    flashCore: flat(0xfff6d8),
+    flashCore: flat(COLORS.model.cfff6d8),
     heart: new THREE.MeshLambertMaterial({
-      color: 0xe8527a,
+      color: COLORS.model.ce8527a,
       flatShading: true,
     }),
     shield: new THREE.MeshLambertMaterial({
-      color: 0xd9dce3,
+      color: COLORS.model.cd9dce3,
       flatShading: true,
     }),
     dash: new THREE.MeshLambertMaterial({
-      color: 0x39d0ff,
+      color: COLORS.model.c39d0ff,
       flatShading: true,
     }),
     headshot: new THREE.MeshLambertMaterial({
-      color: 0xff3b3b,
+      color: COLORS.model.cff3b3b,
       flatShading: true,
     }),
     revive: new THREE.MeshLambertMaterial({
-      color: 0x3fe08a,
+      color: COLORS.model.c3fe08a,
       flatShading: true,
     }),
     coin: new THREE.MeshLambertMaterial({
@@ -747,50 +748,50 @@ export function createWorldRenderer(
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     }),
-    wood: lambert(0xa8703c),
-    woodDark: lambert(0x6e4726),
-    bill: flat(0x35d267),
-    billBand: flat(0xb8f5c6),
-    cabinet: lambert(0xe8734f),
-    cabinetDark: lambert(0xa94f33),
-    barrel: lambert(0x8b2f3a),
-    pot: lambert(0x9c4a2a),
-    leaf: new THREE.MeshLambertMaterial({ color: 0x3f9a4a, flatShading: true }),
-    prompt: lambert(0xffe066),
-    promptSide: lambert(0xd9931f),
-    promptBorder: flat(0x1b1d3a),
+    wood: lambert(COLORS.model.ca8703c),
+    woodDark: lambert(COLORS.model.c6e4726),
+    bill: flat(COLORS.model.c35d267),
+    billBand: flat(COLORS.model.cb8f5c6),
+    cabinet: lambert(COLORS.model.ce8734f),
+    cabinetDark: lambert(COLORS.model.ca94f33),
+    barrel: lambert(COLORS.model.c8b2f3a),
+    pot: lambert(COLORS.model.c9c4a2a),
+    leaf: new THREE.MeshLambertMaterial({ color: COLORS.model.c3f9a4a, flatShading: true }),
+    prompt: lambert(COLORS.model.cffe066),
+    promptSide: lambert(COLORS.model.cd9931f),
+    promptBorder: flat(COLORS.model.c1b1d3a),
     blood: new THREE.MeshBasicMaterial({
       color: bloodColor,
       transparent: true,
       opacity: 0.85,
       depthWrite: false,
     }),
-    brass: lambert(0xd9b84a),
-    copper: lambert(0xd98a5a),
-    shellRed: lambert(0xc8242c),
-    bulletEnemy: flat(0xff4040),
+    brass: lambert(COLORS.model.cd9b84a),
+    copper: lambert(COLORS.model.cd98a5a),
+    shellRed: lambert(COLORS.model.cc8242c),
+    bulletEnemy: flat(COLORS.model.cff4040),
     shuriken: new THREE.MeshLambertMaterial({
-      color: 0xc8ccd8,
+      color: COLORS.model.cc8ccd8,
       flatShading: true,
     }),
     wind: new THREE.MeshBasicMaterial({
-      color: 0xd6f4ff,
+      color: COLORS.model.cd6f4ff,
       transparent: true,
       opacity: 0.6,
       depthWrite: false,
     }),
   };
   const markerMat: Record<EnemyState, THREE.Material> = {
-    patrol: flat(0xffffff),
-    suspicious: flat(0xffd84a),
-    alert: flat(0xff3030),
-    dead: flat(0x000000),
+    patrol: flat(COLORS.model.cffffff),
+    suspicious: flat(COLORS.model.cffd84a),
+    alert: flat(COLORS.model.cff3030),
+    dead: flat(COLORS.model.c000000),
   };
   const coneMat: Record<EnemyState, THREE.Material> = {
-    patrol: coneMaterial(0xffffff),
-    suspicious: coneMaterial(0xffd84a),
-    alert: coneMaterial(0xff4040),
-    dead: coneMaterial(0x000000),
+    patrol: coneMaterial(COLORS.model.cffffff),
+    suspicious: coneMaterial(COLORS.model.cffd84a),
+    alert: coneMaterial(COLORS.model.cff4040),
+    dead: coneMaterial(COLORS.model.c000000),
   };
 
   const kit = createCharacterKit(look);
@@ -984,7 +985,7 @@ export function createWorldRenderer(
     context.textBaseline = 'middle';
     context.lineJoin = 'round';
     context.lineWidth = 12;
-    context.strokeStyle = '#1b0508';
+    context.strokeStyle = COLORS.ui.bloodOutline;
     context.fillStyle = floaterColor(amount, onPlayer);
     const [x, y] = [canvas.width / 2, canvas.height / 2 + 4];
     if (banner) {
@@ -1598,7 +1599,7 @@ export function createWorldRenderer(
     context.textBaseline = 'middle';
     context.lineJoin = 'round';
     context.lineWidth = 14;
-    context.strokeStyle = '#14141f';
+    context.strokeStyle = COLORS.ui.ink;
     context.fillStyle = color;
     const [x, y] = [canvas.width / 2, canvas.height / 2];
     context.strokeText(name, x, y, canvas.width - 24);
@@ -1639,7 +1640,7 @@ export function createWorldRenderer(
       flash,
       lastGun: null,
       kit: own,
-      tag: player.name ? nameTag(player.name, player.color ?? '#ffffff') : null,
+      tag: player.name ? nameTag(player.name, player.color ?? COLORS.ui.white) : null,
     };
   }
 

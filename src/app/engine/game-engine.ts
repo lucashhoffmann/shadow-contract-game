@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import * as THREE from 'three';
 
 import { createWorldRenderer } from '@/app/engine/renderers/world.renderer';
@@ -42,9 +43,9 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1f2033);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.8));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+  scene.background = new THREE.Color(COLORS.model.c1f2033);
+  scene.add(new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c444466, 1.8));
+  const sun = new THREE.DirectionalLight(COLORS.model.cffffff, 1.4);
   sun.position.set(3, 10, 5);
   scene.add(sun);
 

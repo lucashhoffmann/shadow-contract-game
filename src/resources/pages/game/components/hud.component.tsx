@@ -29,7 +29,7 @@ function ContractBar({ room }: { room: number }) {
       </p>
       <ol
         aria-label={t.game.contractRoom(position, SHOP_EVERY)}
-        className='flex items-center gap-1 rounded-lg border-2 border-white/80 bg-[#1b1d3a] p-1.5'
+        className='flex items-center gap-1 rounded-lg border-2 border-white/80 bg-[var(--game-hudPanel)] p-1.5'
       >
         {Array.from({ length: SHOP_EVERY }, (_, i) => {
           const step = i + 1;
@@ -103,7 +103,7 @@ function WeaponCard({ hud, previews }: Pick<HudProps, 'hud' | 'previews'>) {
     <div
       data-empty={empty}
       className={cn(
-        'flex w-fit items-center gap-2 rounded-lg border-2 border-white/80 bg-[#1b1d3a] px-2 py-1',
+        'flex w-fit items-center gap-2 rounded-lg border-2 border-white/80 bg-[var(--game-hudPanel)] px-2 py-1',
         empty && 'border-white/40 opacity-60 grayscale',
       )}
     >
@@ -166,7 +166,7 @@ function WeaponSlots({ hud, arsenal, previews, onSelectWeapon }: HudProps) {
             data-empty={empty}
             onClick={() => onSelectWeapon(id)}
             className={cn(
-              'flex w-14 flex-col items-center rounded-md border-2 bg-[#1b1d3a] px-1 py-0.5 text-[10px] leading-tight font-black',
+              'flex w-14 flex-col items-center rounded-md border-2 bg-[var(--game-hudPanel)] px-1 py-0.5 text-[10px] leading-tight font-black',
               selected ? 'border-yellow-300' : 'border-white/30',
               empty && 'opacity-50 grayscale',
             )}
@@ -266,7 +266,7 @@ export function Hud({
             type='button'
             aria-label={t.common.pause}
             onClick={onPause}
-            className='pointer-events-auto flex size-11 cursor-pointer items-center justify-center rounded-xl border-4 border-white bg-[#3d4fd6] text-white shadow-[0_4px_0_#14141f] transition-transform active:translate-y-1 active:shadow-none'
+            className='pointer-events-auto flex size-11 cursor-pointer items-center justify-center rounded-xl border-4 border-white bg-[var(--game-secondary)] text-white shadow-[0_4px_0_var(--game-ink)] transition-transform active:translate-y-1 active:shadow-none'
           >
             <Pause
               aria-hidden

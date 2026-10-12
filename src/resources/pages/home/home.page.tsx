@@ -15,8 +15,8 @@ import { useLanguage, useTexts } from '@/shared/i18n';
 
 // botao gordo de jogo: borda branca, sombra dura embaixo, afunda ao clicar
 const CHUNKY =
-  'text-outline flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-4 border-white text-white uppercase shadow-[0_5px_0_#14141f] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none';
-const SECONDARY = `${CHUNKY} w-full bg-[#3d4fd6] px-5 py-2 text-lg`;
+  'text-outline flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-4 border-white text-white uppercase shadow-[0_5px_0_var(--game-ink)] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none';
+const SECONDARY = `${CHUNKY} w-full bg-[var(--game-secondary)] px-5 py-2 text-lg`;
 
 export function HomePage() {
   const t = useTexts();
@@ -42,7 +42,7 @@ export function HomePage() {
         <div className='spotlight-light absolute inset-0 bg-gradient-to-b from-white/45 via-white/12 to-transparent blur-md [clip-path:polygon(47%_0,53%_0,100%_100%,0_100%)]' />
         {/* miolo mais forte do facho */}
         <div className='spotlight-light absolute inset-0 bg-gradient-to-b from-white/35 via-white/8 to-transparent blur-sm [clip-path:polygon(48.5%_0,51.5%_0,70%_100%,30%_100%)]' />
-        <div className='absolute top-0 left-1/2 h-5 w-16 -translate-x-1/2 rounded-b-xl border-x-4 border-b-4 border-[#14141f] bg-[#3a3d52]' />
+        <div className='absolute top-0 left-1/2 h-5 w-16 -translate-x-1/2 rounded-b-xl border-x-4 border-b-4 border-[var(--game-ink)] bg-[var(--game-ceiling)]' />
         <div className='spotlight-light absolute top-3 left-1/2 h-3 w-10 -translate-x-1/2 rounded-full bg-white shadow-[0_0_24px_10px_rgb(255_255_255/0.75)]' />
       </div>
       <div
@@ -51,9 +51,9 @@ export function HomePage() {
       />
       <h1 className='text-outline relative flex -rotate-3 flex-col text-6xl leading-none tracking-wide uppercase sm:text-7xl'>
         <span className='text-white'>Shadow</span>{' '}
-        <span className='text-[1.15em] text-[#ff2d55]'>Contract</span>
+        <span className='text-[1.15em] text-[var(--game-brandPink)]'>Contract</span>
       </h1>
-      <p className='text-outline relative flex items-center gap-2 rounded-full bg-black/35 px-4 py-1 text-lg text-[#ffd21f]'>
+      <p className='text-outline relative flex items-center gap-2 rounded-full bg-black/35 px-4 py-1 text-lg text-[var(--game-highlight)]'>
         <Trophy
           aria-hidden
           className='size-5'
@@ -63,7 +63,7 @@ export function HomePage() {
       </p>
       <button
         type='button'
-        className={`${CHUNKY} relative bg-[#2fd15a] px-14 py-4 text-4xl`}
+        className={`${CHUNKY} relative bg-[var(--game-success)] px-14 py-4 text-4xl`}
         onClick={() => startRun()}
       >
         <Play
@@ -157,7 +157,7 @@ export function HomePage() {
           href='https://github.com/lucashhoffmann/'
           target='_blank'
           rel='noopener noreferrer'
-          className='text-[#ff2d55] underline-offset-4 hover:underline'
+          className='text-[var(--game-brandPink)] underline-offset-4 hover:underline'
         >
           Hoffmann
         </a>

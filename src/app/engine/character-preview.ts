@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -30,15 +31,15 @@ export function createCharacterPreview(
 
   // mesma luz e fundo do jogo, para a cor do preview ser a cor da run
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1f2033);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.8));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+  scene.background = new THREE.Color(COLORS.model.c1f2033);
+  scene.add(new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c444466, 1.8));
+  const sun = new THREE.DirectionalLight(COLORS.model.cffffff, 1.4);
   sun.position.set(3, 10, 5);
   scene.add(sun);
 
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(1.2, 48),
-    new THREE.MeshLambertMaterial({ color: 0x4a4f6a }),
+    new THREE.MeshLambertMaterial({ color: COLORS.model.c4a4f6a }),
   );
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);

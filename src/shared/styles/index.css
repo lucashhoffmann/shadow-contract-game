@@ -163,23 +163,23 @@
 
 :root {
   --radius: 0.75rem;
-  --background: #1f2033;
-  --foreground: #f4f4fb;
-  --primary: #ffb22e;
-  --primary-foreground: #2a1c00;
-  --secondary: #3d4fd6;
-  --secondary-foreground: #ffffff;
-  --muted: #2b2d42;
-  --muted-foreground: #a5a8c7;
-  --accent: #34375a;
-  --accent-foreground: #ffffff;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --info: #3b82f6;
-  --info-foreground: #ffffff;
-  --border: #3a3d5c;
-  --input: #3a3d5c;
-  --ring: #ffb22e;
+  --background: var(--game-background);
+  --foreground: var(--game-foreground);
+  --primary: var(--game-primary);
+  --primary-foreground: var(--game-primaryText);
+  --secondary: var(--game-secondary);
+  --secondary-foreground: var(--game-white);
+  --muted: var(--game-muted);
+  --muted-foreground: var(--game-mutedText);
+  --accent: var(--game-accent);
+  --accent-foreground: var(--game-white);
+  --destructive: var(--game-destructive);
+  --destructive-foreground: var(--game-white);
+  --info: var(--game-info);
+  --info-foreground: var(--game-white);
+  --border: var(--game-border);
+  --input: var(--game-border);
+  --ring: var(--game-primary);
 }
 
 @layer base {
@@ -235,7 +235,7 @@
 /* letra gorda com contorno escuro grosso e sombra dura embaixo, estilo
    titulo de jogo; o contorno fica atras do preenchimento */
 @utility text-outline {
-  -webkit-text-stroke: 0.22em #14141f;
+  -webkit-text-stroke: 0.22em var(--game-ink);
   paint-order: stroke fill;
-  text-shadow: 0 0.09em 0 #14141f;
+  text-shadow: 0 0.09em 0 var(--game-ink);
 }

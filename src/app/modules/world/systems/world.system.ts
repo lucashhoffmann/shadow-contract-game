@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import {
   collectPickups,
   meleeTarget,
@@ -98,7 +99,7 @@ export function createEmptyWorld(
   mode: WorldMode = 'solo',
 ): World {
   setRoomSize(mode);
-  const attackRng = { rngState: seed ^ 0x51f15e };
+  const attackRng = { rngState: seed ^ COLORS.model.c51f15e };
   const attackVariance = savedAttackVariance ?? {
     // minimo nunca abaixo do dano base: dois golpes sempre matam
     min: (100 + Math.floor(nextRandom(attackRng) * 11)) / 100,

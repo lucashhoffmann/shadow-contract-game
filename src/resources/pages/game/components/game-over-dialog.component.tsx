@@ -56,11 +56,11 @@ export function GameOverDialog({
         <DialogHeader className='items-center gap-3'>
           <DialogTitle className='text-outline flex flex-col text-5xl leading-none tracking-wide uppercase sm:text-6xl'>
             <span className='text-white'>{t.game.you}</span>{' '}
-            <span className='text-[1.2em] text-[#ff2d55]'>{t.game.died}</span>
+            <span className='text-[1.2em] text-[var(--game-brandPink)]'>{t.game.died}</span>
           </DialogTitle>
           <Skull
             aria-hidden
-            className='size-16 fill-white text-[#14141f] drop-shadow-[0_4px_0_#14141f]'
+            className='size-16 fill-white text-[var(--game-ink)] drop-shadow-[0_4px_0_var(--game-ink)]'
             strokeWidth={1.5}
           />
           <DialogDescription className='text-outline text-lg text-white'>
@@ -70,7 +70,7 @@ export function GameOverDialog({
         <DialogFooter className='flex-col items-center gap-3 sm:flex-col sm:justify-center'>
           <button
             type='button'
-            className='text-outline flex items-center gap-2 rounded-2xl border-4 border-white bg-[#2fd15a] px-6 py-3 text-2xl text-white uppercase shadow-[0_5px_0_#14141f] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none'
+            className='text-outline flex items-center gap-2 rounded-2xl border-4 border-white bg-[var(--game-success)] px-6 py-3 text-2xl text-white uppercase shadow-[0_5px_0_var(--game-ink)] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none'
             onClick={() => {
               setAnalysisOpen(false);
               onRestart();

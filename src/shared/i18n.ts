@@ -15,6 +15,10 @@ const pt = {
     health: 'Vida',
     shield: 'Escudo',
     pause: 'Pausar',
+    crouch: 'Agachar',
+    dash: 'Saltar',
+    joystick: 'Joystick',
+    close: 'Fechar',
   },
   home: {
     record: (best: number) => `Recorde: sala ${best}`,
@@ -59,7 +63,7 @@ const pt = {
     publicSessions: 'Sessoes publicas',
     noSessions: 'Nenhuma sessao aberta agora. Crie a sua.',
     joinHost: (name: string) => `Entrar na sessao de ${name}`,
-    sessionType: (isPublic: boolean) =>
+    sessionType: (isPublic: boolean): string =>
       isPublic ? 'Sessao publica' : 'Sessao privada',
     inviteCode: 'Codigo de convite',
     players: 'Jogadores',
@@ -71,6 +75,15 @@ const pt = {
     host: 'Host',
     connectionError: 'Nao foi possivel conectar ao servidor de salas.',
     closedError: 'O host saiu: a sessao acabou.',
+    errors: {
+      name: 'Escreva seu nome.',
+      alreadyInSession: 'Voce ja esta em uma sessao.',
+      missingSession: 'Sessao nao encontrada.',
+      alreadyStarted: 'A partida ja comecou.',
+      full: 'Sessao cheia.',
+      notInSession: 'Voce nao esta em uma sessao.',
+      onlyHost: 'So o host comeca a partida.',
+    },
   },
   game: {
     contract: (number: number) => `Contrato ${number}`,
@@ -279,6 +292,10 @@ const en: typeof pt = {
     health: 'Health',
     shield: 'Shield',
     pause: 'Pause',
+    crouch: 'Crouch',
+    dash: 'Dash',
+    joystick: 'Joystick',
+    close: 'Close',
   },
   home: {
     record: (best) => `Best: room ${best}`,
@@ -334,6 +351,15 @@ const en: typeof pt = {
     host: 'Host',
     connectionError: 'Could not connect to the session server.',
     closedError: 'The host left: the session has ended.',
+    errors: {
+      name: 'Enter your name.',
+      alreadyInSession: 'You are already in a session.',
+      missingSession: 'Session not found.',
+      alreadyStarted: 'The game has already started.',
+      full: 'Session is full.',
+      notInSession: 'You are not in a session.',
+      onlyHost: 'Only the host can start the game.',
+    },
   },
   game: {
     contract: (number) => `Contract ${number}`,
@@ -513,12 +539,11 @@ export const useLanguage = create<{
 }>()(
   persist(
     (set) => ({
-      language:
-        typeof navigator !== 'undefined' &&
-        navigator.language.toLowerCase().startsWith('en')
-          ? 'en'
-          : 'pt-BR',
-      setLanguage: (language) => set({ language }),
+      language: 'pt-BR',
+      setLanguage: (language) => {
+        document.documentElement.lang = language;
+        set({ language });
+      },
     }),
     { name: 'shadow-contract-language' },
   ),
@@ -526,3 +551,9 @@ export const useLanguage = create<{
 
 export const getTexts = () => texts[useLanguage.getState().language];
 export const useTexts = () => texts[useLanguage((state) => state.language)];
+
+export function translateSessionError(error: string): string {
+  const key = (Object.keys(pt.lobby.errors) as (keyof typeof pt.lobby.errors)[])
+    .find((candidate) => pt.lobby.errors[candidate] === error);
+  return key ? getTexts().lobby.errors[key] : error;
+}

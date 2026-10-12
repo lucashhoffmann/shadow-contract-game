@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import { useEffect, useRef, useState } from 'react';
 import { getTexts, useLanguage } from '@/shared/i18n';
 
@@ -15,7 +16,7 @@ export type RecordCard = {
 const WIDTH = 1080;
 const HEIGHT = 1920;
 const FONT = "'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif";
-const INK = '#14141f';
+const INK = COLORS.ui.ink;
 // largura maxima de uma linha de texto
 const LINE = 940;
 
@@ -24,8 +25,8 @@ function drawCard(
   { best, room, kills }: RecordCard,
 ): void {
   const background = context.createLinearGradient(0, 0, 0, HEIGHT);
-  background.addColorStop(0, '#34376a');
-  background.addColorStop(0.55, '#1f2033');
+  background.addColorStop(0, COLORS.ui.cardTop);
+  background.addColorStop(0.55, COLORS.ui.background);
   background.addColorStop(1, INK);
   context.fillStyle = background;
   context.fillRect(0, 0, WIDTH, HEIGHT);
@@ -51,17 +52,17 @@ function drawCard(
     context.fillText(text, WIDTH / 2, y);
   };
 
-  line('SHADOW', 430, 230, '#ffffff');
-  line('CONTRACT', 660, 230, '#ff2d55');
-  line(getTexts().share.myRecord, 980, 96, '#ffd21f');
-  line(getTexts().share.room(best), 1220, 330, '#ffffff');
+  line('SHADOW', 430, 230, COLORS.ui.white);
+  line('CONTRACT', 660, 230, COLORS.ui.brandPink);
+  line(getTexts().share.myRecord, 980, 96, COLORS.ui.highlight);
+  line(getTexts().share.room(best), 1220, 330, COLORS.ui.white);
   line(
     getTexts().share.run(room, kills),
     1470,
     60,
-    '#d8d9ee',
+    COLORS.ui.cardText,
   );
-  line(getTexts().share.challenge, 1690, 84, '#2fd15a');
+  line(getTexts().share.challenge, 1690, 84, COLORS.ui.success);
 }
 
 // desenha o cartao e devolve o PNG; null se o navegador nao tem canvas 2D

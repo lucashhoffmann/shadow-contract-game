@@ -1,6 +1,5 @@
 import { Check } from 'lucide-react';
 
-import { ITEMS } from '@/app/modules/shop/constants/shop.constants';
 import type { WeaponId } from '@/app/modules/world/types/world.types';
 import { cn } from '@/shared/lib/utils';
 import { useTexts } from '@/shared/i18n';
@@ -31,9 +30,9 @@ export function WeaponPicker({
   return (
     <section
       aria-label={t.character.weaponPreview}
-      className='font-display mt-5 flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border-4 border-white/80 bg-[#16345c] p-4 pt-0 text-center'
+      className='font-display mt-5 flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border-4 border-white/80 bg-[var(--game-panel)] p-4 pt-0 text-center'
     >
-      <h2 className='-mt-5 rounded-full border-4 border-white bg-[#1f4f8f] px-5 py-1 tracking-wide text-white uppercase shadow-lg'>
+      <h2 className='-mt-5 rounded-full border-4 border-white bg-[var(--game-panelTitle)] px-5 py-1 tracking-wide text-white uppercase shadow-lg'>
         {t.character.weaponPreview}
       </h2>
       <p className='font-sans text-xs font-bold tracking-wide text-white/80 uppercase'>

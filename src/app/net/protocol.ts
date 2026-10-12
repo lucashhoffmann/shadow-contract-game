@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 // Contrato entre o servidor de salas e o jogo. Copia de
 // shadow-contract-server/src/protocol.ts: mudou la, copiar de novo.
 //
@@ -7,7 +8,7 @@
 export const MAX_PLAYERS = 4;
 export const NAME_MAX = 16;
 // cor de cada jogador, pela ordem de entrada
-export const PLAYER_COLORS = ['#ff8a3c', '#39d0ff', '#3fe08a', '#ff5fa2'];
+export const PLAYER_COLORS = [COLORS.ui.playerOrange, COLORS.ui.playerCyan, COLORS.ui.playerMint, COLORS.ui.playerPink];
 
 export type PlayerInfo = {
   id: string;

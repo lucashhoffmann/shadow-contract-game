@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import * as THREE from 'three';
 
 import {
@@ -73,11 +74,11 @@ function rod(
 function pistol({ paint, add }: Kit, silenced: boolean): void {
   // origem na traseira do ferrolho, na linha entre ferrolho e armacao
   const p: Trace = (px, py) => [(665 - px) / 250, (105 - py) / 250];
-  const black = paint(0x1b1b1f);
-  const tan = paint(0x6f6339);
-  const tanDark = paint(0x594f2c);
-  const brown = paint(0x5a3d34);
-  const plateGrey = paint(0x2c2f33);
+  const black = paint(COLORS.model.c1b1b1f);
+  const tan = paint(COLORS.model.c6f6339);
+  const tanDark = paint(COLORS.model.c594f2c);
+  const brown = paint(COLORS.model.c5a3d34);
+  const plateGrey = paint(COLORS.model.c2c2f33);
 
   // ferrolho
   add(
@@ -212,22 +213,22 @@ function pistol({ paint, add }: Kit, silenced: boolean): void {
 
   if (!silenced) return;
   // silenciador: cano rosqueado saindo do ferrolho e tubo no mesmo eixo
-  const tube = paint(0x3a3d44);
+  const tube = paint(COLORS.model.c3a3d44);
   add(rod(0.07, 0.14), black, PISTOL_MUZZLE_X, PISTOL_BORE_Y);
   add(rod(0.16, 0.12), black, PISTOL_MUZZLE_X + 0.1, PISTOL_BORE_Y);
   add(rod(0.145, 1.3), tube, PISTOL_MUZZLE_X + 0.1, PISTOL_BORE_Y);
   add(rod(0.16, 0.06), black, PISTOL_MUZZLE_X + 1.36, PISTOL_BORE_Y);
-  add(rod(0.06, 0.01), paint(0x050506), PISTOL_MUZZLE_X + 1.42, PISTOL_BORE_Y);
+  add(rod(0.06, 0.01), paint(COLORS.model.c050506), PISTOL_MUZZLE_X + 1.42, PISTOL_BORE_Y);
 }
 
 // escopeta de dois canos lado a lado, serrada
 function shotgun({ paint, add }: Kit): void {
   // origem na culatra, na base dos canos
   const s: Trace = (px, py) => [(px - 235) / 160, (140 - py) / 160];
-  const barrel = paint(0x3a3d42);
-  const receiver = paint(0x464a50);
-  const dark = paint(0x2a2c30);
-  const wood = paint(0x5c3b2e);
+  const barrel = paint(COLORS.model.c3a3d42);
+  const receiver = paint(COLORS.model.c464a50);
+  const dark = paint(COLORS.model.c2a2c30);
+  const wood = paint(COLORS.model.c5c3b2e);
   const BARREL_R = 0.125;
   const BARREL_Z = 0.12;
   const [barrelX, barrelY] = s(228, 121);
@@ -236,7 +237,7 @@ function shotgun({ paint, add }: Kit): void {
   for (const side of [1, -1]) {
     const z = side * BARREL_Z;
     add(rod(BARREL_R, length), barrel, barrelX, barrelY, z);
-    add(rod(0.085, 0.01), paint(0x050506), barrelX + length, barrelY, z);
+    add(rod(0.085, 0.01), paint(COLORS.model.c050506), barrelX + length, barrelY, z);
     // caes
     add(
       plate(
@@ -341,24 +342,24 @@ function shotgun({ paint, add }: Kit): void {
 
 // mesma katana que o player leva na mao, deitada com a ponta em +x
 function sword({ paint, add }: Kit): void {
-  add(rod(0.028, 0.26, 8), paint(0x1c1c28), -0.1);
-  add(rod(0.085, 0.025), paint(0xd9a441), 0.16);
+  add(rod(0.028, 0.26, 8), paint(COLORS.model.c1c1c28), -0.1);
+  add(rod(0.085, 0.025), paint(COLORS.model.cd9a441), 0.16);
   add(
     // fio para baixo: a ponta curva para cima
     katanaBlade()
       .rotateY(Math.PI / 2)
       .rotateZ(-Math.PI / 2)
       .rotateX(Math.PI),
-    paint(0xc8ccd8),
+    paint(COLORS.model.cc8ccd8),
     0.185,
   );
 }
 
 // tres cartuchos em pe, levemente tortos: estojo de latao e ponta de cobre
 function ammo({ paint, add }: Kit): void {
-  const brass = paint(0xd9b84a);
-  const copper = paint(0xd98a5a);
-  const rim = paint(0xa8862c);
+  const brass = paint(COLORS.model.cd9b84a);
+  const copper = paint(COLORS.model.cd98a5a);
+  const rim = paint(COLORS.model.ca8862c);
   for (const [x, z, lean] of [
     [-0.34, 0.06, 0.1],
     [0, -0.1, -0.04],

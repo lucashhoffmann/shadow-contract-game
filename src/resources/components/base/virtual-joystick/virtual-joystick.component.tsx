@@ -2,6 +2,7 @@ import { ChevronsDown, ChevronsUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { cn } from '@/shared/lib/utils';
+import { useTexts } from '@/shared/i18n';
 import { useVirtualJoystick } from '@/resources/components/base/virtual-joystick/use-virtual-joystick.component';
 
 type VirtualJoystickProps = {
@@ -22,6 +23,7 @@ export function VirtualJoystick({
   onDash,
   onCrouch,
 }: VirtualJoystickProps) {
+  const t = useTexts();
   // agachar e liga/desliga: um toque agacha, outro levanta
   const [crouched, setCrouched] = useState(false);
   // saiu da tela agachado: nao deixa preso
@@ -34,7 +36,7 @@ export function VirtualJoystick({
 
   return (
     <div
-      aria-label='Joystick'
+      aria-label={t.common.joystick}
       className='virtual-joystick pointer-events-auto absolute inset-x-0 bottom-0 z-10 hidden h-[45%] touch-none select-none'
       {...handlers}
     >
@@ -72,12 +74,12 @@ export function VirtualJoystick({
       {onCrouch && (
         <button
           type='button'
-          aria-label='Agachar'
+          aria-label={t.common.crouch}
           aria-pressed={crouched}
           className={cn(
             'pointer-events-auto absolute right-5 flex size-16 items-center justify-center rounded-full border-4 active:scale-90',
             crouched
-              ? 'border-white bg-[#ffd21f]/80 text-[#14141f]'
+              ? 'border-white bg-[var(--game-highlight)]/80 text-[var(--game-ink)]'
               : 'border-white/35 bg-white/10 text-white/80',
           )}
           style={{ bottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
@@ -100,7 +102,7 @@ export function VirtualJoystick({
           O toque para aqui: nao comeca o joystick por baixo */}
       <button
         type='button'
-        aria-label='Saltar'
+        aria-label={t.common.dash}
         className='pointer-events-auto absolute right-5 flex size-16 items-center justify-center rounded-full border-4 border-white/35 bg-white/10 text-white/80 active:scale-90 active:bg-white/25'
         style={{
           // com o agachar embaixo, o salto sobe uma posicao

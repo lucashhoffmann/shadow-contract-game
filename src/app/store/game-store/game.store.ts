@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -101,9 +102,9 @@ export const LOOK_SCALE = { min: 0.7, max: 1.4 };
 export const WEAPON_SCALE = { min: 0.4, max: 1.4 };
 
 export const DEFAULT_LOOK: PlayerLook = {
-  cloth: '#ff8a3c',
-  accent: '#1c1c28',
-  skin: '#e8b796',
+  cloth: COLORS.ui.playerOrange,
+  accent: COLORS.ui.charcoal,
+  skin: COLORS.ui.skinDefault,
   // inimigos usam 1: o player comeca so um pouco maior, para se destacar
   head: 1.1,
   legs: 1,
@@ -112,7 +113,7 @@ export const DEFAULT_LOOK: PlayerLook = {
   weapon: 1,
 };
 
-export const DEFAULT_BLOOD_COLOR = '#a61020';
+export const DEFAULT_BLOOD_COLOR = COLORS.ui.bloodDefault;
 
 const COLOR = /^#[0-9a-f]{6}$/i;
 

@@ -13,7 +13,7 @@ export function InstallApp() {
       <button
         type='button'
         onClick={install}
-        className='text-outline relative hidden items-center gap-2 rounded-2xl border-4 border-white bg-[#ffb22e] px-5 py-2 text-lg text-white uppercase shadow-[0_5px_0_#14141f] transition-transform active:translate-y-1 active:shadow-none pointer-coarse:flex'
+        className='text-outline relative hidden items-center gap-2 rounded-2xl border-4 border-white bg-[var(--game-primary)] px-5 py-2 text-lg text-white uppercase shadow-[0_5px_0_var(--game-ink)] transition-transform active:translate-y-1 active:shadow-none pointer-coarse:flex'
       >
         <Download
           aria-hidden

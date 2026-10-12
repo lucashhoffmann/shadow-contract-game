@@ -6,11 +6,11 @@ import { useTexts } from '@/shared/i18n';
 
 // botao gordo de jogo, igual ao da home
 const CHUNKY =
-  'text-outline flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-4 border-white px-5 py-2 text-lg text-white uppercase shadow-[0_5px_0_#14141f] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100';
+  'text-outline flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-4 border-white px-5 py-2 text-lg text-white uppercase shadow-[0_5px_0_var(--game-ink)] transition-transform hover:scale-105 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100';
 const PANEL =
-  'flex w-full flex-col gap-3 rounded-2xl border-4 border-white/80 bg-[#16345c] p-4';
+  'flex w-full flex-col gap-3 rounded-2xl border-4 border-white/80 bg-[var(--game-panel)] p-4';
 const FIELD =
-  'w-full rounded-xl border-4 border-white bg-[#14141f] px-3 py-2 font-sans text-lg font-bold text-white outline-none focus:border-[#ffd21f]';
+  'w-full rounded-xl border-4 border-white bg-[var(--game-ink)] px-3 py-2 font-sans text-lg font-bold text-white outline-none focus:border-[var(--game-highlight)]';
 
 // Sala de espera do multiplayer, em tres passos: nome, listagem de sessoes e
 // sessao (quem entrou e o codigo de convite).
@@ -38,7 +38,7 @@ export function LobbyPage() {
     <main className='font-display relative flex min-h-full flex-col items-center gap-5 overflow-y-auto bg-[radial-gradient(ellipse_at_50%_30%,#3a3f78_0%,#1f2033_55%,#12131f_100%)] p-6 pt-16 text-center'>
       <button
         type='button'
-        className={`${CHUNKY} absolute top-3 left-3 bg-[#3d4fd6] text-base`}
+        className={`${CHUNKY} absolute top-3 left-3 bg-[var(--game-secondary)] text-base`}
         onClick={exit}
       >
         <ArrowLeft
@@ -54,7 +54,7 @@ export function LobbyPage() {
       {error && (
         <p
           role='alert'
-          className='rounded-xl bg-[#ff2d55] px-4 py-2 font-sans text-sm font-bold text-white'
+          className='rounded-xl bg-[var(--game-brandPink)] px-4 py-2 font-sans text-sm font-bold text-white'
         >
           {error}
         </p>
@@ -81,7 +81,7 @@ export function LobbyPage() {
             <button
               type='submit'
               disabled={!name.trim() || status === 'connecting'}
-              className={`${CHUNKY} bg-[#2fd15a]`}
+              className={`${CHUNKY} bg-[var(--game-success)]`}
             >
               {status === 'connecting' ? t.lobby.connecting : t.lobby.enter}
             </button>
@@ -91,11 +91,11 @@ export function LobbyPage() {
         {status === 'lobby' && (
           <>
             <section className={PANEL}>
-              <h2 className='text-xl text-[#ffd21f] uppercase'>{t.lobby.createSession}</h2>
+              <h2 className='text-xl text-[var(--game-highlight)] uppercase'>{t.lobby.createSession}</h2>
               <div className='grid grid-cols-2 gap-3'>
                 <button
                   type='button'
-                  className={`${CHUNKY} bg-[#2fd15a]`}
+                  className={`${CHUNKY} bg-[var(--game-success)]`}
                   onClick={() => create(true)}
                 >
                   <Users
@@ -107,7 +107,7 @@ export function LobbyPage() {
                 </button>
                 <button
                   type='button'
-                  className={`${CHUNKY} bg-[#3d4fd6]`}
+                  className={`${CHUNKY} bg-[var(--game-secondary)]`}
                   onClick={() => create(false)}
                 >
                   <Lock
@@ -126,7 +126,7 @@ export function LobbyPage() {
                 join(code);
               }}
             >
-              <label className='flex flex-col gap-2 text-left text-xl text-[#ffd21f] uppercase'>
+              <label className='flex flex-col gap-2 text-left text-xl text-[var(--game-highlight)] uppercase'>
                 {t.lobby.joinCode}
                 <input
                   value={code}
@@ -138,7 +138,7 @@ export function LobbyPage() {
               <button
                 type='submit'
                 disabled={code.length < 5}
-                className={`${CHUNKY} bg-[#3d4fd6]`}
+                className={`${CHUNKY} bg-[var(--game-secondary)]`}
               >
                 {t.lobby.enter}
               </button>
@@ -147,7 +147,7 @@ export function LobbyPage() {
               aria-label={t.lobby.publicSessions}
               className={PANEL}
             >
-              <h2 className='text-xl text-[#ffd21f] uppercase'>
+              <h2 className='text-xl text-[var(--game-highlight)] uppercase'>
                 {t.lobby.publicSessions}
               </h2>
               {sessions.length === 0 && (
@@ -170,7 +170,7 @@ export function LobbyPage() {
                     <button
                       type='button'
                       aria-label={t.lobby.joinHost(open.hostName)}
-                      className={`${CHUNKY} bg-[#2fd15a] px-4 py-1 text-base`}
+                      className={`${CHUNKY} bg-[var(--game-success)] px-4 py-1 text-base`}
                       onClick={() => join(open.code)}
                     >
                       {t.lobby.enter}
@@ -189,7 +189,7 @@ export function LobbyPage() {
             </p>
             <p
               aria-label={t.lobby.inviteCode}
-              className='text-outline text-5xl tracking-[0.25em] text-[#ffd21f]'
+              className='text-outline text-5xl tracking-[0.25em] text-[var(--game-highlight)]'
             >
               {session.code}
             </p>
@@ -217,7 +217,7 @@ export function LobbyPage() {
                   {player.host && (
                     <Crown
                       aria-label={t.lobby.host}
-                      className='size-5 text-[#ffd21f]'
+                      className='size-5 text-[var(--game-highlight)]'
                       strokeWidth={3}
                     />
                   )}
@@ -233,7 +233,7 @@ export function LobbyPage() {
             <div className='grid grid-cols-2 gap-3'>
               <button
                 type='button'
-                className={`${CHUNKY} bg-[#3d4fd6]`}
+                className={`${CHUNKY} bg-[var(--game-secondary)]`}
                 onClick={leave}
               >
                 {t.lobby.leave}
@@ -241,7 +241,7 @@ export function LobbyPage() {
               <button
                 type='button'
                 disabled={!you?.host}
-                className={`${CHUNKY} bg-[#2fd15a]`}
+                className={`${CHUNKY} bg-[var(--game-success)]`}
                 onClick={start}
               >
                 <Play

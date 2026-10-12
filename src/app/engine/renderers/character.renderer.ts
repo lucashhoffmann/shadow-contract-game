@@ -1,3 +1,4 @@
+import { COLORS } from '@/shared/colors';
 import * as THREE from 'three';
 
 import { SLASH_TIME } from '@/app/modules/world/constants/world.constants';
@@ -157,11 +158,11 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     new THREE.MeshToonMaterial({ color, gradientMap: ramp });
   const mat = {
     outline: new THREE.MeshBasicMaterial({
-      color: 0x14141f,
+      color: COLORS.model.c14141f,
       side: THREE.BackSide,
     }),
     shadow: new THREE.MeshBasicMaterial({
-      color: 0x000000,
+      color: COLORS.model.c000000,
       transparent: true,
       opacity: 0.3,
       depthWrite: false,
@@ -169,14 +170,14 @@ export function createCharacterKit(look: PlayerLook): CharacterKit {
     playerCloth: toon(look.cloth),
     playerAccent: toon(look.accent),
     playerSkin: toon(look.skin),
-    gold: toon(0xd9a441),
-    dark: toon(0x1c1c28),
-    steel: toon(0xc8ccd8),
-    skin: toon(0xe8b796),
-    purple: toon(0x5a3f8a),
-    red: toon(0xd93636),
-    navy: toon(0x2c3e66),
-    white: toon(0xf2f2f2),
+    gold: toon(COLORS.model.cd9a441),
+    dark: toon(COLORS.model.c1c1c28),
+    steel: toon(COLORS.model.cc8ccd8),
+    skin: toon(COLORS.model.ce8b796),
+    purple: toon(COLORS.model.c5a3f8a),
+    red: toon(COLORS.model.cd93636),
+    navy: toon(COLORS.model.c2c3e66),
+    white: toon(COLORS.model.cf2f2f2),
   };
 
   const eyes: Part[] = SIDES.map((side) => [
