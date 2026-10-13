@@ -32,6 +32,18 @@ function loadGltf(url: string): Promise<GLTF> {
   return file;
 }
 
+// So baixa e interpreta os arquivos do modelo, sem montar corpo: para a tela
+// de carregamento. Depois disso `loadCharacterView` resolve sem esperar rede.
+export async function preloadCharacterModel(
+  model: CharacterModel,
+): Promise<void> {
+  await Promise.all([
+    loadGltf(model.url),
+    loadGltf(model.clipsUrl),
+    ...(model.holds ?? []).map((hold) => loadGltf(hold.url)),
+  ]);
+}
+
 // Baixa o que falta e monta um corpo novo. Rejeita se algum arquivo nao
 // chegar: quem chama decide o que mostrar no lugar.
 export async function loadCharacterView(

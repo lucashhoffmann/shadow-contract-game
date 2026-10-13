@@ -71,7 +71,26 @@ export function createModelKit(scene: THREE.Object3D): ModelKit {
   };
 }
 
+// cada arquivo e baixado e interpretado uma vez; quem pede depois reaproveita
+const files = new Map<string, Promise<THREE.Object3D>>();
+function loadScene(url: string): Promise<THREE.Object3D> {
+  let file = files.get(url);
+  if (!file) {
+    file = new GLTFLoader().loadAsync(url).then((gltf) => gltf.scene);
+    files.set(url, file);
+    // falhou (sem rede): a proxima tentativa baixa de novo
+    file.catch(() => files.delete(url));
+  }
+  return file;
+}
+
+// So baixa e interpreta o arquivo: para a tela de carregamento. Depois disso
+// `loadModelKit` resolve sem esperar rede.
+export async function preloadModelKit(url: string): Promise<void> {
+  await loadScene(url);
+}
+
 // Rejeita se o arquivo nao chegar: quem chama decide o que mostrar no lugar.
 export async function loadModelKit(url: string): Promise<ModelKit> {
-  return createModelKit((await new GLTFLoader().loadAsync(url)).scene);
+  return createModelKit(await loadScene(url));
 }

@@ -2,7 +2,9 @@
 // (CC0, Kay Lousberg) baixados em kaylousberg.itch.io. Roda uma vez, quando
 // muda a lista de clipes ou de personagens:
 //
-//   node scripts/pack-kaykit.mjs <pasta Character_Animations> <pasta Adventurers>
+//   node scripts/pack-kaykit.mjs <Character_Animations> <Adventurers> [<Skeletons>]
+//
+// O pacote Skeletons e opcional: sem ele, so nao saem os esqueletos.
 //
 // O pacote de animacoes traz um GLB por tema, cada um com o manequim inteiro
 // dentro. Aqui sai um GLB so, com o esqueleto e os clipes de CLIPS, sem malha:
@@ -27,9 +29,30 @@ const CLIPS = {
   CombatRanged: ['Ranged_1H_Shoot', 'Ranged_2H_Shoot'],
 };
 // personagens copiados inteiros (a textura ja vem dentro do GLB)
-const CHARACTERS = ['Rogue_Hooded', 'Knight', 'Ranger', 'Barbarian'];
+const CHARACTERS = [
+  'Rogue_Hooded',
+  'Rogue',
+  'Mage',
+  'Knight',
+  'Ranger',
+  'Barbarian',
+];
 // o que vai na mao: .gltf com .bin e textura ao lado
 const PROPS = ['sword_1handed.gltf', 'sword_1handed.bin', 'knight_texture.png'];
+// do pacote Skeletons: mesmo esqueleto (Rig_Medium), mesmos clipes
+const SKELETONS = [
+  'Skeleton_Warrior',
+  'Skeleton_Minion',
+  'Skeleton_Rogue',
+  'Skeleton_Mage',
+];
+const SKELETON_PROPS = [
+  'Skeleton_Blade.gltf',
+  'Skeleton_Blade.bin',
+  'Skeleton_Axe.gltf',
+  'Skeleton_Axe.bin',
+  'skeleton_texture.png',
+];
 
 const FLOAT = 5126;
 const SIZE = { SCALAR: 1, VEC3: 3, VEC4: 4 };
@@ -168,7 +191,7 @@ function pack(animations) {
   ]);
 }
 
-const [animations, adventurers] = process.argv.slice(2);
+const [animations, adventurers, skeletons] = process.argv.slice(2);
 if (!animations || !adventurers) {
   console.error(
     'uso: node scripts/pack-kaykit.mjs <Character_Animations> <Adventurers>',
@@ -184,6 +207,17 @@ for (const name of CHARACTERS) {
     join(adventurers, 'Characters/gltf', `${name}.glb`),
     join(OUT, `${name.toLowerCase().replace('_', '-')}.glb`),
   );
+}
+if (skeletons) {
+  for (const name of SKELETONS) {
+    copyFileSync(
+      join(skeletons, 'characters/gltf', `${name}.glb`),
+      join(OUT, `${name.toLowerCase().replace('_', '-')}.glb`),
+    );
+  }
+  for (const name of SKELETON_PROPS) {
+    copyFileSync(join(skeletons, 'assets/gltf', name), join(OUT, name));
+  }
 }
 for (const name of PROPS) {
   copyFileSync(join(adventurers, 'Assets/gltf', name), join(OUT, name));

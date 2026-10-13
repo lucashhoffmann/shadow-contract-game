@@ -42,7 +42,7 @@ describe.skipIf(!published)('arquivos do KayKit em public/models', () => {
 
   it('cada modelo de inimigo existe, tem os ossos dos clipes e os pontos de mao', () => {
     const animated = clips.nodes.map((node) => node.name);
-    for (const model of Object.values(ENEMY_MODELS)) {
+    for (const model of Object.values(ENEMY_MODELS).flat()) {
       const bones = glb(model.url).nodes.map((node) => node.name);
       for (const slot of Object.values(model.rig.slots)) {
         expect(bones).toContain(slot);
