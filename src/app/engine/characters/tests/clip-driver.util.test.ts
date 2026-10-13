@@ -165,3 +165,122 @@ describe('splitClipNames', () => {
     });
   });
 });
+
+describe('driveClips: animacao rica', () => {
+  const RICH: ClipSet = {
+    idle: [{ name: 'idleA' }, { name: 'idleB' }],
+    walk: { name: 'walk' },
+    move: [{ name: 'runA' }, { name: 'runB' }],
+    attacks: [{ name: 'slash' }],
+    attackStyles: { two: [{ name: 'heavy' }, { name: 'slam' }] },
+    spin: { name: 'spin' },
+    spinStyles: { two: { name: 'whirl' } },
+    aim: { name: 'aim' },
+    shot: { name: 'shoot' },
+    aimStyles: { bow: { name: 'bowAim' } },
+    shotStyles: { bow: { name: 'bowLoose' } },
+    throw: { name: 'throw' },
+    hits: [{ name: 'hitA' }, { name: 'hitB' }],
+    block: { name: 'block' },
+    taunt: { name: 'taunt' },
+    emotes: { cheer: { name: 'cheer' } },
+    death: [{ name: 'deathA' }, { name: 'deathB' }],
+  };
+  const rich = (pose: Partial<CharacterPose>, split = true) =>
+    driveClips(RICH, { ...REST, ...pose }, 0, () => 2, split);
+  const playing = (pose: Partial<CharacterPose>, split = true) =>
+    rich(pose, split)
+      .filter((command) => command.weight > 0)
+      .map((command) => command.name);
+
+  it('parado vira andando ate a metade, e andando vira correndo dai em diante', () => {
+    expect(rich({ moving: 0.25 }).map((c) => [c.name, c.weight])).toEqual([
+      ['idleA', 0.5],
+      ['walk', 0.5],
+    ]);
+    expect(rich({ moving: 0.75 }).map((c) => [c.name, c.weight])).toEqual([
+      ['walk', 0.5],
+      ['runA', 0.5],
+    ]);
+    expect(playing({ moving: 1 })).toEqual(['runA']);
+  });
+
+  it('`variant` escolhe a variacao de parado, correr e morrer, sempre a mesma', () => {
+    expect(playing({ variant: 0 })).toEqual(['idleA']);
+    expect(playing({ variant: 1 })).toEqual(['idleB']);
+    expect(playing({ variant: 3, moving: 1 })).toEqual(['runB']);
+    expect(playing({ variant: 7, dead: true })).toEqual(['deathB']);
+    expect(playing({ variant: -1 })).toEqual(['idleB']);
+  });
+
+  it('`style` troca os golpes e o giro; estilo que o esqueleto nao tem cai no padrao', () => {
+    expect(playing({ attack: 0.5, style: 'two' })).toEqual(['heavy']);
+    expect(playing({ attack: 0.5, style: 'two', swing: 1 })).toEqual(['slam']);
+    expect(playing({ attack: 0.5, style: 'two', spinning: true })).toEqual([
+      'whirl',
+    ]);
+    expect(playing({ attack: 0.5, style: 'whip' })).toEqual(['slash']);
+    expect(playing({ attack: 0.5, style: 'whip', spinning: true })).toEqual([
+      'spin',
+    ]);
+  });
+
+  it('de arma na mao aponta em ciclo no tronco, com as pernas no passo; o disparo entra por cima', () => {
+    expect(rich({ aiming: true, moving: 1 })).toEqual([
+      { name: 'walk', weight: 0, time: null, part: 'lower' },
+      { name: 'runA', weight: 1, time: null, part: 'lower' },
+      { name: 'aim', weight: 1, time: null, part: 'upper' },
+    ]);
+    expect(rich({ aiming: true, shot: 0.5 }).at(-1)).toEqual({
+      name: 'shoot',
+      weight: 1,
+      time: 1,
+      part: 'upper',
+    });
+    // arco: mira e disparo proprios
+    expect(playing({ aiming: true, style: 'bow' })).toContain('bowAim');
+    expect(playing({ aiming: true, shot: 0.2, style: 'bow' })).toContain(
+      'bowLoose',
+    );
+  });
+
+  it('sem separar o corpo, a mira nao trava as pernas: so o disparo toma o corpo', () => {
+    expect(playing({ aiming: true, moving: 1 }, false)).toEqual(['aim']);
+    expect(playing({ shot: 0.5 }, false)).toEqual(['shoot']);
+  });
+
+  it('golpe levado estremece o tronco e vale mais que mira e disparo; escudo usa o bloqueio', () => {
+    expect(rich({ hit: 0.5, aiming: true, shot: 0.5 }).at(-1)).toMatchObject({
+      name: 'hitA',
+      part: 'upper',
+    });
+    expect(rich({ hit: 0.5, variant: 1 }).at(-1)?.name).toBe('hitB');
+    expect(rich({ hit: 0.5, blocked: true }).at(-1)?.name).toBe('block');
+  });
+
+  it('arremesso, grito e gesto tomam o corpo inteiro, cada um no seu lugar da fila', () => {
+    expect(playing({ throwing: 0.5 })).toEqual(['throw']);
+    expect(playing({ taunt: 0.5, throwing: 0.5, attack: 0.5 })).toEqual([
+      'taunt',
+    ]);
+    expect(
+      playing({ emote: { name: 'cheer', phase: 0.5 }, taunt: 0.5 }),
+    ).toEqual(['cheer']);
+    // gesto que o esqueleto nao tem nao trava nada
+    expect(playing({ emote: { name: 'dance', phase: 0.5 } })).toEqual([
+      'idleA',
+    ]);
+    // morto vale mais que tudo
+    expect(
+      playing({ dead: true, emote: { name: 'cheer', phase: 0 }, attack: 0 }),
+    ).toEqual(['deathA']);
+  });
+
+  it('lista todos os clipes, e separa os do tronco dos das pernas', () => {
+    expect(clipNames(RICH)).toHaveLength(22);
+    expect(splitClipNames(RICH)).toEqual({
+      upper: ['shoot', 'bowLoose', 'aim', 'bowAim', 'hitA', 'hitB', 'block'],
+      lower: ['idleA', 'idleB', 'runA', 'runB', 'walk'],
+    });
+  });
+});

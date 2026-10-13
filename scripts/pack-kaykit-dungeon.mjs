@@ -24,6 +24,19 @@ const PIECES = [
   'coin_stack_small',
   // so a folha de madeira de dentro e usada (porta de correr)
   'wall_doorway',
+  // decoracao: nao entra na simulacao
+  'torch_mounted',
+  'banner_red',
+  'banner_blue',
+  'banner_green',
+  'floor_tile_small_broken_A',
+  'floor_tile_small_broken_B',
+  'floor_tile_small_weeds_A',
+  // mobilia fixa e pilar: obstaculo no template da sala
+  'table_medium_decorated_A',
+  'shelves',
+  'barrel_small_stack',
+  'pillar',
 ];
 
 const [pack] = process.argv.slice(2);

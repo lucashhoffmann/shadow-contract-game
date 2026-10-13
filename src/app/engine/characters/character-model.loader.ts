@@ -17,6 +17,9 @@ export type CharacterModel = {
   rig: RigSpec;
   // objetos presos ao corpo: `slot` e um nome de `rig.slots`
   holds?: { slot: string; url: string }[];
+  // jeito de lutar com o que ele segura (`pose.style`): escolhe o conjunto
+  // de golpes ou de mira e tiro do esqueleto
+  style?: string;
 };
 
 // cada arquivo e baixado e interpretado uma vez; quem pede depois reaproveita

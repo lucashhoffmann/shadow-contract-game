@@ -23,6 +23,10 @@ export type RigSpec = {
   turn: number;
   // nome que o jogo usa -> nome do osso no arquivo
   slots: Record<string, string>;
+  // Como cada estilo de arma de alcance e segurado (`pose.style`; '' e o
+  // padrao): em que ponto do corpo, e para onde apontam a frente e o topo da
+  // arma, nos eixos desse ponto, quando o personagem esta em pose de mira
+  grips?: Record<string, { slot: string; forward: number[]; up: number[] }>;
   // ossos da cintura para baixo. Com isto, apontar e atirar pegam so o
   // tronco e as pernas continuam andando; sem, o tiro toma o corpo inteiro
   lower?: string[];

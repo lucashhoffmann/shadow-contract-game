@@ -20,6 +20,25 @@ export type CharacterPose = {
   // o golpe em curso e o giro
   spinning: boolean;
   dead: boolean;
+  // Tudo daqui para baixo e opcional: enriquece a animacao quando o
+  // esqueleto tem os clipes, e nao faz falta quando nao tem.
+  // numero fixo do personagem (o id): escolhe entre as variacoes de parado,
+  // andar, correr e morrer, para dois iguais nao se mexerem igual
+  variant?: number;
+  // jeito de lutar com o que esta na mao: troca o conjunto de golpes e o
+  // clipe de mira e de tiro ('bow', 'two'...; os nomes sao do `ClipSet`)
+  style?: string;
+  // de arma de alcance na mao, apontando; `shot` e o disparo em si
+  aiming?: boolean;
+  // fase do arremesso (adaga do cavaleiro)
+  throwing?: number | null;
+  // fase da reacao a um golpe levado; `blocked`: o escudo segurou
+  hit?: number | null;
+  blocked?: boolean;
+  // fase do grito de desafio (chefe ao despertar)
+  taunt?: number | null;
+  // gesto de corpo inteiro fora do combate (comemorar na loja)
+  emote?: { name: string; phase: number } | null;
 };
 
 export type CharacterView = {
