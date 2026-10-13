@@ -12,10 +12,10 @@ extracao para quando houver um segundo jogo.
 
 ## Jogos que saem daqui
 
-| Jogo            | Pasta                        | O que mudou                                                        |
-| --------------- | ---------------------------- | ------------------------------------------------------------------ |
-| Shadow Contract | `workspace/shadow-contract`  | o original: ninja e terno, personagens de pecas, cenario de caixas |
-| Blade & Bounty  | `workspace/blade-and-bounty` | medieval: arco, besta, modelos e masmorra do KayKit, outras fontes |
+| Jogo            | Pasta                              | O que mudou                                                        |
+| --------------- | ---------------------------------- | ------------------------------------------------------------------ |
+| Shadow Contract | `workspace/games/shadow-contract`  | o original: ninja e terno, personagens de pecas, cenario de caixas |
+| Blade & Bounty  | `workspace/games/blade-and-bounty` | medieval: arco, besta, modelos e masmorra do KayKit, outras fontes |
 
 O Blade & Bounty foi feito pelo caminho de "Comecar um jogo novo hoje"
 (copia), nao por pacote. Por isso o codigo comum existe **duas vezes**.
