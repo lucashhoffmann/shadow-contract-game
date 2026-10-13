@@ -10,6 +10,31 @@ existe e uma arquitetura que se repete bem e um punhado de pecas que ja sao
 neutras. Este documento marca a fronteira para ela nao piorar e da a ordem de
 extracao para quando houver um segundo jogo.
 
+## Jogos que saem daqui
+
+| Jogo            | Pasta                        | O que mudou                                                        |
+| --------------- | ---------------------------- | ------------------------------------------------------------------ |
+| Shadow Contract | `workspace/shadow-contract`  | o original: ninja e terno, personagens de pecas, cenario de caixas |
+| Blade & Bounty  | `workspace/blade-and-bounty` | medieval: arco, besta, modelos e masmorra do KayKit, outras fontes |
+
+O Blade & Bounty foi feito pelo caminho de "Comecar um jogo novo hoje"
+(copia), nao por pacote. Por isso o codigo comum existe **duas vezes**.
+
+**Regra enquanto nao ha pacote:** correcao ou melhoria em codigo comum feita
+num jogo e copiada para o outro no mesmo dia. Vale para:
+
+- `src/app/engine/characters/*` menos `character-models.config.ts`
+- `src/app/engine/scenery/model-kit.ts`
+- `scripts/pack-kaykit*.mjs`
+- os testes dessas pastas
+
+Os arquivos sao identicos nos dois, salvo os nomes que o tema trocou no
+Blade & Bounty (`ninja` virou `knight`, `pistol` virou `bow` etc.; tabela no
+README de la). `diff -r` entre as duas pastas mostra o que divergiu.
+
+Com dois jogos, o passo "Quando virar pacote" deixou de ser hipotetico: o
+primeiro candidato e exatamente essa lista.
+
 ## As tres camadas de reuso
 
 ```text
@@ -31,18 +56,22 @@ nao ha codigo. O kit rende medio e esta hoje misturado com o jogo.
 
 Nao importa nada de `app/modules` nem de `app/store`.
 
-| Arquivo                                                         | O que e                                                                                                           |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `shared/utils/rng.util.ts`                                      | rng com seed, estado em `{ rngState }`                                                                            |
-| `shared/utils/math.util.ts`                                     | distancia, angulo, clamp                                                                                          |
-| `shared/lib/utils.ts`                                           | `cn` de classes                                                                                                   |
-| `app/net/protocol.ts`                                           | contrato do servidor de salas; `game:input`, `game:state` e `game:event` levam `unknown`, o jogo define o formato |
-| `app/net/session.client.ts`                                     | conexao socket.io                                                                                                 |
-| `resources/components/base/virtual-joystick/*`                  | joystick de toque com botoes de salto, agachar e ataque                                                           |
-| `resources/components/ui/*`                                     | botao e dialogo                                                                                                   |
-| `resources/pages/home/components/install-app/*`                 | convite de instalar o PWA                                                                                         |
-| `resources/pages/game/components/damage-vignette.component.tsx` | borda que pulsa (dano, aviso, vida baixa)                                                                         |
-| `resources/pages/game/components/kill-streak.component.tsx`     | selo de sequencia                                                                                                 |
+| Arquivo                                                         | O que e                                                                                                                          |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/utils/rng.util.ts`                                      | rng com seed, estado em `{ rngState }`                                                                                           |
+| `shared/utils/math.util.ts`                                     | distancia, angulo, clamp                                                                                                         |
+| `shared/lib/utils.ts`                                           | `cn` de classes                                                                                                                  |
+| `app/net/protocol.ts`                                           | contrato do servidor de salas; `game:input`, `game:state` e `game:event` levam `unknown`, o jogo define o formato                |
+| `app/net/session.client.ts`                                     | conexao socket.io                                                                                                                |
+| `resources/components/base/virtual-joystick/*`                  | joystick de toque com botoes de salto, agachar e ataque                                                                          |
+| `resources/components/ui/*`                                     | botao e dialogo                                                                                                                  |
+| `resources/pages/home/components/install-app/*`                 | convite de instalar o PWA                                                                                                        |
+| `resources/pages/game/components/damage-vignette.component.tsx` | borda que pulsa (dano, aviso, vida baixa)                                                                                        |
+| `resources/pages/game/components/kill-streak.component.tsx`     | selo de sequencia                                                                                                                |
+| `app/engine/characters/*` menos `character-models.config.ts`    | personagem de modelo glTF atras de `CharacterView`: view, escolha de clipes, carregador, esqueleto KayKit (`docs/characters.md`) |
+| `scripts/pack-kaykit.mjs`                                       | junta clipes do KayKit num GLB so, sem malha                                                                                     |
+| `app/engine/scenery/model-kit.ts`                               | kit de cenario: um GLB com varias pecas, pedidas pelo nome (`docs/scenery.md`)                                                   |
+| `scripts/pack-kaykit-dungeon.mjs`                               | junta pecas soltas do KayKit Dungeon num GLB so, com a textura uma vez                                                           |
 
 O servidor de salas (`shadow-contract-server`) tambem e neutro: nao simula
 nada, so junta jogadores e repassa mensagens. Serve a qualquer jogo em que o

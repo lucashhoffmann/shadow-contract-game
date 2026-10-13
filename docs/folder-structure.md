@@ -36,6 +36,18 @@ src
 │   │   ├── game-engine.ts
 │   │   ├── character-preview.ts
 │   │   ├── weapon-preview.ts
+│   │   ├── characters                   personagens de modelo (docs/characters.md)
+│   │   │   ├── character-view.types.ts
+│   │   │   ├── clip-driver.util.ts
+│   │   │   ├── gltf-character.view.ts
+│   │   │   ├── character-model.loader.ts
+│   │   │   ├── kaykit.rig.ts
+│   │   │   ├── character-models.config.ts
+│   │   │   └── tests
+│   │   ├── scenery                      cenario de modelo (docs/scenery.md)
+│   │   │   ├── model-kit.ts
+│   │   │   ├── scenery.config.ts
+│   │   │   └── tests
 │   │   └── renderers
 │   │       ├── character.renderer.ts
 │   │       ├── weapon.renderer.ts

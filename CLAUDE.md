@@ -9,6 +9,10 @@ Antes de criar ou mover arquivo, ler:
 - `docs/contracts.md`: tipos e interfaces entre simulacao, store, engine e UI
 - `docs/testing.md`: o que testar, onde colocar e como rodar
 - `docs/engine-reuse.md`: o que e reusavel em outros jogos e o que e so deste
+- `docs/characters.md`: como os personagens sao montados e animados; como
+  criar inimigo, skin ou golpe novo
+- `docs/scenery.md`: cenario de modelo (piso, parede, caixas, baus); como
+  trocar peca ou kit
 
 Regras que mais quebram:
 

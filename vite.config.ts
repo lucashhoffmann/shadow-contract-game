@@ -42,7 +42,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        // modelos (public/models) entram junto: sem eles o jogo offline
+        // cairia nos personagens de pecas
+        globPatterns: ['**/*.{js,css,html,png,svg,woff2,glb,gltf,bin}'],
         cleanupOutdatedCaches: true,
         // fontes vem do Google Fonts: guarda no aparelho para jogar offline
         runtimeCaching: [

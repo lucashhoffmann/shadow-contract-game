@@ -2,6 +2,15 @@ import { COLORS } from '@/shared/colors';
 import { getTexts } from '@/shared/i18n';
 import * as THREE from 'three';
 
+import { loadCharacterView } from '@/app/engine/characters/character-model.loader';
+import {
+  ENEMY_MODELS,
+  PLAYER_MODEL,
+} from '@/app/engine/characters/character-models.config';
+import type { CharacterView } from '@/app/engine/characters/character-view.types';
+import { loadModelKit, type ModelKit } from '@/app/engine/scenery/model-kit';
+import { SCENERY } from '@/app/engine/scenery/scenery.config';
+
 import {
   type Character,
   type CharacterKind,
@@ -22,6 +31,7 @@ import {
 } from '@/app/modules/level/utils/grid.util';
 import {
   createHeldGuns,
+  createWeaponModel,
   GUNS,
   HAND_Y,
 } from '@/app/engine/renderers/weapon.renderer';
@@ -30,6 +40,7 @@ import { nearbyReviveChest } from '@/app/modules/multiplayer/systems/multiplayer
 import { nearbyChest } from '@/app/modules/shop/systems/shop.system';
 import {
   DASH_TIME,
+  ENEMY_KINDS,
   LAUNCH_TIME,
   FLOATER_TIME,
   HEARING_YELLOW,
@@ -37,6 +48,7 @@ import {
   ROOM_W,
   SHOP_EVERY,
   SHOT_TIME,
+  SLASH_TIME,
   VIEW_HALF_ANGLE,
 } from '@/app/modules/world/constants/world.constants';
 import type {
@@ -67,6 +79,12 @@ const BULLET_Y = 0.7;
 
 const MOVING_SPEED = 0.5;
 const RUN_LEAN = 0.38;
+// velocidade (tiles/s) em que o corpo de modelo ja esta em corrida cheia
+const MODEL_RUN_SPEED = 3;
+// brilho do corpo de modelo em furia (o de pecas troca o contorno)
+const RAGE_GLOW = 0x8a1010;
+// ponto do clipe de tiro em que a arma ja esta apontada
+const AIM_HOLD = 0.5;
 const ADRENALINE_LEAN = 0.55;
 const IDLE_DELAY = 0.8;
 const FOLLOW_RATE = 24;
@@ -74,6 +92,12 @@ const SNAP_DISTANCE = 2;
 const JUMP_HEIGHT = 0.8;
 // altura do centro do tronco: o mergulho gira em volta dele, nao dos pes
 const FLIP_PIVOT_Y = 0.6;
+// vento do salto: quantos arcos e riscos, e quantas vezes por segundo cada
+// um percorre o rastro
+const WIND_GUSTS = 3;
+const WIND_STREAKS = 9;
+const WIND_GUST_RATE = 4;
+const WIND_STREAK_RATE = 3.2;
 // no alto do salto o corpo fica quase deitado, em pose de corrida: uma perna
 // dobrada com o joelho a frente e a outra esticada atras; braco livre a
 // frente e o da arma recolhido atras. Angulos relativos ao tronco inclinado.
@@ -169,6 +193,10 @@ const PROMPT_HOP = 0.22;
 const PROMPT_PULSE = 0.09;
 // quanto cada folha corre para o lado ao abrir
 const DOOR_SLIDE = 1.45;
+// folha da porta de madeira do kit: meio vao de largura, pouco abaixo da
+// parede
+const DOOR_LEAF = 1.5;
+const DOOR_LEAF_HEIGHT = 1.16;
 // giro da tampa do bau aberta, em torno da dobradica
 const CHEST_OPEN = -1.9;
 const BLOOD_GROW_TIME = 2.5;
@@ -221,6 +249,8 @@ const COIN_STACKS = [
 type Jumper = {
   character: Character;
   wind: THREE.Group;
+  gusts: THREE.Mesh[];
+  streaks: THREE.Mesh[];
   flip: number;
   crouch: number;
   // quanto esta encostado de costas na parede (0..1)
@@ -266,6 +296,11 @@ type EnemyView = Jumper & {
   deathAt: number | null;
   // ja soltou a explosao de notas e sangue da morte
   burst: boolean;
+  // corpo de modelo (ENEMY_MODELS), no lugar do de pecas; null enquanto o
+  // arquivo nao chega, e para sempre em quem nao tem modelo
+  body: CharacterView | null;
+  // saiu de cena: modelo que chegar depois disso e descartado
+  removed: boolean;
 };
 
 export type WorldRenderer = {
@@ -942,6 +977,38 @@ export function createWorldRenderer(
   }
 
   const rooms = new Map<number, THREE.Group>();
+  // Kit de cenario (SCENERY): piso, parede, caixas, baus e moedas de modelo.
+  // Enquanto o arquivo nao chega, e para sempre se nao chegar, vale o cenario
+  // de caixas e papel de parede.
+  let scenery: ModelKit | null = null;
+  let disposed = false;
+  // bloco de parede do kit, centrado no tile; e o material de cada nivel
+  let wallBlock: THREE.BufferGeometry | null = null;
+  const sceneryTints = new Map<number, THREE.Material>();
+  if (SCENERY.url) {
+    loadModelKit(SCENERY.url).then(
+      (kit) => {
+        if (disposed) return kit.dispose();
+        scenery = kit;
+        // o que ja foi desenhado sem o kit e refeito no proximo `sync`
+        reconcile(rooms, new Set(), removeRoom);
+        reconcile(props, new Set(), (view) => scene.remove(view.group));
+        reconcile(pickups, new Set(), removeMesh);
+      },
+      () => {},
+    );
+  }
+  // material do kit no tom do nivel: cada contrato continua com a sua cor
+  function sceneryTint(level: number, base: THREE.Material): THREE.Material {
+    let tinted = sceneryTints.get(level);
+    if (!tinted) {
+      const material = base.clone() as THREE.MeshLambertMaterial;
+      material.color.setHSL((HUE_START + level * HUE_STEP) % 1, 0.45, 0.8);
+      tinted = material;
+      sceneryTints.set(level, tinted);
+    }
+    return tinted;
+  }
   const enemies = new Map<number, EnemyView>();
   const props = new Map<number, { group: THREE.Group; broken: boolean }>();
   const pickups = new Map<number, THREE.Group>();
@@ -1111,6 +1178,31 @@ export function createWorldRenderer(
   // So visual: nao bloqueia passagem nem bala.
   function buildDoor(): { group: THREE.Group; leaves: THREE.Group[] } {
     const group = new THREE.Group();
+    // porta do kit: duas folhas de madeira no vao da parede de pedra, sem a
+    // moldura de metal. Correm para os lados como a outra
+    const wood = scenery
+      ?.clone(SCENERY.door.piece)
+      ?.getObjectByName(SCENERY.door.leaf);
+    if (wood instanceof THREE.Mesh) {
+      wood.geometry.computeBoundingBox();
+      // a folha nasce da dobradica, um pouco para tras dela
+      const hinge = -(wood.geometry.boundingBox?.min.x ?? 0);
+      const wide = DOOR_LEAF / SCENERY.door.width;
+      const leaves = [-1, 1].map((side) => {
+        const leaf = new THREE.Group();
+        leaf.position.z = -0.1;
+        const panel = wood.clone();
+        panel.scale.set(wide, DOOR_LEAF_HEIGHT / SCENERY.door.height, 0.35);
+        // a da esquerda e a mesma folha virada: a dobradica fica do lado de
+        // fora nas duas
+        panel.rotation.set(0, side < 0 ? Math.PI : 0, 0);
+        panel.position.set(side * hinge * wide, 0, 0);
+        leaf.add(panel);
+        group.add(leaf);
+        return leaf;
+      });
+      return { group, leaves };
+    }
     const part = (
       parent: THREE.Group,
       material: THREE.Material,
@@ -1173,12 +1265,20 @@ export function createWorldRenderer(
   }
 
   // tampa do bau de cada sala de loja, por indice da sala
-  const chestLids = new Map<number, THREE.Group>();
+  const chestLids = new Map<number, THREE.Object3D>();
 
   // bau da loja: caixa de madeira oca com paineis claros e tampa com fecho.
   // A frente e +z (para a camera); a tampa gira na dobradica de tras.
-  function buildChest(): { group: THREE.Group; lid: THREE.Group } {
+  function buildChest(): { group: THREE.Group; lid: THREE.Object3D } {
     const group = new THREE.Group();
+    // bau do kit: a tampa e um no dele, com a origem na dobradica
+    const piece = scenery?.clone(SCENERY.chest.piece);
+    const hinged = piece?.getObjectByName(SCENERY.chest.lid);
+    if (piece && hinged) {
+      piece.scale.setScalar(SCENERY.chest.scale);
+      group.add(piece);
+      return { group, lid: hinged };
+    }
     const lid = new THREE.Group();
     lid.position.set(0, 0.42, -0.3);
     const part = (
@@ -1221,18 +1321,58 @@ export function createWorldRenderer(
       papers = wallpaper(level);
       wallpapers.set(level, papers);
     }
-    const floor = new THREE.Mesh(geo.floor, papers.floor.material);
-    floor.name = 'floor';
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(ROOM_W / 2, 0, -(room.index + 0.5) * ROOM_H);
-    group.add(floor);
+    const tile = scenery?.mesh(SCENERY.floor.piece);
+    const brick = scenery?.mesh(SCENERY.wall.piece);
+    const matrix = new THREE.Matrix4();
+    if (tile) {
+      // piso do kit: um ladrilho por tile, com o topo no nivel do chao
+      const tiles = new THREE.InstancedMesh(
+        tile.geometry,
+        sceneryTint(level, tile.material),
+        ROOM_W * ROOM_H,
+      );
+      tiles.name = 'floor';
+      const size = SCENERY.floor.scale;
+      tile.geometry.computeBoundingBox();
+      const top = (tile.geometry.boundingBox?.max.y ?? 0) * size;
+      const scale = new THREE.Vector3(size, size, size);
+      const still = new THREE.Quaternion();
+      let i = 0;
+      room.tiles.forEach((line, row) => {
+        for (let col = 0; col < line.length; col++) {
+          const center = tileCenter(room.index, col, row);
+          matrix.compose(
+            new THREE.Vector3(center.x, -top, -center.y),
+            still,
+            scale,
+          );
+          tiles.setMatrixAt(i++, matrix);
+        }
+      });
+      group.add(tiles);
+    } else {
+      const floor = new THREE.Mesh(geo.floor, papers.floor.material);
+      floor.name = 'floor';
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(ROOM_W / 2, 0, -(room.index + 0.5) * ROOM_H);
+      group.add(floor);
+    }
 
-    const walls: Vec2[] = [];
+    // `along`: a parede segue pela coluna (vizinho de parede em cima ou
+    // embaixo, e nenhum dos lados): o bloco do kit gira para acompanhar
+    const walls: (Vec2 & { along: boolean })[] = [];
+    const solid = (row: number, col: number) => room.tiles[row]?.[col] === '#';
     room.tiles.forEach((line, row) => {
       for (let col = 0; col < line.length; col++) {
         const center = tileCenter(room.index, col, row);
         if (line[col] === '#') {
-          walls.push(center);
+          walls.push({
+            ...center,
+            along:
+              !solid(row, col - 1) &&
+              !solid(row, col + 1) &&
+              (solid(row - 1, col) || solid(row + 1, col)),
+          });
         }
       }
     });
@@ -1263,17 +1403,51 @@ export function createWorldRenderer(
       group.add(chest.group);
     }
 
-    const instanced = new THREE.InstancedMesh(
-      geo.wall,
-      papers.wall.material,
-      walls.length,
-    );
-    const matrix = new THREE.Matrix4();
-    walls.forEach((center, i) => {
-      matrix.setPosition(center.x, WALL_HEIGHT / 2, -center.y);
-      instanced.setMatrixAt(i, matrix);
-    });
-    group.add(instanced);
+    if (brick) {
+      // parede do kit: o meio muro encolhido para 1 tile de comprido e a
+      // altura de parede do jogo, um por tile
+      wallBlock ??= brick.geometry
+        .clone()
+        .translate(-SCENERY.wall.length / 2, 0, 0);
+      const blocks = new THREE.InstancedMesh(
+        wallBlock,
+        sceneryTint(level, brick.material),
+        walls.length,
+      );
+      blocks.name = 'walls';
+      const scale = new THREE.Vector3(
+        1 / SCENERY.wall.length,
+        WALL_HEIGHT / SCENERY.wall.height,
+        1,
+      );
+      const turns = [0, Math.PI / 2].map((angle) =>
+        new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          angle,
+        ),
+      );
+      walls.forEach((wall, i) => {
+        matrix.compose(
+          new THREE.Vector3(wall.x, 0, -wall.y),
+          turns[wall.along ? 1 : 0],
+          scale,
+        );
+        blocks.setMatrixAt(i, matrix);
+      });
+      group.add(blocks);
+    } else {
+      const instanced = new THREE.InstancedMesh(
+        geo.wall,
+        papers.wall.material,
+        walls.length,
+      );
+      instanced.name = 'walls';
+      walls.forEach((center, i) => {
+        matrix.makeTranslation(center.x, WALL_HEIGHT / 2, -center.y);
+        instanced.setMatrixAt(i, matrix);
+      });
+      group.add(instanced);
+    }
     scene.add(group);
     return group;
   }
@@ -1347,6 +1521,17 @@ export function createWorldRenderer(
       scene.add(group);
       return group;
     }
+    // moedas do kit, com a mesma aura
+    const coins = scenery?.clone(SCENERY.money.piece);
+    if (coins) {
+      group.name = 'moneyPickup';
+      coins.scale.setScalar(SCENERY.money.scale);
+      const aura = new THREE.Mesh(geo.aura, mat.aura);
+      aura.position.y = 0.14;
+      group.add(coins, aura);
+      scene.add(group);
+      return group;
+    }
     COIN_STACKS.forEach(([x, z, count], s) => {
       for (let i = 0; i < count; i++) {
         const coin = new THREE.Mesh(geo.coin, mat.coin);
@@ -1386,6 +1571,26 @@ export function createWorldRenderer(
           barrel: [mat.barrel, mat.chestLock],
           plant: [mat.pot, mat.leaf],
         }[variant];
+    // inteiro, do kit: bau dourado, ou uma das pecas quebraveis pelo id
+    const placed = prop.golden
+      ? SCENERY.goldenChest
+      : SCENERY.props[Math.floor(pick * SCENERY.props.length)];
+    const piece = prop.broken ? null : scenery?.clone(placed.piece);
+    if (piece) {
+      piece.scale.setScalar(placed.scale);
+      // viradas cada uma para um lado; o bau dourado, de frente
+      if (!prop.golden) piece.rotation.y = (prop.id % 4) * (Math.PI / 2);
+      group.add(piece);
+      if (prop.golden) {
+        group.name = 'goldenChest';
+        const aura = new THREE.Mesh(geo.aura, mat.aura);
+        aura.position.y = 0.35;
+        aura.scale.setScalar(1.5);
+        group.add(aura);
+      }
+      scene.add(group);
+      return group;
+    }
     if (prop.broken) {
       // destrocos na cor do que quebrou, espalhados sem regra: tamanhos,
       // distancias e giros diferentes, uns deitados e outros meio de pe
@@ -1534,21 +1739,26 @@ export function createWorldRenderer(
   function makeJumper(kind: CharacterKind, from = kit): Jumper {
     const character = makeCharacter(kind, from);
     const wind = new THREE.Group();
-    for (let i = 0; i < 3; i++) {
+    const gusts = Array.from({ length: WIND_GUSTS }, () => {
       const gust = new THREE.Mesh(geo.gust, mat.wind);
-      gust.position.x = -0.1 - i * 0.24;
-      gust.scale.setScalar(1 - i * 0.22);
+      wind.add(gust);
+      return gust;
+    });
+    // riscos espalhados em volta do corpo, cada um na sua altura e lado
+    const streaks = Array.from({ length: WIND_STREAKS }, (_, i) => {
       const streak = new THREE.Mesh(geo.streak, mat.wind);
+      const around = (i / WIND_STREAKS) * Math.PI * 2 + i;
       streak.position.set(
-        -0.75 - (i % 2) * 0.2,
-        (i - 1) * 0.12,
-        (i - 1) * 0.22,
+        0,
+        Math.sin(around) * (0.12 + (i % 3) * 0.1),
+        Math.cos(around) * (0.16 + (i % 2) * 0.14),
       );
-      wind.add(gust, streak);
-    }
+      wind.add(streak);
+      return streak;
+    });
     wind.visible = false;
     character.root.add(wind);
-    return { character, wind, flip: 0, crouch: 0, hug: 0 };
+    return { character, wind, gusts, streaks, flip: 0, crouch: 0, hug: 0 };
   }
 
   // `animate` mais o salto e a cobertura. Salto: sobe e desce em arco,
@@ -1625,6 +1835,21 @@ export function createWorldRenderer(
     wind.scale.setScalar(0.3 + arc * 0.7);
     wind.scale.x *= 1 + air * 0.8;
     wind.rotation.x = Math.sin(time * 30) * 0.15;
+    if (!jumping) return;
+    // arcos saem das costas um atras do outro, abrindo e sumindo
+    jumper.gusts.forEach((gust, i) => {
+      const flow = (time * WIND_GUST_RATE + i / WIND_GUSTS) % 1;
+      gust.position.x = -0.1 - flow * 0.75;
+      gust.scale.setScalar((0.55 + flow * 0.6) * (1 - flow * flow));
+    });
+    // riscos correm para tras em fila: nascem curtos junto do corpo, esticam
+    // e afinam ate sumir
+    jumper.streaks.forEach((streak, i) => {
+      const flow = (time * WIND_STREAK_RATE + i * 0.37) % 1;
+      streak.position.x = -0.3 - flow * 1.5;
+      const thin = 1 - flow * 0.7;
+      streak.scale.set(0.4 + Math.sin(Math.PI * flow) * 2, thin, thin);
+    });
   }
 
   // morto: estirado de brucos, centrado em `pos`, sem giro nem vento
@@ -1734,7 +1959,7 @@ export function createWorldRenderer(
     blood.rotation.x = -Math.PI / 2;
     blood.visible = false;
     scene.add(blood);
-    return {
+    const view: EnemyView = {
       ...jumper,
       marker,
       markerParts,
@@ -1748,7 +1973,35 @@ export function createWorldRenderer(
       blood,
       deathAt: null,
       burst: false,
+      body: null,
+      removed: false,
     };
+    // Tipo com modelo: o corpo de pecas aparece ate o arquivo chegar e some
+    // quando o modelo entra. O root continua o mesmo: posicao, sombra e
+    // marcadores nao mudam. Sem o arquivo (offline, teste), fica o de pecas.
+    const model = ENEMY_MODELS[kind];
+    if (model) {
+      loadCharacterView(model).then(
+        (body) => {
+          if (view.removed) return body.dispose();
+          view.body = body;
+          character.root.add(body.object);
+          character.lean.visible = false;
+          // quem atira leva na mao a arma de fogo do jogo, no tamanho certo
+          // apesar da escala do modelo
+          if (!ENEMY_KINDS[kind].ranged) return;
+          const id = kind === 'fat' ? 'shotgun' : 'pistol';
+          const gun = createWeaponModel(id).root;
+          const size = GUNS[id].scale / model.rig.scale;
+          const [gripX, gripY] = GUNS[id].grip;
+          gun.scale.setScalar(size);
+          gun.position.set(-gripX * size, -gripY * size, 0);
+          body.slot('rightHand')?.add(gun);
+        },
+        () => {},
+      );
+    }
+    return view;
   }
 
   // balao de fala: uma textura por texto, repartida entre os inimigos
@@ -1847,6 +2100,8 @@ export function createWorldRenderer(
   }
 
   function removeEnemy(view: EnemyView) {
+    view.removed = true;
+    view.body?.dispose();
     scene.remove(view.character.root, view.cone, view.blood);
     view.cone.geometry.dispose();
     view.blood.geometry.dispose();
@@ -1890,6 +2145,14 @@ export function createWorldRenderer(
     // raiva depois de matar: marca sobre a cabeca e contorno vermelho
     rage: THREE.Group;
     enraged: boolean;
+    // corpo de modelo (PLAYER_MODEL), no lugar do de pecas; null ate chegar
+    body: CharacterView | null;
+    // o que o modelo leva na mao direita quando nao esta com arma de fogo
+    blade: THREE.Object3D | null;
+    removed: boolean;
+    // o golpe em curso comecou durante um salto: sai girando ate o fim
+    spinning: boolean;
+    lastSlash: number;
   };
   const playerViews = new Map<number, PlayerView>();
 
@@ -1944,7 +2207,7 @@ export function createWorldRenderer(
     rage.position.y = 1.95;
     rage.rotation.order = 'YXZ';
     jumper.character.root.add(rage);
-    return {
+    const view: PlayerView = {
       rage,
       enraged: false,
       jumper,
@@ -1955,10 +2218,43 @@ export function createWorldRenderer(
       tag: player.name
         ? nameTag(player.name, player.color ?? COLORS.ui.white)
         : null,
+      body: null,
+      blade: null,
+      removed: false,
+      spinning: false,
+      lastSlash: 0,
     };
+    // Mesmo esquema do inimigo: o de pecas aparece ate o modelo chegar.
+    if (PLAYER_MODEL) {
+      const { rig } = PLAYER_MODEL;
+      loadCharacterView(PLAYER_MODEL).then(
+        (body) => {
+          if (view.removed) return body.dispose();
+          view.body = body;
+          jumper.character.root.add(body.object);
+          const hand = body.slot('rightHand');
+          view.blade = hand?.children[0] ?? null;
+          // As armas de fogo saem do braco de pecas e vao para a mao do
+          // modelo. O suporte foi feito para o braco (cano em -y, mao em
+          // HAND_Y): o encaixe gira isso para o eixo da mao do modelo (cano
+          // em +x) e desfaz a escala do corpo.
+          const socket = new THREE.Group();
+          const size = 1 / rig.scale;
+          socket.rotation.z = Math.PI / 2;
+          socket.scale.setScalar(size);
+          socket.position.x = HAND_Y * size;
+          socket.add(view.held.mount);
+          hand?.add(socket);
+        },
+        () => {},
+      );
+    }
+    return view;
   }
 
   function removePlayer(view: PlayerView) {
+    view.removed = true;
+    view.body?.dispose();
     scene.remove(view.jumper.character.root);
     view.held.dispose();
     view.kit?.dispose();
@@ -1989,6 +2285,11 @@ export function createWorldRenderer(
     held.hold(armed ? gunId : null);
     if (lost) {
       layDead(jumper, who.pos, who.facing);
+      // o modelo cai pelo proprio clipe de morte: o root fica de pe
+      if (view.body) {
+        body.root.position.y = 0;
+        body.root.rotation.set(0, who.facing, 0);
+      }
     } else {
       animateJumper(
         jumper,
@@ -2008,7 +2309,31 @@ export function createWorldRenderer(
     }
     body.shadow.visible = !lost;
     // invisivel: some o corpo, fica so a sombra no chao
-    body.lean.visible = lost || who.invisible <= 0;
+    const shown = lost || who.invisible <= 0;
+    body.lean.visible = shown && !view.body;
+    if (view.body) {
+      view.body.object.visible = shown;
+      if (view.blade) view.blade.visible = !armed;
+      // golpe novo: decide ali se e o giro, e mantem ate ele acabar
+      if (who.slash > view.lastSlash) view.spinning = who.dashCooldown > 0;
+      view.lastSlash = who.slash;
+      view.body.pose(
+        {
+          moving: Math.min(1, body.speed / MODEL_RUN_SPEED),
+          crouching: who.crouching,
+          attack: who.slash > 0 ? 1 - who.slash / SLASH_TIME : null,
+          dash: who.dash > 0 ? 1 - who.dash / DASH_TIME : null,
+          // de arma na mao fica apontando; o disparo percorre o resto
+          shot: !armed
+            ? null
+            : AIM_HOLD + (1 - AIM_HOLD) * (shot > 0 ? 1 - shot / SHOT_TIME : 0),
+          swing: Math.max(0, body.swing),
+          spinning: view.spinning,
+          dead: lost,
+        },
+        dt,
+      );
+    }
     // invencivel: aura dourada em volta do corpo, criada no primeiro uso
     let glow = body.root.getObjectByName('invincibleAura');
     if (!glow && who.invincible > 0) {
@@ -2022,6 +2347,7 @@ export function createWorldRenderer(
     // Raiva: matou, e enquanto dura a adrenalina o contorno do corpo fica
     // vermelho e a marca pulsa sobre a cabeca. Invisivel nao mostra.
     const furious = !lost && who.adrenaline > 0 && who.invisible <= 0;
+    view.body?.highlight(furious ? RAGE_GLOW : null);
     if (furious !== view.enraged) {
       view.enraged = furious;
       const outline = (view.kit ?? kit).outline;
@@ -2305,6 +2631,11 @@ export function createWorldRenderer(
           view.blood.position.set(enemy.pos.x, 0.015, -enemy.pos.y);
           view.blood.scale.set(radius, radius * 0.78, 1);
           layDead(view, enemy.pos, enemy.facing, enemy.launch);
+          // o modelo cai pelo proprio clipe de morte: o root fica de pe
+          if (view.body) {
+            view.character.root.position.y = 0;
+            view.character.root.rotation.set(0, enemy.facing, 0);
+          }
         } else {
           view.deathAt = null;
           animateJumper(
@@ -2323,6 +2654,30 @@ export function createWorldRenderer(
           poseAttack(view.character, enemy.attack);
           updateCone(world, enemy, view.cone);
         }
+        // o corpo de modelo recebe a mesma fase que o de pecas acabou de usar
+        const acting = enemy.attack > 0 ? 1 - enemy.attack / SLASH_TIME : null;
+        const ranged = ENEMY_KINDS[enemy.kind].ranged;
+        view.body?.pose(
+          {
+            moving: Math.min(1, view.character.speed / MODEL_RUN_SPEED),
+            crouching: false,
+            attack: ranged ? null : acting,
+            dash: enemy.dash > 0 ? 1 - enemy.dash / DASH_TIME : null,
+            // quem atira fica de arma apontada enquanto esta em alerta
+            // (meio do clipe) e o disparo percorre a outra metade
+            shot: !ranged
+              ? null
+              : acting !== null
+                ? AIM_HOLD + (1 - AIM_HOLD) * acting
+                : enemy.state === 'alert'
+                  ? AIM_HOLD
+                  : null,
+            swing: Math.max(0, view.character.swing),
+            spinning: false,
+            dead,
+          },
+          dt,
+        );
         // orelha: ouvido enchendo (cresce junto) ou indo atras do barulho.
         // Ver o player troca pela exclamacao.
         const listening =
@@ -2358,6 +2713,8 @@ export function createWorldRenderer(
         // furia: contorno do corpo vira vermelho (uma vez) e a marca de raiva
         // pulsa sobre a cabeca enquanto ele viver
         const furious = enemy.enraged && !dead;
+        // o modelo pode chegar com a furia ja ligada: repete todo quadro
+        view.body?.highlight(furious ? RAGE_GLOW : null);
         if (furious !== view.enraged) {
           view.enraged = furious;
           view.character.root.traverse((child) => {
@@ -2441,6 +2798,10 @@ export function createWorldRenderer(
     },
 
     dispose() {
+      disposed = true;
+      scenery?.dispose();
+      wallBlock?.dispose();
+      for (const material of sceneryTints.values()) material.dispose();
       reconcile(rooms, new Set(), removeRoom);
       reconcile(enemies, new Set(), removeEnemy);
       reconcile(props, new Set(), (view) => scene.remove(view.group));

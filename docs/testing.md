@@ -13,12 +13,25 @@ pnpm typecheck     # inclui os arquivos de teste (tsconfig.spec.json)
 
 ## Camadas de teste
 
-| Camada        | O que cobre                | Como                                         |
-| ------------- | -------------------------- | -------------------------------------------- |
-| `app/modules` | regras do jogo             | Vitest puro sobre `World`, sem DOM           |
-| `app/store`   | ponte simulacao/UI         | Vitest chamando acoes do store               |
-| `resources`   | HUD, loja, menus, joystick | Testing Library                              |
-| `app/engine`  | render three.js            | sem teste unitario; verificacao no navegador |
+| Camada        | O que cobre                | Como                                              |
+| ------------- | -------------------------- | ------------------------------------------------- |
+| `app/modules` | regras do jogo             | Vitest puro sobre `World`, sem DOM                |
+| `app/store`   | ponte simulacao/UI         | Vitest chamando acoes do store                    |
+| `resources`   | HUD, loja, menus, joystick | Testing Library                                   |
+| `app/engine`  | render three.js            | cena three sem WebGL (jsdom); visual no navegador |
+
+Personagem de modelo (`app/engine/characters`): `clip-driver` e conta pura;
+a view e testada com um modelo e clipes montados no proprio teste, sem
+carregar arquivo; `kaykit.assets.test.ts` le os GLB de `public/models` e
+confere clipes e ossos contra a configuracao. Teste de renderer com inimigo
+de modelo troca o carregador por `vi.mock(...character-model.loader)`: sem
+isso o arquivo nao chega no jsdom e o inimigo fica de pecas.
+
+Cenario de modelo (`app/engine/scenery`): `model-kit.test.ts` monta a cena
+do kit no proprio teste; `dungeon.assets.test.ts` confere as pecas do GLB
+publicado contra `SCENERY`. Teste de renderer com o kit troca so
+`loadModelKit` (`vi.mock` mantendo o resto do modulo) por um kit de caixas;
+sem isso o renderer desenha o cenario antigo.
 
 jsdom nao tem WebGL. Teste de pagina que monta a engine usa
 `vi.mock('@/app/engine/game-engine')`; a tela de personagem usa
