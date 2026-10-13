@@ -32,6 +32,7 @@ export function useGamePage() {
   const streak = useGameStore((state) => state.streak);
   const scoreboard = useGameStore((state) => state.scoreboard);
   const setScoreboard = useGameStore((state) => state.setScoreboard);
+  const tutorial = useGameStore((state) => state.tutorial);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -111,5 +112,6 @@ export function useGamePage() {
     // icone do placar: liga e desliga (no teclado e o Tab segurado)
     toggleScoreboard: () => setScoreboard(!scoreboard),
     backToMenu,
+    tutorial,
   };
 }

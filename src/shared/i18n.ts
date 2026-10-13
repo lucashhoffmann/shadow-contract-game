@@ -336,6 +336,63 @@ const pt = {
       },
     ],
   },
+  tutorial: {
+    title: 'Tutorial',
+    button: 'Tutorial',
+    skip: 'Pular tutorial',
+    steps: {
+      welcome: {
+        title: 'Bem-vindo ao contrato',
+        keyboard:
+          'Um guia rápido antes do contrato: siga os passos na tela. Dá para pular a qualquer momento.',
+        touch:
+          'Um guia rápido antes do contrato: siga os passos na tela. Dá para pular a qualquer momento.',
+      },
+      move: {
+        title: 'Ande',
+        keyboard: 'Use WASD ou as setas para se mover pela sala.',
+        touch: 'Arraste o joystick na parte inferior da tela para andar.',
+      },
+      crouch: {
+        title: 'Agache',
+        keyboard:
+          'Segure C ou Ctrl: você anda devagar e os inimigos ouvem menos.',
+        touch:
+          'Toque no botão de agachar à direita: você anda devagar e os inimigos ouvem menos.',
+      },
+      dash: {
+        title: 'Salte',
+        keyboard:
+          'Aperte Espaço para um salto de esquiva. Aqui é de graça; depois gasta 1 dos 6.',
+        touch:
+          'Toque no botão de setas à direita para saltar. Aqui é de graça; depois gasta 1 dos 6.',
+      },
+      door: {
+        title: 'Atravesse a porta',
+        keyboard: 'Siga em frente até a porta no fundo da sala.',
+        touch: 'Siga em frente até a porta no fundo da sala.',
+      },
+      kill: {
+        title: 'Elimine por trás',
+        keyboard:
+          'Fique fora do cone de visão, chegue pelas costas e aperte F. Agachado é certeiro.',
+        touch:
+          'Fique fora do cone de visão, chegue pelas costas e toque na mão sobre ele. Agachado é certeiro.',
+      },
+      loot: {
+        title: 'Pegue o dinheiro',
+        keyboard: 'Passe por cima do que ele soltou.',
+        touch: 'Passe por cima do que ele soltou.',
+      },
+      done: {
+        title: 'Pronto para o contrato',
+        keyboard:
+          'Você já sabe o essencial. Aperte P a qualquer hora para rever a legenda completa.',
+        touch:
+          'Você já sabe o essencial. Toque em pausa a qualquer hora para rever a legenda completa.',
+      },
+    },
+  },
   match: {
     title: 'Partida',
     resume: 'Continuar',
@@ -664,6 +721,62 @@ const en: typeof pt = {
         ],
       },
     ],
+  },
+  tutorial: {
+    title: 'Tutorial',
+    button: 'Tutorial',
+    skip: 'Skip tutorial',
+    steps: {
+      welcome: {
+        title: 'Welcome to the contract',
+        keyboard:
+          'A quick guide before the contract: follow the steps on screen. You can skip at any time.',
+        touch:
+          'A quick guide before the contract: follow the steps on screen. You can skip at any time.',
+      },
+      move: {
+        title: 'Move',
+        keyboard: 'Use WASD or the arrow keys to move around the room.',
+        touch: 'Drag the joystick at the bottom of the screen to move.',
+      },
+      crouch: {
+        title: 'Crouch',
+        keyboard: 'Hold C or Ctrl: you move slowly and enemies hear less.',
+        touch:
+          'Tap the crouch button on the right: you move slowly and enemies hear less.',
+      },
+      dash: {
+        title: 'Dash',
+        keyboard:
+          'Press Space for a dodge dash. Free here; later it uses 1 of 6.',
+        touch:
+          'Tap the arrows button on the right to dash. Free here; later it uses 1 of 6.',
+      },
+      door: {
+        title: 'Go through the door',
+        keyboard: 'Head forward to the door at the back of the room.',
+        touch: 'Head forward to the door at the back of the room.',
+      },
+      kill: {
+        title: 'Strike from behind',
+        keyboard:
+          'Stay out of the view cone, approach from behind and press F. Crouched never misses.',
+        touch:
+          'Stay out of the view cone, approach from behind and tap the hand over the enemy. Crouched never misses.',
+      },
+      loot: {
+        title: 'Grab the money',
+        keyboard: 'Walk over what they dropped.',
+        touch: 'Walk over what they dropped.',
+      },
+      done: {
+        title: 'Ready for the contract',
+        keyboard:
+          'You know the essentials. Press P any time to review the full guide.',
+        touch:
+          'You know the essentials. Tap pause any time to review the full guide.',
+      },
+    },
   },
   match: {
     title: 'Match',

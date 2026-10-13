@@ -119,6 +119,9 @@ src/app/modules
 │   ├── constants/shop.constants.ts      catalogo de itens
 │   ├── systems/shop.system.ts           mercado, compra e gatilho da loja
 │   └── tests
+├── tutorial
+│   ├── systems/tutorial.system.ts       passos do guia e quando cada um esta cumprido
+│   └── tests
 └── multiplayer                          so o que muda com varios jogadores
     ├── systems/multiplayer.system.ts    createMultiWorld, stepMultiWorld
     ├── utils/snapshot.util.ts           mensagens host <-> convidado
@@ -147,6 +150,7 @@ src/resources/pages
     ├── components
     │   ├── hud.component.tsx
     │   ├── legend-dialog.component.tsx  legenda inicial e tela de pausa
+    │   ├── tutorial-overlay             cartoes do tutorial guiado por cima do jogo
     │   ├── shop-dialog.component.tsx
     │   ├── game-over-dialog.component.tsx
     │   └── share-record                 cartao PNG do recorde e compartilhamento

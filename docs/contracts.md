@@ -634,6 +634,8 @@ hud: {
 }
 market: Market;
 best: number; // maior sala alcancada, persistido em localStorage
+tutorial: boolean; // a run atual e o tutorial guiado (cartoes por cima do jogo)
+tutorialDone: boolean; // ja viu um tutorial; persistido. Sem ele, o Play da home abre o tutorial
 look: PlayerLook; // aparencia do player, persistida em localStorage
 bloodColor: string; // cor das pocas, persistida em localStorage
 idleWarnings: number; // pulsos azuis da run atual, nao persistido
@@ -663,20 +665,22 @@ por `BLOOD_GROW_TIME` segundos ate um tamanho fixo.
 
 Acoes:
 
-| Acao                   | Quem chama | Efeito                                  |
-| ---------------------- | ---------- | --------------------------------------- |
-| `startRun(seed?)`      | UI         | cria `World` em `intro`                 |
-| `begin()`              | UI, engine | `intro` -> `playing`                    |
-| `togglePause()`        | UI, engine | `playing` <-> `paused`                  |
-| `tick(input, dt)`      | engine     | `stepWorld` e sincroniza `hud`/`screen` |
-| `buy(itemId)`          | UI         | `buyItem` e sincroniza                  |
-| `selectWeapon(id)`     | UI         | troca a arma na mao; null = espada      |
-| `cycleWeapon()`        | engine (Q) | proxima arma; so em `playing`           |
-| `closeShop()`          | UI, engine | volta para `playing`                    |
-| `backToMenu()`         | UI         | descarta `World`, `screen = 'menu'`     |
-| `openCharacter()`      | UI (menu)  | `screen = 'character'`; em run, nada    |
-| `setLook(patch)`       | UI         | valida e grava `look`; em run, nada     |
-| `setBloodColor(color)` | UI         | valida e grava a cor do sangue          |
+| Acao                   | Quem chama | Efeito                                        |
+| ---------------------- | ---------- | --------------------------------------------- |
+| `startRun(seed?)`      | UI         | cria `World` em `intro`                       |
+| `startTutorial()`      | UI (menu)  | `startRun` + `tutorial`; marca `tutorialDone` |
+| `finishTutorial()`     | UI         | tira o guia; a run segue                      |
+| `begin()`              | UI, engine | `intro` -> `playing`                          |
+| `togglePause()`        | UI, engine | `playing` <-> `paused`                        |
+| `tick(input, dt)`      | engine     | `stepWorld` e sincroniza `hud`/`screen`       |
+| `buy(itemId)`          | UI         | `buyItem` e sincroniza                        |
+| `selectWeapon(id)`     | UI         | troca a arma na mao; null = espada            |
+| `cycleWeapon()`        | engine (Q) | proxima arma; so em `playing`                 |
+| `closeShop()`          | UI, engine | volta para `playing`                          |
+| `backToMenu()`         | UI         | descarta `World`, `screen = 'menu'`           |
+| `openCharacter()`      | UI (menu)  | `screen = 'character'`; em run, nada          |
+| `setLook(patch)`       | UI         | valida e grava `look`; em run, nada           |
+| `setBloodColor(color)` | UI         | valida e grava a cor do sangue                |
 
 Fora do estado reativo:
 

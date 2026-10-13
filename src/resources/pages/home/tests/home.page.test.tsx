@@ -35,9 +35,26 @@ describe('HomePage', () => {
   });
 
   it('Play inicia uma run, que abre na legenda', async () => {
+    useGameStore.setState({ tutorialDone: true });
     render(<HomePage />);
     await userEvent.click(screen.getByRole('button', { name: 'Play' }));
     expect(useGameStore.getState().screen).toBe('intro');
+    expect(useGameStore.getState().tutorial).toBe(false);
+  });
+
+  it('na primeira vez o Play abre o tutorial, e o botao Tutorial refaz depois', async () => {
+    useGameStore.setState({ tutorialDone: false });
+    render(<HomePage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }));
+    expect(useGameStore.getState().screen).toBe('intro');
+    expect(useGameStore.getState().tutorial).toBe(true);
+    // comecar ja conta como visto
+    expect(useGameStore.getState().tutorialDone).toBe(true);
+
+    useGameStore.getState().backToMenu();
+    expect(useGameStore.getState().tutorial).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Tutorial' }));
+    expect(useGameStore.getState().tutorial).toBe(true);
   });
 
   it('Configurar personagem abre a tela de personagem', async () => {

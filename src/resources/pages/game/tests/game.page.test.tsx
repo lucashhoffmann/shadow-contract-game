@@ -566,6 +566,25 @@ describe('GamePage', () => {
     });
   });
 
+  it('tutorial: troca a legenda pelo guia, Comecar solta o jogo e Pular encerra', async () => {
+    act(() => useGameStore.getState().startTutorial());
+    render(<GamePage />);
+    expect(screen.queryByText('Como jogar')).not.toBeInTheDocument();
+    expect(screen.getByText('Bem-vindo ao contrato')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Comecar' }));
+    expect(useGameStore.getState().screen).toBe('playing');
+    // o passo seguinte chega quando o guia confere o mundo
+    await screen.findByText('Ande', undefined, { timeout: 1000 });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Pular tutorial' }),
+    );
+    expect(useGameStore.getState().tutorial).toBe(false);
+    expect(screen.queryByRole('dialog', { name: 'Tutorial' })).toBeNull();
+    expect(useGameStore.getState().screen).toBe('playing');
+  });
+
   it('pausa mostra a legenda como Pausado e Continuar retoma', async () => {
     render(<GamePage />);
     act(() => useGameStore.getState().begin());

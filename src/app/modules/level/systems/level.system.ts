@@ -63,6 +63,11 @@ const TEMPLATES = {
 export function pickTemplate(world: World, index: number): RoomTemplate {
   const { start, shop, combat } = TEMPLATES[world.mode];
   if (index === 0) return start;
+  // tutorial: sala 1 e sempre a mesma, a 2 e a loja, depois so sala vazia
+  if (isTutorial()) {
+    if (index === 1) return combat[0];
+    return index === TUTORIAL_SHOP_ROOM ? shop : start;
+  }
   if (index % SHOP_EVERY === 0) return shop;
   return combat[Math.floor(nextRandom(world) * combat.length)];
 }
@@ -120,6 +125,30 @@ export function goldenChestChance(index: number): number {
   );
 }
 
+// caixas e dinheiro marcados no template
+function spawnProps(world: World, index: number, template: RoomTemplate): void {
+  template.tiles.forEach((line, row) => {
+    for (let col = 0; col < line.length; col++) {
+      if (line[col] === 'o') {
+        world.props.push({
+          id: world.nextId++,
+          roomIndex: index,
+          pos: tileCenter(index, col, row),
+          broken: false,
+        });
+      }
+      if (line[col] !== '$') continue;
+      world.pickups.push({
+        id: world.nextId++,
+        kind: 'money',
+        roomIndex: index,
+        pos: tileCenter(index, col, row),
+        value: TILE_MONEY,
+      });
+    }
+  });
+}
+
 export function spawnRoom(
   world: World,
   index: number,
@@ -155,6 +184,14 @@ export function spawnRoom(
   );
   const route = (i: number) =>
     template.enemies[i].path.map(([col, row]) => tileCenter(index, col, row));
+  // tutorial: um inimigo comum sozinho, para aprender o golpe pelas costas
+  if (isTutorial()) {
+    if (template.enemies.length > 0) {
+      world.enemies.push(createEnemy(world, index, route(0), 'suit'));
+    }
+    spawnProps(world, index, template);
+    return;
+  }
   // rondas do template que sobraram: viram o caminho extra das duplas
   const spare = template.enemies
     .slice(enemyCount)
@@ -199,26 +236,7 @@ export function spawnRoom(
     spawned++;
   }
 
-  template.tiles.forEach((line, row) => {
-    for (let col = 0; col < line.length; col++) {
-      if (line[col] === 'o') {
-        world.props.push({
-          id: world.nextId++,
-          roomIndex: index,
-          pos: tileCenter(index, col, row),
-          broken: false,
-        });
-      }
-      if (line[col] !== '$') continue;
-      world.pickups.push({
-        id: world.nextId++,
-        kind: 'money',
-        roomIndex: index,
-        pos: tileCenter(index, col, row),
-        value: TILE_MONEY,
-      });
-    }
-  });
+  spawnProps(world, index, template);
 
   // bau da loja tem guarda
   const chest = world.rooms[world.rooms.length - 1].chest;

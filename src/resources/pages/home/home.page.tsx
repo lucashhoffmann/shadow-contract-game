@@ -1,4 +1,11 @@
-import { Play, Settings, Trophy, UserRound, Users } from 'lucide-react';
+import {
+  GraduationCap,
+  Play,
+  Settings,
+  Trophy,
+  UserRound,
+  Users,
+} from 'lucide-react';
 
 import { useGameStore } from '@/app/store/game-store/game.store';
 import { useHomePage } from '@/resources/pages/home/use-home.page';
@@ -24,6 +31,10 @@ export function HomePage() {
   const setLanguage = useLanguage((state) => state.setLanguage);
   const best = useGameStore((state) => state.best);
   const startRun = useGameStore((state) => state.startRun);
+  // primeira vez: o Play leva ao tutorial (da para pular); depois, o botao
+  // proprio refaz quando quiser
+  const tutorialDone = useGameStore((state) => state.tutorialDone);
+  const startTutorial = useGameStore((state) => state.startTutorial);
   const openCharacter = useGameStore((state) => state.openCharacter);
   const openLobby = useGameStore((state) => state.openLobby);
   const { online } = useHomePage();
@@ -70,7 +81,7 @@ export function HomePage() {
       <button
         type='button'
         className={`${CHUNKY} relative bg-[var(--game-success)] px-14 py-4 text-4xl`}
-        onClick={() => startRun()}
+        onClick={() => (tutorialDone ? startRun() : startTutorial())}
       >
         <Play
           aria-hidden
@@ -91,6 +102,18 @@ export function HomePage() {
             strokeWidth={3}
           />
           {t.home.character}
+        </button>
+        <button
+          type='button'
+          className={SECONDARY}
+          onClick={startTutorial}
+        >
+          <GraduationCap
+            aria-hidden
+            className='size-5'
+            strokeWidth={3}
+          />
+          {t.tutorial.button}
         </button>
         {/* so com o servidor de salas no ar (use-home.page) */}
         {online && (

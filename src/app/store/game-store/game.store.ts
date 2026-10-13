@@ -31,6 +31,7 @@ import {
   ROOM_H,
   ROOM_W,
   setRoomSize,
+  setTutorial,
   STREAK_NEVER,
   SHOP_EVERY,
 } from '@/app/modules/world/constants/world.constants';
@@ -256,7 +257,14 @@ type GameStore = {
   receiveInput: (index: number, payload: unknown) => void;
   // convidado: chegou o estado do mundo
   receiveState: (snapshot: Snapshot) => void;
-  startRun: (seed?: number) => void;
+  startRun: (seed?: number, tutorial?: boolean) => void;
+  // tutorial guiado: `tutorial` e a run atual; `tutorialDone` (persistido)
+  // diz se o jogador ja viu um, para o Play nao forcar outro
+  tutorial: boolean;
+  tutorialDone: boolean;
+  startTutorial: () => void;
+  // some o guia e a run segue normal
+  finishTutorial: () => void;
   begin: () => void;
   togglePause: () => void;
   tick: (input: InputState, dt: number) => void;
@@ -546,6 +554,7 @@ export const useGameStore = create<GameStore>()(
           };
           sentScores = '';
           set({ online: true, host: link.host, menu: false, scores: [] });
+          setTutorial(false);
           setJoystickInput(0, 0);
           if (link.host) {
             world = createMultiWorld(seed, seats);
@@ -574,7 +583,7 @@ export const useGameStore = create<GameStore>()(
           sync();
         },
         // toda run abre na legenda; `begin` solta a simulacao
-        startRun: (seed = Date.now()) => {
+        startRun: (seed = Date.now(), tutorial = false) => {
           multi?.leave();
           multi = null;
           sentScores = '';
@@ -582,13 +591,26 @@ export const useGameStore = create<GameStore>()(
             online: false,
             host: false,
             menu: false,
+            tutorial,
             streak: { count: 0, at: STREAK_NEVER },
           });
+          // antes de criar o mundo: muda as salas e tira a morte
+          setTutorial(tutorial);
           world = createWorld(seed, get().intelligence, get().attackVariance);
           world.status = 'intro';
           setJoystickInput(0, 0);
           sync();
         },
+        tutorial: false,
+        tutorialDone: false,
+        // Ambiente controlado de 3 salas com o guia por cima (world.constants).
+        // Comecar ja conta como visto: quem sai no meio nao e obrigado de
+        // novo (o botao da home refaz)
+        startTutorial: () => {
+          get().startRun(Date.now(), true);
+          set({ tutorialDone: true });
+        },
+        finishTutorial: () => set({ tutorial: false }),
         begin: () => {
           if (!world) return;
           beginRun(world);
@@ -670,6 +692,7 @@ export const useGameStore = create<GameStore>()(
             host: false,
             menu: false,
             scoreboard: false,
+            tutorial: false,
             streak: { count: 0, at: STREAK_NEVER },
           });
           set({ screen: 'menu' });
@@ -680,6 +703,7 @@ export const useGameStore = create<GameStore>()(
       name: 'shadow-contract',
       partialize: (state) => ({
         best: state.best,
+        tutorialDone: state.tutorialDone,
         look: state.look,
         bloodColor: state.bloodColor,
         intelligence: state.intelligence,
@@ -687,11 +711,18 @@ export const useGameStore = create<GameStore>()(
       }),
       // valor salvo passa pela mesma validacao de `setLook`
       merge: (saved, current) => {
-        const { best, look, bloodColor, intelligence, attackVariance } =
-          (saved ?? {}) as Partial<GameStore>;
+        const {
+          best,
+          tutorialDone,
+          look,
+          bloodColor,
+          intelligence,
+          attackVariance,
+        } = (saved ?? {}) as Partial<GameStore>;
         return {
           ...current,
           best: best ?? current.best,
+          tutorialDone: tutorialDone === true,
           look: mergeLook(current.look, look ?? {}),
           bloodColor:
             typeof bloodColor === 'string' && COLOR.test(bloodColor)
