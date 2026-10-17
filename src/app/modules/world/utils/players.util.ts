@@ -7,7 +7,7 @@ import {
   MULTI_ENEMIES_PER_PLAYER,
   MULTI_THREAT_ROOMS,
 } from '@/app/modules/world/constants/world.constants';
-import { distance } from '@/shared/utils/math.util';
+import { distance } from 'three-hex-engine/kit';
 
 // Varios jogadores sobre sistemas escritos para um: os sistemas leem
 // `world.player`, e quem chama aponta esse campo para o jogador da vez.

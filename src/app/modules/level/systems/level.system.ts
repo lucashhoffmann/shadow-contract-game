@@ -30,12 +30,14 @@ import {
   GOLDEN_CHEST_PER_ROOM,
   NINJA_CHANCE,
   NINJA_FROM_ROOM,
-  ROOM_ENEMY_MAX,
   ROOMS_AHEAD,
   ROOMS_BEHIND,
   ROOMS_PER_EXTRA_ENEMY,
+  ROOM_ENEMY_MAX,
   SHOP_EVERY,
   TILE_MONEY,
+  TUTORIAL_SHOP_ROOM,
+  isTutorial,
 } from '@/app/modules/world/constants/world.constants';
 import type {
   EnemyKind,
@@ -43,7 +45,7 @@ import type {
   Vec2,
   World,
 } from '@/app/modules/world/types/world.types';
-import { nextRandom } from '@/shared/utils/rng.util';
+import { nextRandom } from 'three-hex-engine/kit';
 import { eventText } from '@/shared/i18n';
 
 // cada modo tem as proprias salas, no tamanho dele

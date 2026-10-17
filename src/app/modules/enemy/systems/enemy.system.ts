@@ -99,8 +99,8 @@ import type {
   Vec2,
   World,
 } from '@/app/modules/world/types/world.types';
-import { angleDiff, angleTo, clamp, distance } from '@/shared/utils/math.util';
-import { nextRandom } from '@/shared/utils/rng.util';
+import { angleDiff, angleTo, clamp, distance } from 'three-hex-engine/kit';
+import { nextRandom } from 'three-hex-engine/kit';
 
 const NODE_REACH = 0.1;
 

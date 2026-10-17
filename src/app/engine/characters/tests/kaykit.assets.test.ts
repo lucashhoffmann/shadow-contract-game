@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import { ENEMY_MODELS } from '@/app/engine/characters/character-models.config';
-import { clipNames } from '@/app/engine/characters/clip-driver.util';
+import { clipNames } from 'three-hex-engine/three';
 import {
   KAYKIT_CLIPS_URL,
   KAYKIT_MEDIUM,

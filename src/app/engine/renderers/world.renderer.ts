@@ -2,13 +2,13 @@ import { COLORS } from '@/shared/colors';
 import { getTexts } from '@/shared/i18n';
 import * as THREE from 'three';
 
-import { loadCharacterView } from '@/app/engine/characters/character-model.loader';
+import { loadCharacterView } from 'three-hex-engine/three';
 import {
   ENEMY_MODELS,
   PLAYER_MODEL,
 } from '@/app/engine/characters/character-models.config';
-import type { CharacterView } from '@/app/engine/characters/character-view.types';
-import { loadModelKit, type ModelKit } from '@/app/engine/scenery/model-kit';
+import type { CharacterView } from 'three-hex-engine/three';
+import { loadModelKit, type ModelKit } from 'three-hex-engine/three';
 import { SCENERY } from '@/app/engine/scenery/scenery.config';
 
 import {
@@ -65,7 +65,7 @@ import type {
   World,
 } from '@/app/modules/world/types/world.types';
 import type { PlayerLook } from '@/app/store/game-store/game.store';
-import { nextRandom } from '@/shared/utils/rng.util';
+import { nextRandom } from 'three-hex-engine/kit';
 
 // Desenha o World. Nunca muta o World.
 // Simulacao (x, y) vira three (x, altura, -y).

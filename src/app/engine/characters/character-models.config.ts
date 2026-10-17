@@ -1,4 +1,4 @@
-import type { CharacterModel } from '@/app/engine/characters/character-model.loader';
+import type { CharacterModel } from 'three-hex-engine/three';
 import type { EnemyKind } from '@/app/modules/world/types/world.types';
 
 // O unico arquivo desta pasta que sabe que jogo e este: quem usa que modelo.

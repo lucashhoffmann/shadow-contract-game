@@ -1,6 +1,6 @@
 import { ArrowLeft, Crown, Lock, Play, Users } from 'lucide-react';
 
-import { MAX_PLAYERS, NAME_MAX } from '@/app/net/protocol';
+import { MAX_PLAYERS, NAME_MAX } from 'three-hex-engine/protocol';
 import { useLobbyPage } from '@/resources/pages/lobby/use-lobby.page';
 import { useTexts } from '@/shared/i18n';
 

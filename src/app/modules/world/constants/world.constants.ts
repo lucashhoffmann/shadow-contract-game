@@ -18,6 +18,18 @@ export let ROOM_H: number = ROOM_SIZES.solo[1];
 export function setRoomSize(mode: keyof typeof ROOM_SIZES): void {
   [ROOM_W, ROOM_H] = ROOM_SIZES[mode];
 }
+// Tutorial guiado: ambiente controlado de 3 salas (inicial, 1 inimigo, loja)
+// em que o player nao morre. Flag de modulo como o tamanho da sala: o store
+// liga antes de criar o World e desliga em toda run comum.
+// ponytail: flag global; se o tutorial precisar de mais regra, vai para o World
+let tutorial = false;
+export function setTutorial(on: boolean): void {
+  tutorial = on;
+}
+export function isTutorial(): boolean {
+  return tutorial;
+}
+export const TUTORIAL_SHOP_ROOM = 2;
 export const ROOMS_AHEAD = 1;
 export const ROOMS_BEHIND = 1;
 // um contrato = SHOP_EVERY salas, a ultima e a loja

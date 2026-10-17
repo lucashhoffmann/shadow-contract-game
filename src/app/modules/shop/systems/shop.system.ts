@@ -19,9 +19,9 @@ import type {
   Weapon,
   World,
 } from '@/app/modules/world/types/world.types';
-import { distance } from '@/shared/utils/math.util';
+import { distance } from 'three-hex-engine/kit';
 import { eventText } from '@/shared/i18n';
-import { nextRandom } from '@/shared/utils/rng.util';
+import { nextRandom } from 'three-hex-engine/kit';
 
 function roundPrice(value: number): number {
   return Math.round(value / PRICE_STEP) * PRICE_STEP;

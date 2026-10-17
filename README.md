@@ -93,6 +93,7 @@ pnpm install
 pnpm dev
 ```
 
+
 Abra no navegador o endereço exibido pelo Vite. Para conferir o projeto:
 
 ```bash
@@ -107,7 +108,8 @@ pnpm build
 ## Estrutura
 
 - `src/app/modules`: regras de mundo, salas, inimigos, combate e loja.
-- `src/app/engine`: loop do jogo e renderização com Three.js.
+- `src/app/engine`: renderização deste jogo com Three.js; loop, input e renderer base vêm do `three-hex-engine`.
 - `src/resources`: telas React, controles e interface.
-- `src/shared`: estilos e utilitários compartilhados.
+- `src/shared`: estilos, cores e textos.
+- `three-hex-engine` (dependência npm, https://github.com/lucashhoffmann/three-hex-engine): o que serve a qualquer jogo, compartilhado com os outros jogos.
 - `docs`: contratos entre módulos, organização e estratégia de testes.

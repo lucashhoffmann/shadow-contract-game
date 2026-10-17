@@ -327,8 +327,10 @@ Cuidados:
 ## Personagens de modelo
 
 Corpo feito de um arquivo glTF (malha, esqueleto, clipes de animacao) em vez
-de pecas. Codigo em `src/app/engine/characters/`; arquivos em
-`public/models/`.
+de pecas. O mecanismo (view, escolha de clipes, carregador) esta na engine
+compartilhada (`three-hex-engine`, `src/adapters/three/`), importado de
+`three-hex-engine/three`. O que e deste jogo fica em
+`src/app/engine/characters/`; arquivos em `public/models/`.
 
 ### As pecas e quem conhece o que
 
@@ -336,28 +338,30 @@ de pecas. Codigo em `src/app/engine/characters/`; arquivos em
 world.renderer.ts            sabe do jogo; entrega a pose do quadro
       │  CharacterPose
       ▼
-CharacterView                a fronteira (character-view.types.ts)
+CharacterView                a fronteira (engine: character-view.types.ts)
       ▲
-gltf-character.view.ts       modelo + AnimationMixer; serve a qualquer esqueleto
+gltf-character.view.ts       engine: modelo + AnimationMixer; qualquer esqueleto
       │ usa
-clip-driver.util.ts          pose -> que clipe, que peso, que ponto. Conta pura
+clip-driver.util.ts          engine: pose -> que clipe, que peso, que ponto
       ▲ configurado por
 kaykit.rig.ts                um esqueleto: escala, frente, ossos, clipes
       ▲ usado por
 character-models.config.ts   este jogo: que inimigo usa que arquivo
 ```
 
-| Arquivo                      | Papel                                                                      | Sabe de que jogo e? |
-| ---------------------------- | -------------------------------------------------------------------------- | ------------------- |
-| `character-view.types.ts`    | `CharacterView` e `CharacterPose`: o contrato                              | nao                 |
-| `clip-driver.util.ts`        | `driveClips`: escolhe clipes a partir da pose. Sem three                   | nao                 |
-| `gltf-character.view.ts`     | `createGltfCharacterView`: copia o modelo, toca os clipes, `RigSpec`       | nao                 |
-| `character-model.loader.ts`  | `loadCharacterView`: baixa (uma vez por arquivo) e monta, `CharacterModel` | nao                 |
-| `kaykit.rig.ts`              | `KAYKIT_MEDIUM`: o esqueleto medio do KayKit                               | nao                 |
-| `character-models.config.ts` | `ENEMY_MODELS`: inimigo -> modelo                                          | **sim, so ele**     |
+| Arquivo                                     | Papel                                                                      | Sabe de que jogo e? |
+| ------------------------------------------- | -------------------------------------------------------------------------- | ------------------- |
+| engine: `character-view.types.ts`           | `CharacterView` e `CharacterPose`: o contrato                              | nao                 |
+| engine: `clip-driver.util.ts`               | `driveClips`: escolhe clipes a partir da pose. Sem three                   | nao                 |
+| engine: `gltf-character.view.ts`            | `createGltfCharacterView`: copia o modelo, toca os clipes, `RigSpec`       | nao                 |
+| engine: `character-model.loader.ts`         | `loadCharacterView`: baixa (uma vez por arquivo) e monta, `CharacterModel` | nao                 |
+| `characters/kaykit.rig.ts`                  | `KAYKIT_MEDIUM`: o esqueleto medio do KayKit                               | nao                 |
+| `characters/character-models.config.ts`     | `ENEMY_MODELS`: inimigo -> modelo                                          | **sim, so ele**     |
 
-Os cinco primeiros nao importam `app/modules` nem `app/store`: vao inteiros
-para outro jogo (`docs/engine-reuse.md`).
+"engine:" e `src/adapters/three/` do repositorio `three-hex-engine`; tudo sai de `three-hex-engine/three`.
+Os quatro primeiros sao comuns aos tres jogos: correcao neles e feita na
+engine, nao aqui (`docs/engine-reuse.md`). `kaykit.rig.ts` nao sabe do jogo, mas os
+clipes e cortes ja divergiram entre Blade e Shadow: fica em cada jogo.
 
 ### O contrato
 

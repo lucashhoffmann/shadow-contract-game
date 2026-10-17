@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { vi } from 'vitest';
 
 import { createWorldRenderer } from '@/app/engine/renderers/world.renderer';
-import { createModelKit, loadModelKit } from '@/app/engine/scenery/model-kit';
+import { createModelKit, loadModelKit } from 'three-hex-engine/three';
 import { SCENERY } from '@/app/engine/scenery/scenery.config';
 import { ROOM_H, ROOM_W } from '@/app/modules/world/constants/world.constants';
 import {
@@ -13,8 +13,8 @@ import { createArenaWorld } from '@/test/world.fixture';
 
 // o carregador de verdade baixa arquivo: aqui o kit e montado na hora, com
 // uma caixa no lugar de cada peca
-vi.mock('@/app/engine/scenery/model-kit', async (original) => ({
-  ...(await original<typeof import('@/app/engine/scenery/model-kit')>()),
+vi.mock('three-hex-engine/three', async (original) => ({
+  ...(await original<typeof import('three-hex-engine/three')>()),
   loadModelKit: vi.fn(),
 }));
 

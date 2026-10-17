@@ -701,12 +701,20 @@ campo proprio.
 function createGameEngine(canvas: HTMLCanvasElement): { dispose(): void };
 ```
 
-- dono do loop `requestAnimationFrame`, do teclado e do `WebGLRenderer`
-- a cada frame: acumula tempo, chama `tick` em passos de `FIXED_DT`, depois
-  `renderer.sync(world)` e desenha (inclusive em `intro` e `paused`)
-- teclas: WASD/setas movem, `P` chama `togglePause`, `Enter` chama `begin`,
-  `F` pulsa `interact`, `B` pulsa `open` ou chama `closeShop`, `Q` chama
-  `cycleWeapon`
+- monta o loop, o input e o `WebGLRenderer` com pecas do `three-hex-engine`:
+  `createEngine` (`three-hex-engine/core`) com `rafClock`
+  (`three-hex-engine/clock`, por baixo `requestAnimationFrame`),
+  `createThreeRenderer` (`three-hex-engine/three`: renderer, cena, camera,
+  resize) e `combineInputs(createKeyboardInput(), createGamepadInput())`
+  (`three-hex-engine/input`)
+- a cada frame: o loop da engine acumula tempo, chama `tick` em passos de
+  `FIXED_DT` (com teto de frame e frame snap), depois `renderer.sync(world)` e
+  desenha (inclusive em `intro` e `paused`)
+- controles seguros vem do input da engine: direcoes por `MOVE` (WASD, setas
+  e gamepad), dash com espaco ou `PadA`, agachar com Ctrl, C ou `PadB`
+- atalhos de um toque e `preventDefault` ficam no `keydown` do proprio
+  jogo: `P` chama `togglePause`, `Enter` chama `begin`, `F` pulsa `interact`,
+  `B` pulsa `open` ou chama `closeShop`, `Q` chama `cycleWeapon`
 - em aparelho de toque (`pointer: coarse`) os icones de interacao mostram
   uma mao tocando no lugar das letras F e B
 - toque ou clique a ate `PROMPT_TAP_RADIUS` px de um icone de interacao a
@@ -929,6 +937,8 @@ link, seed?)`, `receiveInput(index, payload)`, `receiveState(snapshot)`.
   `connect`, `create(publica)`, `join(codigo)`, `start`, `leave`,
   `disconnect`. Ao receber `session:started` monta o `MultiLink` e chama
   `startMulti`; `session:closed` (host saiu) tira todos da partida
-- `app/net`: `protocol.ts` (copia do servidor) e `session.client.ts`
-  (socket.io). Endereco do servidor: `VITE_SERVER_URL`, ou a mesma maquina na
-  porta 3001
+- `app/net/session.client.ts`: so resolve o endereco do servidor
+  (`VITE_SERVER_URL`, ou a mesma maquina na porta 3001) e repassa para
+  `three-hex-engine/net` (socket.io). O protocolo e um arquivo so, da engine
+  (`three-hex-engine/protocol`, `src/net/protocol.ts` na engine), usado pelo
+  front e pelo servidor

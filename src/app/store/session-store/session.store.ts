@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 import type { Snapshot } from '@/app/modules/multiplayer/utils/snapshot.util';
 import type { InputState } from '@/app/modules/world/types/world.types';
-import type { Joined, PlayerInfo, SessionInfo } from '@/app/net/protocol';
+import type { Joined, PlayerInfo, SessionInfo } from 'three-hex-engine/protocol';
 import { connectSession, type SessionSocket } from '@/app/net/session.client';
 import { useGameStore } from '@/app/store/game-store/game.store';
 import { getTexts, translateSessionError } from '@/shared/i18n';

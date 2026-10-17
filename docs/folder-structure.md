@@ -3,6 +3,11 @@
 Estrutura alvo do `shadow-contract`. Regras de nome e dependencia estao em
 `docs/pattern.md`.
 
+Pecas que servem a qualquer jogo (loop, input, rng, grade, rede, servidor de
+salas, view de personagem glTF, kit de cenario) nao moram aqui: vem da biblioteca
+`three-hex-engine` (dependencia npm, ver
+https://github.com/lucashhoffmann/three-hex-engine).
+
 ## Raiz
 
 ```text
@@ -37,15 +42,10 @@ src
 │   │   ├── character-preview.ts
 │   │   ├── weapon-preview.ts
 │   │   ├── characters                   personagens de modelo (docs/characters.md)
-│   │   │   ├── character-view.types.ts
-│   │   │   ├── clip-driver.util.ts
-│   │   │   ├── gltf-character.view.ts
-│   │   │   ├── character-model.loader.ts
 │   │   │   ├── kaykit.rig.ts
 │   │   │   ├── character-models.config.ts
 │   │   │   └── tests
 │   │   ├── scenery                      cenario de modelo (docs/scenery.md)
-│   │   │   ├── model-kit.ts
 │   │   │   ├── scenery.config.ts
 │   │   │   └── tests
 │   │   └── renderers
@@ -61,8 +61,7 @@ src
 │   │   ├── shop
 │   │   └── multiplayer
 │   ├── net                              servidor de salas (multiplayer)
-│   │   ├── protocol.ts                  copia de shadow-contract-server
-│   │   └── session.client.ts            conexao socket.io
+│   │   └── session.client.ts            le VITE_SERVER_URL; o resto e three-hex-engine/net
 │   └── store
 │       ├── game-store
 │       │   ├── game.store.ts
@@ -83,8 +82,7 @@ src
 │   └── main.tsx
 ├── shared
 │   ├── lib
-│   ├── styles
-│   └── utils
+│   └── styles
 └── test
     ├── setup.ts
     └── world.fixture.ts
@@ -102,8 +100,8 @@ src/app/modules
 │   └── tests
 ├── level
 │   ├── templates/room.template.ts       salas pre-fabricadas
-│   ├── utils/grid.util.ts               tile, colisao, raio, linha de visao
-│   ├── utils/pathfinding.util.ts        findPath
+│   ├── utils/grid.util.ts               tile, colisao, raio, linha de visao (conta em three-hex-engine/kit)
+│   ├── utils/pathfinding.util.ts        findPath (BFS em three-hex-engine/kit)
 │   ├── systems/level.system.ts          gerar e descartar salas
 │   └── tests
 ├── player
@@ -169,5 +167,5 @@ src/resources/pages
 | novo visual 3D                   | `app/engine/renderers`                         |
 | novo campo visivel na UI         | `Hud` em `app/store/game-store/game.store.ts`  |
 | nova tela ou painel              | `resources/pages/<feature>`                    |
-| helper matematico neutro         | `shared/utils`                                 |
+| helper que serve a qualquer jogo | repositorio `three-hex-engine`                 |
 | mundo de teste                   | `src/test/world.fixture.ts`                    |

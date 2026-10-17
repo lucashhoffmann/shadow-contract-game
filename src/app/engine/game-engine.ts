@@ -1,5 +1,15 @@
-import { COLORS } from '@/shared/colors';
+import { createEngine } from 'three-hex-engine/core';
+import { rafClock } from 'three-hex-engine/clock';
+import {
+  MOVE,
+  combineInputs,
+  createGamepadInput,
+  createKeyboardInput,
+} from 'three-hex-engine/input';
+import { createThreeRenderer } from 'three-hex-engine/three';
 import * as THREE from 'three';
+
+import { COLORS } from '@/shared/colors';
 
 import { createWorldRenderer } from '@/app/engine/renderers/world.renderer';
 import {
@@ -18,7 +28,6 @@ import {
 
 const CAMERA_HEIGHT = 13;
 const CAMERA_BACK = 7;
-const MAX_FRAME_TIME = 0.1;
 const CAMERA_FOV = 45;
 // soco de camera ao matar e ao levar dano: zoom curto com blur que se desfaz
 // por quanto tempo (ms) o clique que vem de um toque em icone e ignorado
@@ -40,16 +49,15 @@ const CAMERA_SNAP_DISTANCE = 3;
 
 export type GameEngine = { dispose: () => void };
 
-function axis(keys: Set<string>, positive: string[], negative: string[]) {
-  const has = (codes: string[]) => codes.some((code) => keys.has(code));
-  return (has(positive) ? 1 : 0) - (has(negative) ? 1 : 0);
-}
+// controles segurados; teclado e gamepad (adapters de input da engine)
+const DASH = ['Space', 'PadA'];
+const CROUCH = ['ControlLeft', 'ControlRight', 'KeyC', 'PadB'];
 
 export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const gfx = createThreeRenderer(canvas, { fov: CAMERA_FOV });
+  const { scene, camera } = gfx;
+  const controls = combineInputs(createKeyboardInput(), createGamepadInput());
 
-  const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.model.c1f2033);
   scene.add(
     new THREE.HemisphereLight(COLORS.model.cffffff, COLORS.model.c444466, 1.8),
@@ -58,14 +66,12 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   sun.position.set(3, 10, 5);
   scene.add(sun);
 
-  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
   const { look, bloodColor } = useGameStore.getState();
   const view = createWorldRenderer(scene, look, bloodColor);
 
-  const keys = new Set<string>();
   const input: InputState = { moveX: 0, moveY: 0, dash: false };
+  // atalhos de uma vez e preventDefault; o que fica segurado vem de `controls`
   const onKeyDown = (event: KeyboardEvent) => {
-    keys.add(event.code);
     // Ctrl agacha e as setas movem: evita atalhos e rolagem do navegador.
     // Ctrl+W (fechar aba) o navegador nao deixa bloquear; por isso C tambem agacha.
     if (
@@ -135,22 +141,12 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     }
   };
   const onKeyUp = (event: KeyboardEvent) => {
-    keys.delete(event.code);
     if (event.code === 'Tab') useGameStore.getState().setScoreboard(false);
   };
   const onBlur = () => {
-    keys.clear();
     useGameStore.getState().setScoreboard(false);
     input.interact = false;
     input.open = false;
-  };
-
-  const resize = () => {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    renderer.setSize(width, height, false);
-    camera.aspect = width / Math.max(1, height);
-    camera.updateProjectionMatrix();
   };
 
   window.addEventListener('keydown', onKeyDown);
@@ -158,50 +154,37 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
   // captura: chega antes do joystick, que cobre a parte de baixo da tela
   window.addEventListener('pointerdown', onPointerDown, true);
   window.addEventListener('blur', onBlur);
-  window.addEventListener('resize', resize);
-  resize();
 
-  let last = performance.now();
-  let accumulator = 0;
-  let frameId = 0;
   let kills = 0;
   let hp = 0;
   let punch = 0;
   const focus = { x: 0, y: 0 };
 
-  const frame = (now: number) => {
-    frameId = requestAnimationFrame(frame);
-    const frameTime = Math.min(MAX_FRAME_TIME, (now - last) / 1000);
-    accumulator += frameTime;
-    last = now;
-
-    input.moveX =
-      axis(keys, ['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']) +
-      joystickInput.moveX;
-    input.moveY =
-      axis(keys, ['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) +
-      joystickInput.moveY;
-    input.dash = keys.has('Space') || joystickInput.dash;
-    // botao de ataque do toque: pulso unico, como a tecla F
-    if (joystickInput.interact) {
-      joystickInput.interact = false;
-      if (getWorld()?.status === 'playing') input.interact = true;
-    }
-    input.crouch =
-      keys.has('ControlLeft') ||
-      keys.has('ControlRight') ||
-      keys.has('KeyC') ||
-      !!joystickInput.crouch;
-
-    // passo fixo: a simulacao nao depende do fps
-    const tick = useGameStore.getState().tick;
-    while (accumulator >= FIXED_DT) {
-      tick(input, FIXED_DT);
+  // laco de passo fixo da engine: a simulacao nao depende do fps
+  const engine = createEngine({
+    fixedDt: FIXED_DT,
+    clock: rafClock,
+    ports: { renderer: gfx, input: controls },
+    update() {
+      input.moveX = controls.axis(MOVE.right, MOVE.left) + joystickInput.moveX;
+      input.moveY = controls.axis(MOVE.up, MOVE.down) + joystickInput.moveY;
+      input.dash = DASH.some(controls.isDown) || joystickInput.dash;
+      // botao de ataque do toque: pulso unico, como a tecla F
+      if (joystickInput.interact) {
+        joystickInput.interact = false;
+        if (getWorld()?.status === 'playing') input.interact = true;
+      }
+      input.crouch = CROUCH.some(controls.isDown) || !!joystickInput.crouch;
+    },
+    step(dt) {
+      useGameStore.getState().tick(input, dt);
       input.interact = false;
       input.open = false;
-      accumulator -= FIXED_DT;
-    }
+    },
+    render: ({ now, frameTime }) => draw(now, frameTime),
+  });
 
+  const draw = (now: number, frameTime: number) => {
     const world = getWorld();
     if (!world) return;
     view.sync(world, now / 1000);
@@ -235,21 +218,21 @@ export function createGameEngine(canvas: HTMLCanvasElement): GameEngine {
     focus.y += (y - focus.y) * follow;
     camera.position.set(focus.x, CAMERA_HEIGHT, -focus.y + CAMERA_BACK);
     camera.lookAt(focus.x, 0, -focus.y);
-    renderer.render(scene, camera);
+    gfx.render();
   };
-  frameId = requestAnimationFrame(frame);
+  engine.start();
 
   return {
     dispose() {
-      cancelAnimationFrame(frameId);
+      engine.stop();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('blur', onBlur);
-      window.removeEventListener('resize', resize);
       canvas.style.filter = '';
       view.dispose();
-      renderer.dispose();
+      // controles e renderer
+      engine.dispose();
     },
   };
 }

@@ -36,7 +36,7 @@ import type {
   World,
 } from '@/app/modules/world/types/world.types';
 import { alivePlayers, asPlayer } from '@/app/modules/world/utils/players.util';
-import { distance } from '@/shared/utils/math.util';
+import { distance } from 'three-hex-engine/kit';
 import { eventText } from '@/shared/i18n';
 
 // Regras que so valem com varios jogadores. O nucleo (movimento, inimigo,

@@ -1,4 +1,13 @@
 import {
+  angleTo,
+  castRay as castRayOnGrid,
+  circleHitsTiles,
+  distance,
+  moveCircle as moveCircleOnGrid,
+  nextRandom,
+} from 'three-hex-engine/kit';
+
+import {
   HEADSHOT_FROM_LEVEL,
   HEADSHOT_LOOT_MAX,
   HEADSHOT_LOOT_MIN,
@@ -33,8 +42,6 @@ import type {
   Vec2,
   World,
 } from '@/app/modules/world/types/world.types';
-import { angleTo, clamp, distance } from '@/shared/utils/math.util';
-import { nextRandom } from '@/shared/utils/rng.util';
 
 const RAY_STEP = 0.1;
 
@@ -117,59 +124,17 @@ export function circleHitsWall(
   radius: number,
   sealed = false,
 ): boolean {
-  for (let ty = Math.floor(y - radius); ty <= Math.floor(y + radius); ty++) {
-    for (let tx = Math.floor(x - radius); tx <= Math.floor(x + radius); tx++) {
-      if (
-        !isSolidTile(tileAt(world, tx, ty)) &&
-        !(sealed && isDoorTile(tx, ty))
-      ) {
-        continue;
-      }
-      const dx = x - clamp(x, tx, tx + 1);
-      const dy = y - clamp(y, ty, ty + 1);
-      if (dx * dx + dy * dy < radius * radius) return true;
-    }
-  }
-  return false;
+  return circleHitsTiles(x, y, radius, solidAt(world, sealed));
 }
 
-// Tira o circulo de dentro de cada tile solido que ele invade, pelo caminho
-// mais curto: o ponto do tile mais perto do centro empurra para fora. Em
-// parede reta o empurrao e perpendicular (desliza); em quina sai na diagonal
-// (contorna).
-// `corners` falso resolve so contato de face (centro de frente para o lado
-// do tile). Faces vem antes: numa parede feita de varios tiles, a quina do
-// tile vizinho empurraria de lado na emenda e o deslize ficaria aos trancos.
-function pushOut(
-  world: World,
-  pos: Vec2,
-  radius: number,
-  sealed: boolean,
-  corners: boolean,
-): void {
-  for (let ty = Math.floor(pos.y - radius); ty <= pos.y + radius; ty++) {
-    for (let tx = Math.floor(pos.x - radius); tx <= pos.x + radius; tx++) {
-      if (
-        !isSolidTile(tileAt(world, tx, ty)) &&
-        !(sealed && isDoorTile(tx, ty))
-      ) {
-        continue;
-      }
-      const dx = pos.x - clamp(pos.x, tx, tx + 1);
-      const dy = pos.y - clamp(pos.y, ty, ty + 1);
-      const gap = Math.hypot(dx, dy);
-      // gap 0: centro dentro do tile, sem direcao para sair
-      if (gap >= radius || gap === 0) continue;
-      if (!corners && dx !== 0 && dy !== 0) continue;
-      const push = (radius - gap) / gap;
-      pos.x += dx * push;
-      pos.y += dy * push;
-    }
-  }
+// tile que segura corpo: solido, ou porta quando selada
+function solidAt(world: World, sealed: boolean) {
+  return (tx: number, ty: number) =>
+    isSolidTile(tileAt(world, tx, ty)) || (sealed && isDoorTile(tx, ty));
 }
 
-// Anda e depois resolve a colisao: encosta na parede, desliza nela e contorna
-// quina, em vez de travar quando o passo inteiro nao cabe.
+// Anda e depois resolve a colisao (kit da engine): encosta na parede,
+// desliza nela e contorna quina, em vez de travar.
 export function moveCircle(
   world: World,
   pos: Vec2,
@@ -180,30 +145,22 @@ export function moveCircle(
 ): void {
   // quem ja esta no vao quando a porta sela nao fica preso: pode sair
   const blocked = sealed && !isDoorTile(Math.floor(pos.x), Math.floor(pos.y));
-  // passo nunca maior que meio raio: o centro nao chega a entrar num tile
-  const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (radius / 2)));
-  for (let i = 0; i < steps; i++) {
-    pos.x += dx / steps;
-    pos.y += dy / steps;
-    pushOut(world, pos, radius, blocked, false);
-    pushOut(world, pos, radius, blocked, true);
-  }
+  moveCircleOnGrid(pos, dx, dy, radius, solidAt(world, blocked));
 }
 
-// ponytail: marcha em passos de RAY_STEP em vez de DDA; erro maximo de 0.1
-// tile. Trocar por DDA se o numero de raios por frame crescer.
 export function castRay(
   world: World,
   from: Vec2,
   angle: number,
   maxDist: number,
 ): number {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  for (let d = RAY_STEP; d < maxDist; d += RAY_STEP) {
-    if (isWall(world, from.x + cos * d, from.y + sin * d)) return d;
-  }
-  return maxDist;
+  return castRayOnGrid(
+    from,
+    angle,
+    maxDist,
+    (x, y) => isWall(world, x, y),
+    RAY_STEP,
+  );
 }
 
 export function hasLineOfSight(world: World, a: Vec2, b: Vec2): boolean {

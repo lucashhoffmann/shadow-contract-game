@@ -47,7 +47,7 @@ import {
   fight,
 } from '@/app/modules/world/systems/world.system';
 import type { World } from '@/app/modules/world/types/world.types';
-import { distance } from '@/shared/utils/math.util';
+import { distance } from 'three-hex-engine/kit';
 import { addEnemy, createArenaWorld } from '@/test/world.fixture';
 
 const UP = Math.PI / 2;

@@ -1,4 +1,4 @@
-import type { RigSpec } from '@/app/engine/characters/gltf-character.view';
+import type { RigSpec } from 'three-hex-engine/three';
 
 // Esqueleto "Rig_Medium" dos pacotes KayKit (Kay Lousberg, CC0): Adventurers,
 // Skeletons e os demais personagens medios usam os mesmos ossos, entao todos

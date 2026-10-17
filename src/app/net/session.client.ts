@@ -1,33 +1,25 @@
-import { io, type Socket } from 'socket.io-client';
+import {
+  connectSession as connect,
+  pingServer as ping,
+  serverUrl as resolveUrl,
+  type SessionSocket,
+} from 'three-hex-engine/net';
 
-import type { ClientEvents, ServerEvents } from '@/app/net/protocol';
+// Conexao com o servidor de salas (shadow-contract-server). Transporte e protocolo vem
+// da engine (engine/src/adapters/net); aqui so o endereco deste jogo. Quem
+// decide o que fazer com cada mensagem e o session.store.
 
-// Conexao com o servidor de salas (shadow-contract-server). So transporte:
-// quem decide o que fazer com cada mensagem e o session.store.
-
-export type SessionSocket = Socket<ServerEvents, ClientEvents>;
+export type { SessionSocket };
 
 // VITE_SERVER_URL em producao; sem ela, a mesma maquina do jogo na porta 3001
-// (serve para rede local: o celular acha o servidor pelo IP do computador)
 export function serverUrl(): string {
-  const configured = import.meta.env.VITE_SERVER_URL as string | undefined;
-  return configured || `${location.protocol}//${location.hostname}:3001`;
+  return resolveUrl(import.meta.env.VITE_SERVER_URL as string | undefined);
 }
 
 export function connectSession(url = serverUrl()): SessionSocket {
-  return io(url, { transports: ['websocket'] });
+  return connect(url);
 }
 
-// Health check: o servidor de salas esta no ar? Sem resposta em PING_TIMEOUT
-// ms, conta como fora.
-const PING_TIMEOUT = 3000;
-export async function pingServer(url = serverUrl()): Promise<boolean> {
-  try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(PING_TIMEOUT),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
+export function pingServer(url = serverUrl()): Promise<boolean> {
+  return ping(url);
 }
